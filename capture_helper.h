@@ -96,7 +96,8 @@ static int run_capture_helper(int argc, char** argv) {
 
     Logger& log = Logger::get();
     log.set_level("INFO");
-    log.set_file("C:\\RDHostHelper.log");
+    // File logging permanently disabled — no log files created anywhere.
+    // log.set_file("C:\\RDHostHelper.log");
     log.info("=== Capture helper starting, parent_pid=" + std::to_string(parent_pid) + " ipc=" + ipc_name + " ===");
 
     // Open parent process handle for death detection

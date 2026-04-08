@@ -751,6 +751,28 @@ body {
   font-size: 28px;
   opacity: .15;
 }
+/* ── Speed test cards ── */
+.st-card { display:flex; flex-direction:column; }
+.st-row { display:flex; justify-content:space-between; align-items:baseline; font-size:12px; padding:3px 0; border-bottom:1px solid rgba(255,255,255,0.04); }
+.st-row:last-of-type { border-bottom:none; }
+.st-row .lbl { color:var(--muted); font-size:11px; }
+.st-row .val { font-family:'Consolas',monospace; font-weight:bold; font-size:13px; }
+.st-row .val.good { color:#4caf50; }
+.st-row .val.ok   { color:#cddc39; }
+.st-row .val.warn { color:#ffa726; }
+.st-row .val.bad  { color:#f44336; }
+.st-row .val.idle { color:var(--muted); font-weight:normal; }
+.st-status { font-size:10px; color:var(--muted); margin-top:6px; min-height:14px; }
+.st-status.running { color:#4fc3f7; }
+.st-status.done    { color:#4caf50; }
+.st-status.err     { color:#f44336; }
+.st-runall {
+  background: linear-gradient(135deg, #00a8cc 0%, #0077b6 100%);
+  color: #fff; font-weight: bold; border: none; padding: 6px 14px; border-radius: 4px;
+  cursor: pointer; font-size: 12px;
+}
+.st-runall:hover { filter: brightness(1.15); }
+.st-runall:disabled { opacity: 0.5; cursor: wait; }
 
 .gauge-bar {
   height: 4px;
@@ -940,7 +962,7 @@ body {
   <div class="sep"></div>
   <div id="conn-status">
     <div id="conn-dot"></div>
-    <span id="conn-label">DISCONNECTED</span>
+    <span id="conn-label" data-i18n="disconnected">DISCONNECTED</span>
     <span id="host-status" class="host-status"></span>
   </div>
   <div class="sep"></div>
@@ -948,11 +970,16 @@ body {
   <div id="threat-warning" style="display:none; margin-left:10px; padding:3px 10px; background:linear-gradient(90deg,#c62828,#ef6c00); color:#fff; border-radius:4px; font-size:11px; font-weight:bold; box-shadow:0 0 8px rgba(255,82,82,.6); animation:threatPulse 1.4s ease-in-out infinite;">⚠ <span id="threat-warning-text">THREAT</span></div>
   <div class="right">
     <span id="fps-counter"></span>
-    <button class="topbar-btn" id="btn-connect">CONNECT</button>
-    <button class="topbar-btn danger hidden" id="btn-disconnect">DISCONNECT</button>
-    <button class="topbar-btn" id="btn-stream-toggle">▶ STREAM</button>
-    <button class="topbar-btn" id="btn-record" title="Record">⏺ REC <span id="rec-duration"></span></button>
-    <button class="topbar-btn" id="btn-fullscreen" title="Fullscreen">&#x2922;</button>
+    <select id="lang-select" onchange="setLanguage(this.value)" title="Language" style="background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 6px;font-size:11px;margin-right:6px;">
+      <option value="en">EN</option>
+      <option value="ru">RU</option>
+      <option value="az">AZ</option>
+    </select>
+    <button class="topbar-btn" id="btn-connect" data-i18n="connect">CONNECT</button>
+    <button class="topbar-btn danger hidden" id="btn-disconnect" data-i18n="disconnect">DISCONNECT</button>
+    <button class="topbar-btn" id="btn-stream-toggle" data-i18n="stream">▶ STREAM</button>
+    <button class="topbar-btn" id="btn-record" data-i18n-title="record" title="Record"><span data-i18n="record">⏺ REC</span> <span id="rec-duration"></span></button>
+    <button class="topbar-btn" id="btn-fullscreen" data-i18n-title="fullscreen" title="Fullscreen">&#x2922;</button>
   </div>
 </div>
 
@@ -961,18 +988,18 @@ body {
 
   <!-- Sidebar -->
   <div id="sidebar">
-    <button class="nav-btn active" data-panel="dashboard" title="Dashboard">📊</button>
-    <button class="nav-btn" data-panel="screen" title="Screen">🖥️</button>
-    <button class="nav-btn" data-panel="files" title="Files">📁</button>
-    <button class="nav-btn" data-panel="procs" title="Processes">🧩</button>
-    <button class="nav-btn" data-panel="services" title="Services">🛠️</button>
-    <button class="nav-btn" data-panel="terminal" title="Terminal">⌨️</button>
-    <button class="nav-btn" data-panel="eventlog" title="Event Log">📜</button>
-    <button class="nav-btn" data-panel="registry" title="Registry Editor">🔑</button>
-    <button class="nav-btn" data-panel="screenshots" title="Screenshots">📷</button>
-    <button class="nav-btn" data-panel="audio" title="Audio Recording">🎙️</button>
-    <button class="nav-btn" data-panel="programs" title="Installed Programs">📦</button>
-    <button class="nav-btn" data-panel="settings" title="Settings">⚙️</button>
+    <button class="nav-btn active" data-panel="dashboard" data-i18n-title="nav_dashboard" title="Dashboard">📊</button>
+    <button class="nav-btn" data-panel="screen" data-i18n-title="nav_screen" title="Screen">🖥️</button>
+    <button class="nav-btn" data-panel="files" data-i18n-title="nav_files" title="Files">📁</button>
+    <button class="nav-btn" data-panel="procs" data-i18n-title="nav_procs" title="Processes">🧩</button>
+    <button class="nav-btn" data-panel="services" data-i18n-title="nav_services" title="Services">🛠️</button>
+    <button class="nav-btn" data-panel="terminal" data-i18n-title="nav_terminal" title="Terminal">⌨️</button>
+    <button class="nav-btn" data-panel="eventlog" data-i18n-title="nav_eventlog" title="Event Log">📜</button>
+    <button class="nav-btn" data-panel="registry" data-i18n-title="nav_registry" title="Registry Editor">🔑</button>
+    <button class="nav-btn" data-panel="screenshots" data-i18n-title="nav_screenshots" title="Screenshots">📷</button>
+    <button class="nav-btn" data-panel="audio" data-i18n-title="nav_audio" title="Audio Recording">🎙️</button>
+    <button class="nav-btn" data-panel="programs" data-i18n-title="nav_programs" title="Installed Programs">📦</button>
+    <button class="nav-btn" data-panel="settings" data-i18n-title="nav_settings" title="Settings">⚙️</button>
   </div>
 
   <!-- Main Content -->
@@ -981,124 +1008,151 @@ body {
     <!-- ── DASHBOARD ── -->
     <div id="panel-dashboard" class="panel active" style="flex-direction:column;">
       <div class="panel-header">
-        <span class="panel-title">Dashboard</span>
+        <span class="panel-title" data-i18n="title_dashboard">Dashboard</span>
         <div class="panel-actions">
-          <button class="fm-btn" onclick="refreshDashboard()">↻ Refresh</button>
+          <button class="fm-btn" data-i18n="btn_refresh" onclick="refreshDashboard()">↻ Refresh</button>
         </div>
       </div>
       <div style="flex:1; overflow-y:auto; padding:16px;">
         <div class="dash-grid">
           <div class="dash-card">
             <div class="dash-card-icon">💾</div>
-            <div class="dash-card-title">RAM Used</div>
+            <div class="dash-card-title" data-i18n="dash_ram_used">RAM Used</div>
             <div class="dash-card-value" id="d-ram-pct">—</div>
             <div class="dash-card-sub" id="d-ram-info">— MB used</div>
             <div class="gauge-bar"><div class="gauge-fill" id="d-ram-bar" style="width:0%"></div></div>
           </div>
           <div class="dash-card">
             <div class="dash-card-icon">🔲</div>
-            <div class="dash-card-title">CPU</div>
+            <div class="dash-card-title" data-i18n="dash_cpu">CPU</div>
             <div class="dash-card-value" id="d-cpu-pct">—</div>
-            <div class="dash-card-sub">Processor load</div>
+            <div class="dash-card-sub" data-i18n="dash_cpu_sub">Processor load</div>
             <div class="gauge-bar"><div class="gauge-fill" id="d-cpu-bar" style="width:0%"></div></div>
           </div>
           <div class="dash-card">
             <div class="dash-card-icon">🖼</div>
-            <div class="dash-card-title">GPU</div>
+            <div class="dash-card-title" data-i18n="dash_gpu">GPU</div>
             <div class="dash-card-value" id="d-gpu-pct">—</div>
-            <div class="dash-card-sub">Graphics load</div>
+            <div class="dash-card-sub" data-i18n="dash_gpu_sub">Graphics load</div>
             <div class="gauge-bar"><div class="gauge-fill" id="d-gpu-bar" style="width:0%"></div></div>
           </div>
           <div class="dash-card">
             <div class="dash-card-icon">⏱</div>
-            <div class="dash-card-title">Uptime</div>
+            <div class="dash-card-title" data-i18n="dash_uptime">Uptime</div>
             <div class="dash-card-value" id="d-uptime">—</div>
             <div class="dash-card-sub" id="d-uptime-sub">—</div>
           </div>
           <div class="dash-card">
             <div class="dash-card-icon">🖥</div>
-            <div class="dash-card-title">Hostname</div>
+            <div class="dash-card-title" data-i18n="dash_hostname">Hostname</div>
             <div class="dash-card-value" id="d-hostname" style="font-size:20px">—</div>
             <div class="dash-card-sub" id="d-username">User: —</div>
           </div>
           <div class="dash-card">
             <div class="dash-card-icon">📡</div>
-            <div class="dash-card-title">Stream FPS</div>
+            <div class="dash-card-title" data-i18n="dash_stream_fps">Stream FPS</div>
             <div class="dash-card-value" id="d-fps">—</div>
             <div class="dash-card-sub" id="d-codec">Codec: —</div>
           </div>
           <div class="dash-card">
             <div class="dash-card-icon">⚙</div>
-            <div class="dash-card-title">Processes</div>
+            <div class="dash-card-title" data-i18n="dash_procs">Processes</div>
             <div class="dash-card-value" id="d-proc-count">—</div>
-            <div class="dash-card-sub">Running processes</div>
+            <div class="dash-card-sub" data-i18n="dash_procs_sub">Running processes</div>
           </div>
           <div class="dash-card">
             <div class="dash-card-icon">🔧</div>
-            <div class="dash-card-title">Services</div>
+            <div class="dash-card-title" data-i18n="dash_services">Services</div>
             <div class="dash-card-value" id="d-svc-count">—</div>
             <div class="dash-card-sub" id="d-svc-running">— running</div>
           </div>
           <div class="dash-card">
             <div class="dash-card-icon">🪟</div>
-            <div class="dash-card-title">OS</div>
+            <div class="dash-card-title" data-i18n="dash_os">OS</div>
             <div class="dash-card-value" id="d-os-version" style="font-size:14px">—</div>
           </div>
           <div class="dash-card">
             <div class="dash-card-icon">📦</div>
-            <div class="dash-card-title">Host Version</div>
+            <div class="dash-card-title" data-i18n="dash_host_version">Host Version</div>
             <div class="dash-card-value" id="d-host-version" style="font-size:18px;color:#4caf50;">—</div>
             <div class="dash-card-sub" id="d-host-build" style="font-size:10px;color:#666;">—</div>
           </div>
           <div class="dash-card" style="grid-column: span 2;">
             <div class="dash-card-icon">💿</div>
-            <div class="dash-card-title">Disks</div>
+            <div class="dash-card-title" data-i18n="dash_disks">Disks</div>
             <div id="d-disks-list" style="margin-top:6px;"></div>
           </div>
           <div class="dash-card" style="grid-column: span 2;">
             <div class="dash-card-icon">🔌</div>
-            <div class="dash-card-title">Devices <button class="fm-btn" onclick="refreshDevices()" style="font-size:10px;padding:2px 6px;margin-left:8px;">↻</button></div>
+            <div class="dash-card-title"><span data-i18n="dash_devices">Devices</span> <button class="fm-btn" onclick="refreshDevices()" style="font-size:10px;padding:2px 6px;margin-left:8px;">↻</button></div>
             <div id="d-devices-list" style="margin-top:6px;max-height:300px;overflow-y:auto;font-size:12px;"></div>
           </div>
         </div>
-        <div class="panel-title" style="font-size:13px; margin-bottom:10px;">ACTIVITY LOG</div>
+        <div class="panel-title" data-i18n="title_activity" style="font-size:13px; margin-bottom:10px;">ACTIVITY LOG</div>
         <div class="log-feed" id="log-feed"></div>
         <div style="height:16px;"></div>
-        <div class="panel-title" style="font-size:13px; margin-bottom:10px;">QUICK ACTIONS</div>
+        <div class="panel-title" data-i18n="title_quick_actions" style="font-size:13px; margin-bottom:10px;">QUICK ACTIONS</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="fm-btn" onclick="switchPanel('screen')">▶ Screen Stream</button>
-          <button class="fm-btn" onclick="switchPanel('files')">📁 File Manager</button>
-          <button class="fm-btn" onclick="refreshProcesses()">⚙ Refresh Processes</button>
-          <button class="fm-btn" onclick="refreshServices()">🔧 Refresh Services</button>
-          <button class="fm-btn" onclick="sendCmd({cmd:'proc_launch',exe:'taskmgr.exe',args:'',elevate:'normal'})">🚀 Open Task Manager</button>
-          <button class="fm-btn" onclick="sendCmd({cmd:'proc_launch',exe:'explorer.exe',args:'',elevate:'normal'})">📂 Open Explorer</button>
+          <button class="fm-btn" data-i18n="dash_qa_screen" onclick="switchPanel('screen')">▶ Screen Stream</button>
+          <button class="fm-btn" data-i18n="dash_qa_files" onclick="switchPanel('files')">📁 File Manager</button>
+          <button class="fm-btn" data-i18n="dash_qa_procs" onclick="refreshProcesses()">⚙ Refresh Processes</button>
+          <button class="fm-btn" data-i18n="dash_qa_svcs" onclick="refreshServices()">🔧 Refresh Services</button>
+          <button class="fm-btn" data-i18n="dash_qa_taskmgr" onclick="sendCmd({cmd:'proc_launch',exe:'taskmgr.exe',args:'',elevate:'normal'})">🚀 Open Task Manager</button>
+          <button class="fm-btn" data-i18n="dash_qa_explorer" onclick="sendCmd({cmd:'proc_launch',exe:'explorer.exe',args:'',elevate:'normal'})">📂 Open Explorer</button>
         </div>
         <div style="height:16px;"></div>
-        <div class="panel-title" style="font-size:13px; margin-bottom:10px;">SPEED TEST</div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
+          <div class="panel-title" data-i18n="title_speed_test" style="font-size:13px;">SPEED TEST</div>
+          <button class="st-runall" id="st-runall-btn" data-i18n="st_run_all" onclick="runAllSpeedTests()">▶ Run All Tests</button>
+          <span style="font-size:11px;color:var(--muted);"><span data-i18n="st_last">Last run</span>: <span id="st-last-run" data-i18n="st_never">Never run</span></span>
+        </div>
         <div class="dash-grid">
-          <div class="dash-card">
-            <div class="dash-card-title">Client ↔ VPS</div>
-            <div class="dash-card-value" id="st-vps-latency">—</div>
-            <div class="dash-card-sub" id="st-vps-detail">Ping, Download, Upload</div>
-            <button class="fm-btn" onclick="runSpeedTestVPS()" id="st-vps-btn" style="margin-top:8px">▶ Run Test</button>
+          <div class="dash-card st-card">
+            <div class="dash-card-icon">🌐</div>
+            <div class="dash-card-title" data-i18n="st_card_vps_title">Browser ↔ Relay</div>
+            <div style="margin-top:6px;">
+              <div class="st-row"><span class="lbl" data-i18n="st_lbl_ping">Ping</span><span class="val idle" id="st-vps-ping">—</span></div>
+              <div class="st-row"><span class="lbl" data-i18n="st_lbl_dl">↓ Download</span><span class="val idle" id="st-vps-dl">—</span></div>
+              <div class="st-row"><span class="lbl" data-i18n="st_lbl_ul">↑ Upload</span><span class="val idle" id="st-vps-ul">—</span></div>
+            </div>
+            <div class="dash-card-sub" data-i18n="st_card_vps_desc" style="margin-top:6px;">Your browser to the VPS relay server</div>
+            <div class="st-status" id="st-vps-status" data-i18n="st_idle">Ready</div>
+            <button class="fm-btn" data-i18n="btn_run_test" onclick="runSpeedTestVPS()" id="st-vps-btn" style="margin-top:6px;align-self:flex-start;">▶ Run test</button>
           </div>
-          <div class="dash-card">
-            <div class="dash-card-title">Client ↔ Host</div>
-            <div class="dash-card-value" id="st-host-latency">—</div>
-            <div class="dash-card-sub" id="st-host-detail">End-to-end through relay</div>
-            <button class="fm-btn" onclick="runSpeedTestHost()" id="st-host-btn" style="margin-top:8px">▶ Run Test</button>
+          <div class="dash-card st-card">
+            <div class="dash-card-icon">🔗</div>
+            <div class="dash-card-title" data-i18n="st_card_host_title">Browser ↔ Host (RTT)</div>
+            <div style="margin-top:6px;">
+              <div class="st-row"><span class="lbl" data-i18n="st_lbl_rtt">RTT</span><span class="val idle" id="st-host-ping">—</span></div>
+              <div class="st-row"><span class="lbl" data-i18n="st_lbl_dl">↓ Download</span><span class="val idle" id="st-host-dl">—</span></div>
+              <div class="st-row"><span class="lbl" data-i18n="st_lbl_ul">↑ Upload</span><span class="val idle" id="st-host-ul">—</span></div>
+            </div>
+            <div class="dash-card-sub" data-i18n="st_card_host_desc" style="margin-top:6px;">Round-trip through relay to the host</div>
+            <div class="st-status" id="st-host-status" data-i18n="st_idle">Ready</div>
+            <button class="fm-btn" data-i18n="btn_run_test" onclick="runSpeedTestHost()" id="st-host-btn" style="margin-top:6px;align-self:flex-start;">▶ Run test</button>
           </div>
-          <div class="dash-card">
-            <div class="dash-card-title">Host ↔ VPS</div>
-            <div class="dash-card-value" id="st-hostvps-latency">—</div>
-            <div class="dash-card-sub" id="st-hostvps-detail">Host relay connection</div>
-            <button class="fm-btn" onclick="runSpeedTestHostVPS()" id="st-hostvps-btn" style="margin-top:8px">▶ Run Test</button>
+          <div class="dash-card st-card">
+            <div class="dash-card-icon">📡</div>
+            <div class="dash-card-title" data-i18n="st_card_hostvps_title">Host ↔ Relay (est.)</div>
+            <div style="margin-top:6px;">
+              <div class="st-row"><span class="lbl" data-i18n="st_lbl_ping">Ping</span><span class="val idle" id="st-hostvps-ping">—</span></div>
+              <div class="st-row"><span class="lbl" data-i18n="st_lbl_dl">↓ Download</span><span class="val idle" id="st-hostvps-dl">—</span></div>
+            </div>
+            <div class="dash-card-sub" data-i18n="st_card_hostvps_desc" style="margin-top:6px;">Host's link to the relay (estimated)</div>
+            <div class="st-status" id="st-hostvps-status" data-i18n="st_idle">Ready</div>
+            <button class="fm-btn" data-i18n="btn_run_test" onclick="runSpeedTestHostVPS()" id="st-hostvps-btn" style="margin-top:6px;align-self:flex-start;">▶ Run test</button>
           </div>
-          <div class="dash-card">
-            <div class="dash-card-title">Host Internet</div>
-            <div class="dash-card-value" id="st-inet-speed">—</div>
-            <div class="dash-card-sub" id="st-inet-detail">Host download speed (Cloudflare)</div>
-            <button class="fm-btn" onclick="runSpeedTestInternet()" id="st-inet-btn" style="margin-top:8px">▶ Run Test</button>
+          <div class="dash-card st-card">
+            <div class="dash-card-icon">☁️</div>
+            <div class="dash-card-title" data-i18n="st_card_inet_title">Host → Internet</div>
+            <div style="margin-top:6px;">
+              <div class="st-row"><span class="lbl" data-i18n="st_lbl_dl">↓ Download</span><span class="val idle" id="st-inet-speed">—</span></div>
+              <div class="st-row"><span class="lbl" data-i18n="st_lbl_ul">↑ Upload</span><span class="val idle" id="st-inet-ul">—</span></div>
+              <div class="st-row"><span class="lbl" data-i18n="st_lbl_size">Size</span><span class="val idle" id="st-inet-size">—</span></div>
+            </div>
+            <div class="dash-card-sub" data-i18n="st_card_inet_desc" style="margin-top:6px;">Host download from Cloudflare (5 MB)</div>
+            <div class="st-status" id="st-inet-status" data-i18n="st_idle">Ready</div>
+            <button class="fm-btn" data-i18n="btn_run_test" onclick="runSpeedTestInternet()" id="st-inet-btn" style="margin-top:6px;align-self:flex-start;">▶ Run test</button>
           </div>
         </div>
       </div>
@@ -1110,8 +1164,8 @@ body {
       <video id="webrtc-video" autoplay playsinline muted style="display:none; width:100%; height:100%; object-fit:contain; background:#000;"></video>
       <div id="no-stream">
         <div class="icon">🖥</div>
-        <p>SCREEN STREAM</p>
-        <small class="text-muted">Connect and press ▶ STREAM to start</small>
+        <p data-i18n="scr_no_stream">SCREEN STREAM</p>
+        <small class="text-muted" data-i18n="scr_no_stream_hint">Connect and press ▶ STREAM to start</small>
       </div>
       <div id="stream-stats" class="hidden">
         FPS: <span id="st-fps">0</span><br>
@@ -1119,36 +1173,36 @@ body {
         BW: <span id="st-bw">—</span>
       </div>
       <div id="screen-overlay">
-        <button title="Quality -" onclick="adjustQuality(-10)">🔽</button>
+        <button data-i18n-title="tip_quality_minus" title="Quality -" onclick="adjustQuality(-10)">🔽</button>
         <span id="quality-disp" style="font-size:11px;min-width:28px;text-align:center">50%</span>
-        <button title="Quality +" onclick="adjustQuality(10)">🔼</button>
+        <button data-i18n-title="tip_quality_plus" title="Quality +" onclick="adjustQuality(10)">🔼</button>
         <div class="sep" style="height:16px;"></div>
-        <button title="FPS -" onclick="adjustFps(-5)">🐢</button>
+        <button data-i18n-title="tip_fps_minus" title="FPS -" onclick="adjustFps(-5)">🐢</button>
         <span id="fps-disp" style="font-size:11px;color:var(--muted);min-width:30px;text-align:center">25</span>
-        <button title="FPS +" onclick="adjustFps(5)">🚀</button>
+        <button data-i18n-title="tip_fps_plus" title="FPS +" onclick="adjustFps(5)">🚀</button>
         <div class="sep" style="height:16px;"></div>
-        <button title="Scale -" onclick="adjustScale(-10)">−</button>
+        <button data-i18n-title="tip_scale_minus" title="Scale -" onclick="adjustScale(-10)">−</button>
         <span id="scale-disp" style="font-size:11px;min-width:28px;text-align:center">60%</span>
-        <button title="Scale +" onclick="adjustScale(10)">+</button>
-        <select id="codec-select" class="codec-select" onchange="changeCodec(this.value)" title="Codec">
+        <button data-i18n-title="tip_scale_plus" title="Scale +" onclick="adjustScale(10)">+</button>
+        <select id="codec-select" class="codec-select" onchange="changeCodec(this.value)" data-i18n-title="tip_codec" title="Codec">
           <option value="jpeg">JPEG</option>
           <option value="h264" selected>H.264</option>
         </select>
-        <button title="Bitrate -" onclick="adjustBitrate(-1000)" style="margin-left:6px">◀</button>
+        <button data-i18n-title="tip_bitrate_minus" title="Bitrate -" onclick="adjustBitrate(-1000)" style="margin-left:6px">◀</button>
         <span id="bitrate-disp" style="font-size:11px;color:var(--muted);min-width:36px;text-align:center">5M</span>
-        <button title="Bitrate +" onclick="adjustBitrate(1000)">▶</button>
+        <button data-i18n-title="tip_bitrate_plus" title="Bitrate +" onclick="adjustBitrate(1000)">▶</button>
         <label style="display:inline-flex;align-items:center;gap:4px;margin-left:6px;font-size:11px;color:var(--muted);">
-          <input type="checkbox" id="stream-compressed" onchange="toggleCompressed(this.checked)" /> Compressed
+          <input type="checkbox" id="stream-compressed" onchange="toggleCompressed(this.checked)" /> <span data-i18n="lbl_compressed">Compressed</span>
         </label>
-        <button title="Save settings to host" onclick="saveSettingsToHost()" style="margin-left:6px;font-size:11px;padding:2px 8px;background:#2a5;color:#fff;border:none;border-radius:3px;cursor:pointer">💾 Save</button>
+        <button data-i18n-title="tip_save_host" title="Save settings to host" onclick="saveSettingsToHost()" style="margin-left:6px;font-size:11px;padding:2px 8px;background:#2a5;color:#fff;border:none;border-radius:3px;cursor:pointer"><span data-i18n="btn_save">💾 Save</span></button>
         <div class="sep" style="height:16px;"></div>
-        <button title="Fit/Fill" onclick="toggleFit()" id="btn-fit">⊡</button>
-        <button title="Screenshot" onclick="takeScreenshot()">📷</button>
-        <button title="Record" id="btn-rec-overlay" onclick="toggleRecording()">⏺</button>
-        <button title="Fullscreen" id="btn-fullscreen-overlay" style="font-size:14px;min-width:36px;min-height:36px;font-weight:bold;">[⤢]</button>
+        <button data-i18n-title="tip_fit_fill" title="Fit/Fill" onclick="toggleFit()" id="btn-fit">⊡</button>
+        <button data-i18n-title="tip_screenshot" title="Screenshot" onclick="takeScreenshot()">📷</button>
+        <button data-i18n-title="tip_record" title="Record" id="btn-rec-overlay" onclick="toggleRecording()">⏺</button>
+        <button data-i18n-title="fullscreen" title="Fullscreen" id="btn-fullscreen-overlay" style="font-size:14px;min-width:36px;min-height:36px;font-weight:bold;">[⤢]</button>
       </div>
       <div class="rec-settings" style="margin-top:8px;padding:8px;background:var(--bg2);border-radius:6px;font-size:12px;">
-        <span class="text-muted" style="font-size:11px;">Recording: WebM/MP4. When you stop — Chrome/Edge: “Save as” dialog (you choose folder); other browsers: file goes to Downloads.</span>
+        <span class="text-muted" data-i18n="scr_rec_hint" style="font-size:11px;">Recording: WebM/MP4. When you stop — Chrome/Edge: “Save as” dialog (you choose folder); other browsers: file goes to Downloads.</span>
         <div id="rec-last-path" style="margin-top:8px;padding:6px 8px;background:var(--panel);border-radius:4px;color:var(--accent);font-size:12px;word-break:break-all;min-height:20px;"></div>
         <div id="rec-where-hint" style="margin-top:4px;font-size:11px;color:var(--muted);display:none;"></div>
       </div>
@@ -1157,29 +1211,29 @@ body {
     <!-- ── FILES ── -->
     <div id="panel-files" class="panel" style="flex-direction:column;">
       <div class="fm-toolbar">
-        <span class="panel-title" style="font-size:13px;">FILES</span>
-        <button class="fm-btn" id="btn-up-dir" onclick="goUpDir()" title="Up">⬆</button>
-        <input class="fm-path" id="fm-path-input" value="C:\\" placeholder="Path..." onkeydown="if(event.key==='Enter')navigateTo(this.value)" />
-        <button class="fm-btn" onclick="navigateTo(document.getElementById('fm-path-input').value)">GO</button>
+        <span class="panel-title" data-i18n="title_files" style="font-size:13px;">FILES</span>
+        <button class="fm-btn" id="btn-up-dir" onclick="goUpDir()" data-i18n-title="tip_up" title="Up">⬆</button>
+        <input class="fm-path" id="fm-path-input" value="C:\\" data-i18n-ph="ph_path" placeholder="Path..." onkeydown="if(event.key==='Enter')navigateTo(this.value)" />
+        <button class="fm-btn" data-i18n="btn_go" onclick="navigateTo(document.getElementById('fm-path-input').value)">GO</button>
         <button class="fm-btn" onclick="refreshFiles()">↻</button>
         <div class="sep"></div>
-        <button class="fm-btn" onclick="newFolder()">+ Folder</button>
-        <button class="fm-btn" id="btn-upload" onclick="uploadFile()">⬆ Upload</button>
-        <button class="fm-btn" id="btn-download-sel" onclick="downloadSelected()">⬇ Download</button>
-        <button class="fm-btn" id="btn-copy-sel" onclick="copySelected()">📋 Copy to...</button>
-        <button class="fm-btn danger" id="btn-delete-sel" onclick="deleteSelected()">🗑 Delete</button>
+        <button class="fm-btn" data-i18n="files_new_folder" onclick="newFolder()">+ Folder</button>
+        <button class="fm-btn" id="btn-upload" data-i18n="files_upload" onclick="uploadFile()">⬆ Upload</button>
+        <button class="fm-btn" id="btn-download-sel" data-i18n="files_download" onclick="downloadSelected()">⬇ Download</button>
+        <button class="fm-btn" id="btn-copy-sel" data-i18n="files_copy_to" onclick="copySelected()">📋 Copy to...</button>
+        <button class="fm-btn danger" id="btn-delete-sel" data-i18n="files_delete" onclick="deleteSelected()">🗑 Delete</button>
         <input type="file" id="upload-input" class="hidden" multiple onchange="handleUpload(this)" />
       </div>
       <div class="fm-breadcrumb" id="fm-breadcrumb"></div>
       <div class="fm-transfer-bar"><div class="fill" id="fm-progress"></div></div>
       <div class="fm-body">
         <div class="fm-sidebar">
-          <div class="fm-sidebar-section">Drives</div>
+          <div class="fm-sidebar-section" data-i18n="files_drives">Drives</div>
           <div id="fm-drives"></div>
-          <div class="fm-sidebar-section" style="margin-top:8px;">Quick</div>
-          <button class="fm-drive-btn" onclick="navigateTo('C:\\Users')"><span class="drive-icon">👤</span>Users</button>
+          <div class="fm-sidebar-section" data-i18n="files_quick" style="margin-top:8px;">Quick</div>
+          <button class="fm-drive-btn" onclick="navigateTo('C:\\Users')"><span class="drive-icon">👤</span><span data-i18n="files_users">Users</span></button>
           <button class="fm-drive-btn" onclick="navigateTo('C:\\Windows')"><span class="drive-icon">🪟</span>Windows</button>
-          <button class="fm-drive-btn" onclick="navigateTo('C:\\Program Files')"><span class="drive-icon">📦</span>Programs</button>
+          <button class="fm-drive-btn" onclick="navigateTo('C:\\Program Files')"><span class="drive-icon">📦</span><span data-i18n="files_programs">Programs</span></button>
           <button class="fm-drive-btn" onclick="navigateTo('C:\\Temp')"><span class="drive-icon">🗂</span>Temp</button>
         </div>
         <div class="fm-list-wrap">
@@ -1187,10 +1241,10 @@ body {
             <thead>
               <tr>
                 <th style="width:30px;"><input type="checkbox" id="fm-select-all" onchange="toggleSelectAll(this.checked)" /></th>
-                <th onclick="sortFiles('name')">Name ↕</th>
-                <th onclick="sortFiles('size')" style="width:100px;">Size ↕</th>
-                <th onclick="sortFiles('date')" style="width:160px;">Modified ↕</th>
-                <th style="width:80px;">Attr</th>
+                <th data-i18n="files_col_name" onclick="sortFiles('name')">Name ↕</th>
+                <th data-i18n="files_col_size" onclick="sortFiles('size')" style="width:100px;">Size ↕</th>
+                <th data-i18n="files_col_modified" onclick="sortFiles('date')" style="width:160px;">Modified ↕</th>
+                <th data-i18n="files_col_attr" style="width:80px;">Attr</th>
               </tr>
             </thead>
             <tbody id="fm-body"></tbody>
@@ -1198,24 +1252,24 @@ body {
         </div>
       </div>
       <div style="display:flex;align-items:center;background:var(--panel);border-top:1px solid var(--border);padding:6px 12px;gap:16px;">
-        <div id="fm-status" style="flex:1;font-size:13px;color:#ccc;font-weight:500;">Ready</div>
+        <div id="fm-status" data-i18n="st_ready" style="flex:1;font-size:13px;color:#ccc;font-weight:500;">Ready</div>
         <div id="fm-info-stats" style="display:flex;gap:14px;font-size:12px;color:var(--muted);white-space:nowrap;">
           <span id="fm-info-items">—</span>
           <span id="fm-info-size">—</span>
           <span id="fm-info-selected">—</span>
           <span id="fm-info-drive">—</span>
         </div>
-        <button id="btn-cancel-transfer" class="fm-btn danger" style="display:none;padding:2px 12px;font-size:12px;font-weight:bold;" onclick="cancelTransfer()">✕ CANCEL</button>
+        <button id="btn-cancel-transfer" data-i18n="btn_cancel_transfer" class="fm-btn danger" style="display:none;padding:2px 12px;font-size:12px;font-weight:bold;" onclick="cancelTransfer()">✕ CANCEL</button>
       </div>
     </div>
 
     <!-- ── PROCESSES ── -->
     <div id="panel-procs" class="panel" style="flex-direction:column;">
       <div class="proc-toolbar">
-        <span class="panel-title" style="font-size:13px;">PROCESSES</span>
-        <input class="proc-search" id="proc-search" placeholder="Filter by name..." oninput="filterProcesses(this.value)" />
-        <button class="fm-btn" onclick="refreshProcesses()">↻ Refresh</button>
-        <button class="fm-btn danger" onclick="killSelected()">Kill</button>
+        <span class="panel-title" data-i18n="title_procs" style="font-size:13px;">PROCESSES</span>
+        <input class="proc-search" id="proc-search" data-i18n-ph="ph_filter_by_name" placeholder="Filter by name..." oninput="filterProcesses(this.value)" />
+        <button class="fm-btn" data-i18n="btn_refresh" onclick="refreshProcesses()">↻ Refresh</button>
+        <button class="fm-btn danger" data-i18n="procs_kill" onclick="killSelected()">Kill</button>
       </div>
       <div class="proc-table-wrap">
         <table class="proc-table">
@@ -1223,10 +1277,10 @@ body {
             <tr>
               <th style="width:30px;"><input type="checkbox" /></th>
               <th onclick="sortProcs('pid')">PID</th>
-              <th onclick="sortProcs('name')">Name</th>
-              <th onclick="sortProcs('memory')" style="width:120px;">Memory</th>
-              <th onclick="sortProcs('threads')" style="width:70px;">Threads</th>
-              <th style="width:80px;">Actions</th>
+              <th data-i18n="procs_col_name" onclick="sortProcs('name')">Name</th>
+              <th data-i18n="procs_col_memory" onclick="sortProcs('memory')" style="width:120px;">Memory</th>
+              <th data-i18n="procs_col_threads" onclick="sortProcs('threads')" style="width:70px;">Threads</th>
+              <th data-i18n="procs_col_actions" style="width:80px;">Actions</th>
             </tr>
           </thead>
           <tbody id="proc-body"></tbody>
@@ -1234,21 +1288,21 @@ body {
       </div>
       <!-- Launch form -->
       <div class="launch-form">
-        <div style="font-family:var(--display);font-size:13px;font-weight:700;color:var(--accent);letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;">LAUNCH PROGRAM</div>
+        <div data-i18n="procs_launch_title" style="font-family:var(--display);font-size:13px;font-weight:700;color:var(--accent);letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;">LAUNCH PROGRAM</div>
         <div class="launch-form-row">
-          <label class="form-label">Executable</label>
-          <input class="launch-input" id="launch-exe" placeholder="notepad.exe or full path..." />
-          <button class="fm-btn" onclick="browseExe()">Browse</button>
+          <label class="form-label" data-i18n="procs_exe">Executable</label>
+          <input class="launch-input" id="launch-exe" data-i18n-ph="ph_exe" placeholder="notepad.exe or full path..." />
+          <button class="fm-btn" data-i18n="btn_browse" onclick="browseExe()">Browse</button>
         </div>
         <div class="launch-form-row">
-          <label class="form-label">Arguments</label>
-          <input class="launch-input" id="launch-args" placeholder="Optional arguments..." />
+          <label class="form-label" data-i18n="procs_args">Arguments</label>
+          <input class="launch-input" id="launch-args" data-i18n-ph="ph_args" placeholder="Optional arguments..." />
           <select class="launch-select" id="launch-elevate">
-            <option value="normal">Normal</option>
-            <option value="admin">As Admin</option>
-            <option value="system">As System</option>
+            <option value="normal" data-i18n="opt_normal">Normal</option>
+            <option value="admin" data-i18n="opt_as_admin">As Admin</option>
+            <option value="system" data-i18n="opt_as_system">As System</option>
           </select>
-          <button class="fm-btn success-btn" onclick="launchProgram()">🚀 Launch</button>
+          <button class="fm-btn success-btn" data-i18n="btn_launch" onclick="launchProgram()">🚀 Launch</button>
         </div>
       </div>
     </div>
@@ -1256,21 +1310,21 @@ body {
     <!-- ── SERVICES ── -->
     <div id="panel-services" class="panel" style="flex-direction:column;">
       <div class="panel-header">
-        <span class="panel-title">Services</span>
-        <input class="proc-search" id="svc-search" style="flex:1;max-width:300px;" placeholder="Filter services..." oninput="filterServices(this.value)" />
+        <span class="panel-title" data-i18n="title_services">Services</span>
+        <input class="proc-search" id="svc-search" style="flex:1;max-width:300px;" data-i18n-ph="ph_filter_services" placeholder="Filter services..." oninput="filterServices(this.value)" />
         <div class="panel-actions">
-          <button class="fm-btn" onclick="refreshServices()">↻ Refresh</button>
+          <button class="fm-btn" data-i18n="btn_refresh" onclick="refreshServices()">↻ Refresh</button>
         </div>
       </div>
       <div class="svc-table-wrap">
         <table class="svc-table">
           <thead>
             <tr>
-              <th onclick="sortSvcs('name')">Service Name</th>
-              <th onclick="sortSvcs('display')">Display Name</th>
-              <th onclick="sortSvcs('status')" style="width:100px;">Status</th>
-              <th onclick="sortSvcs('start')" style="width:100px;">Start Type</th>
-              <th style="width:180px;">Actions</th>
+              <th data-i18n="srv_name" onclick="sortSvcs('name')">Service Name</th>
+              <th data-i18n="srv_display" onclick="sortSvcs('display')">Display Name</th>
+              <th data-i18n="srv_status" onclick="sortSvcs('status')" style="width:100px;">Status</th>
+              <th data-i18n="srv_start" onclick="sortSvcs('start')" style="width:100px;">Start Type</th>
+              <th data-i18n="procs_col_actions" style="width:180px;">Actions</th>
             </tr>
           </thead>
           <tbody id="svc-body"></tbody>
@@ -1283,24 +1337,24 @@ body {
     <!-- ── TERMINAL ── -->
     <div id="panel-terminal" class="panel" style="flex-direction:column;">
       <div class="panel-header">
-        <span class="panel-title">Terminal</span>
+        <span class="panel-title" data-i18n="title_terminal">Terminal</span>
         <div class="panel-actions">
-          <button class="fm-btn" onclick="clearTerminal()">Clear</button>
+          <button class="fm-btn" data-i18n="clear" onclick="clearTerminal()">Clear</button>
         </div>
       </div>
       <div class="terminal-output" id="term-output"></div>
       <div class="terminal-input-row">
         <span class="term-prompt" id="term-prompt">C:\&gt;</span>
-        <input class="terminal-input" id="term-input" placeholder="Enter command..." onkeydown="handleTermKey(event)" />
+        <input class="terminal-input" id="term-input" data-i18n-ph="ph_enter_cmd" placeholder="Enter command..." onkeydown="handleTermKey(event)" />
       </div>
     </div>
 
     <!-- ── SCREENSHOTS ── -->
     <div id="panel-screenshots" class="panel" style="flex-direction:column;">
       <div class="panel-header">
-        <span class="panel-title">Screenshots</span>
+        <span class="panel-title" data-i18n="title_screenshots">Screenshots</span>
         <div class="panel-actions">
-          <button class="fm-btn" id="ss-toggle-settings" onclick="ssToggleSettings()">Settings</button>
+          <button class="fm-btn" id="ss-toggle-settings" data-i18n="settings" onclick="ssToggleSettings()">Settings</button>
           <button class="fm-btn" onclick="ssRefreshList()">↻</button>
         </div>
       </div>
@@ -1308,58 +1362,58 @@ body {
       <div id="ss-settings" style="display:none; padding:8px 12px; border-bottom:1px solid var(--border); background:var(--card-bg); font-size:12px;">
         <!-- Row 1: Capture params -->
         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:6px;">
-          <label>Interval: <input type="number" id="ss-interval" value="5" min="1" max="3600" style="width:50px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;">s</label>
-          <label>Quality: <input type="range" id="ss-quality" min="10" max="100" value="75" style="width:80px;vertical-align:middle;"><span id="ss-quality-val">75</span></label>
-          <label>Resolution:
+          <label><span data-i18n="ss_interval">Interval</span>: <input type="number" id="ss-interval" value="5" min="1" max="3600" style="width:50px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;">s</label>
+          <label><span data-i18n="ss_quality">Quality</span>: <input type="range" id="ss-quality" min="10" max="100" value="75" style="width:80px;vertical-align:middle;"><span id="ss-quality-val">75</span></label>
+          <label><span data-i18n="ss_resolution">Resolution</span>:
             <select id="ss-resolution" style="background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;">
-              <option value="100">Native (100%)</option>
+              <option value="100" data-i18n="ss_opt_native">Native (100%)</option>
               <option value="75">75%</option>
               <option value="50" selected>50%</option>
               <option value="25">25%</option>
             </select>
           </label>
-          <label>Capture:
+          <label><span data-i18n="ss_capture">Capture</span>:
             <select id="ss-mode" style="background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;">
-              <option value="0" selected>Full Screen</option>
-              <option value="1">Active Window</option>
+              <option value="0" selected data-i18n="ss_opt_full">Full Screen</option>
+              <option value="1" data-i18n="ss_opt_window">Active Window</option>
             </select>
           </label>
-          <label><input type="checkbox" id="ss-always" checked onchange="ssToggleAlways()"> Always</label>
-          <label><input type="checkbox" id="ss-auto-download" onchange="ssOnAutoDLChange(this.checked)"> Auto-DL</label>
+          <label><input type="checkbox" id="ss-always" checked onchange="ssToggleAlways()"> <span data-i18n="ss_always">Always</span></label>
+          <label><input type="checkbox" id="ss-auto-download" onchange="ssOnAutoDLChange(this.checked)"> <span data-i18n="au_auto_dl">Auto-DL</span></label>
         </div>
         <!-- Row 2: App monitor list -->
         <div id="ss-apps-section" style="margin-bottom:6px;">
           <div style="display:flex; gap:6px; align-items:center; margin-bottom:4px;">
-            <span style="font-weight:bold;">Monitor Apps:</span>
-            <button class="fm-btn" onclick="ssLoadRunningApps()">Load from Host</button>
-            <input type="text" id="ss-app-manual" placeholder="Add app or URL..." style="width:160px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 6px;">
-            <button class="fm-btn" onclick="ssAddManualApp()">+ Add</button>
+            <span style="font-weight:bold;" data-i18n="ss_monitor_apps">Monitor Apps:</span>
+            <button class="fm-btn" data-i18n="ss_load_host" onclick="ssLoadRunningApps()">Load from Host</button>
+            <input type="text" id="ss-app-manual" data-i18n-ph="ph_add_app_url" placeholder="Add app or URL..." style="width:160px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 6px;">
+            <button class="fm-btn" data-i18n="ss_add" onclick="ssAddManualApp()">+ Add</button>
             <select id="ss-template-select" style="background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;" onchange="ssApplyTemplate()">
-              <option value="">-- Templates --</option>
+              <option value="" data-i18n="ss_templates">-- Templates --</option>
             </select>
-            <button class="fm-btn" onclick="ssSaveTemplate()">Save</button>
-            <button class="fm-btn" style="color:#f44336;" onclick="ssDeleteTemplate()">Del</button>
+            <button class="fm-btn" data-i18n="save" onclick="ssSaveTemplate()">Save</button>
+            <button class="fm-btn" style="color:#f44336;" data-i18n="ss_del" onclick="ssDeleteTemplate()">Del</button>
           </div>
           <div id="ss-app-list" style="max-height:120px; overflow-y:auto; background:var(--bg); border:1px solid var(--border); border-radius:4px; padding:4px 6px; display:flex; flex-wrap:wrap; gap:4px;">
-            <span style="color:var(--muted);font-size:11px;">No apps added. Use "Load from Host" or add manually.</span>
+            <span style="color:var(--muted);font-size:11px;" data-i18n="ss_no_apps">No apps added. Use "Load from Host" or add manually.</span>
           </div>
           <input type="hidden" id="ss-apps" value="">
         </div>
         <!-- Row 3: Controls + save folder -->
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-          <button class="fm-btn" style="background:#4caf50;color:#fff;" onclick="ssStart()">Start</button>
-          <button class="fm-btn" style="background:#f44336;color:#fff;" onclick="ssStop()">Stop</button>
-          <button class="fm-btn" onclick="ssApplyConfig()">Apply</button>
-          <span id="ss-status" style="color:var(--muted);">Stopped</span>
+          <button class="fm-btn" style="background:#4caf50;color:#fff;" data-i18n="start" onclick="ssStart()">Start</button>
+          <button class="fm-btn" style="background:#f44336;color:#fff;" data-i18n="stop" onclick="ssStop()">Stop</button>
+          <button class="fm-btn" data-i18n="apply" onclick="ssApplyConfig()">Apply</button>
+          <span id="ss-status" style="color:var(--muted);" data-i18n="au_status_stopped">Stopped</span>
           <span style="font-size:10px;display:inline-flex;align-items:center;gap:3px;">
-            Screenshots folder:
-            <button class="fm-btn" onclick="ssChooseFolder()" style="font-size:10px;padding:1px 5px;">Choose folder</button>
-            <button class="fm-btn" onclick="ssClearFolder()" style="font-size:10px;padding:1px 5px;">Clear</button>
+            <span data-i18n="ss_folder_lbl">Screenshots folder:</span>
+            <button class="fm-btn" data-i18n="btn_choose_folder" onclick="ssChooseFolder()" style="font-size:10px;padding:1px 5px;">Choose folder</button>
+            <button class="fm-btn" data-i18n="clear" onclick="ssClearFolder()" style="font-size:10px;padding:1px 5px;">Clear</button>
             <span id="ss-folder-path" style="color:var(--accent);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title=""></span>
           </span>
           <span style="margin-left:auto;font-size:10px;color:var(--muted);">
-            VPS Quota: <input type="number" id="ss-quota" value="500" min="50" max="10000" style="width:55px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:1px 3px;font-size:10px;">MB
-            <button class="fm-btn" onclick="ssSetQuota()" style="font-size:10px;padding:1px 5px;">Set</button>
+            <span data-i18n="ss_vps_quota">VPS Quota:</span> <input type="number" id="ss-quota" value="500" min="50" max="10000" style="width:55px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:1px 3px;font-size:10px;">MB
+            <button class="fm-btn" data-i18n="btn_set" onclick="ssSetQuota()" style="font-size:10px;padding:1px 5px;">Set</button>
             <span id="ss-quota-used" style="margin-left:4px;"></span>
             <span id="ss-quota-name" style="margin-left:4px;color:var(--muted);"></span>
           </span>
@@ -1371,21 +1425,21 @@ body {
         <div id="ss-left" style="flex:0 0 280px; display:flex; flex-direction:column; min-width:150px; max-width:600px; overflow:hidden;">
           <!-- View toggle + stats bar -->
           <div style="padding:4px 8px; border-bottom:1px solid var(--border); display:flex; gap:6px; align-items:center; font-size:11px; background:var(--card-bg);">
-            <button class="fm-btn" id="ss-view-list" onclick="ssSetView('list')" style="font-size:10px;padding:2px 6px;background:var(--accent);color:#fff;">List</button>
-            <button class="fm-btn" id="ss-view-grid" onclick="ssSetView('grid')" style="font-size:10px;padding:2px 6px;">Grid</button>
-            <label><input type="checkbox" id="ss-select-all" onchange="ssToggleSelectAll()"> All</label>
-            <button class="fm-btn" onclick="ssDownloadSelected()" style="font-size:10px;">DL</button>
-            <button class="fm-btn" onclick="ssDeleteSelected()" style="font-size:10px;color:#f44336;">Del</button>
+            <button class="fm-btn" id="ss-view-list" data-i18n="ss_view_list" onclick="ssSetView('list')" style="font-size:10px;padding:2px 6px;background:var(--accent);color:#fff;">List</button>
+            <button class="fm-btn" id="ss-view-grid" data-i18n="ss_view_grid" onclick="ssSetView('grid')" style="font-size:10px;padding:2px 6px;">Grid</button>
+            <label><input type="checkbox" id="ss-select-all" onchange="ssToggleSelectAll()"> <span data-i18n="all">All</span></label>
+            <button class="fm-btn" data-i18n="btn_dl" onclick="ssDownloadSelected()" style="font-size:10px;">DL</button>
+            <button class="fm-btn" data-i18n="ss_del" onclick="ssDeleteSelected()" style="font-size:10px;color:#f44336;">Del</button>
             <span id="ss-stats" style="margin-left:auto;color:var(--muted);">0 files</span>
           </div>
           <div id="ss-gallery" style="flex:1; overflow-y:auto; padding:4px;">
-            <div style="color:var(--muted);text-align:center;padding:40px;">No screenshots yet.</div>
+            <div style="color:var(--muted);text-align:center;padding:40px;" data-i18n="ss_none">No screenshots yet.</div>
           </div>
         </div>
         <!-- Right: inline preview -->
         <div id="ss-splitter" style="flex:0 0 4px; background:var(--border); cursor:col-resize; hover:var(--accent);" onmousedown="ssStartResize(event)"></div>
         <div id="ss-preview" style="flex:1; display:flex; align-items:center; justify-content:center; background:#0a0a0a; overflow:hidden; position:relative; min-width:200px;">
-          <div id="ss-preview-empty" style="color:#555;font-size:13px;">Click a screenshot to preview</div>
+          <div id="ss-preview-empty" style="color:#555;font-size:13px;" data-i18n="ss_click_preview">Click a screenshot to preview</div>
           <img id="ss-preview-img" style="display:none;max-width:100%;max-height:100%;object-fit:contain;cursor:zoom-in;transition:transform 0.1s;" draggable="false">
           <div id="ss-preview-info" style="position:absolute;bottom:4px;left:8px;color:#888;font-size:10px;"></div>
         </div>
@@ -1395,11 +1449,11 @@ body {
     <!-- Screenshot Viewer Overlay -->
     <div id="ss-viewer" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.95);z-index:10000;cursor:crosshair;" onclick="if(event.target===this)ssCloseViewer()">
       <div style="position:absolute;top:8px;right:8px;z-index:10001;display:flex;gap:6px;">
-        <button onclick="ssViewerPrev()" style="background:#333;color:#fff;border:none;border-radius:4px;padding:6px 12px;cursor:pointer;">Prev</button>
-        <button onclick="ssViewerNext()" style="background:#333;color:#fff;border:none;border-radius:4px;padding:6px 12px;cursor:pointer;">Next</button>
-        <button onclick="ssViewerDownload()" style="background:#4caf50;color:#fff;border:none;border-radius:4px;padding:6px 12px;cursor:pointer;">Download</button>
-        <button onclick="ssViewerFit()" style="background:#333;color:#fff;border:none;border-radius:4px;padding:6px 12px;cursor:pointer;">Fit</button>
-        <button onclick="ssCloseViewer()" style="background:#f44336;color:#fff;border:none;border-radius:4px;padding:6px 12px;cursor:pointer;">Close</button>
+        <button data-i18n="btn_prev" onclick="ssViewerPrev()" style="background:#333;color:#fff;border:none;border-radius:4px;padding:6px 12px;cursor:pointer;">Prev</button>
+        <button data-i18n="btn_next" onclick="ssViewerNext()" style="background:#333;color:#fff;border:none;border-radius:4px;padding:6px 12px;cursor:pointer;">Next</button>
+        <button data-i18n="download" onclick="ssViewerDownload()" style="background:#4caf50;color:#fff;border:none;border-radius:4px;padding:6px 12px;cursor:pointer;">Download</button>
+        <button data-i18n="btn_fit" onclick="ssViewerFit()" style="background:#333;color:#fff;border:none;border-radius:4px;padding:6px 12px;cursor:pointer;">Fit</button>
+        <button data-i18n="close" onclick="ssCloseViewer()" style="background:#f44336;color:#fff;border:none;border-radius:4px;padding:6px 12px;cursor:pointer;">Close</button>
       </div>
       <div id="ss-viewer-info" style="position:absolute;bottom:8px;left:8px;color:#aaa;font-size:12px;z-index:10001;"></div>
       <img id="ss-viewer-img" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);max-width:95vw;max-height:95vh;transition:transform 0.1s;" draggable="false">
@@ -1408,17 +1462,17 @@ body {
     <!-- ── AUDIO RECORDING ── -->
     <div id="panel-audio" class="panel" style="flex-direction:column;">
       <div class="panel-header">
-        <span class="panel-title">Audio Recording</span>
+        <span class="panel-title" data-i18n="title_audio">Audio Recording</span>
         <div class="panel-actions">
-          <button class="fm-btn" id="au-toggle-settings" onclick="auToggleSettings()">Settings</button>
+          <button class="fm-btn" id="au-toggle-settings" data-i18n="settings" onclick="auToggleSettings()">Settings</button>
           <button class="fm-btn" onclick="auRefreshList()">↻</button>
         </div>
       </div>
       <!-- Settings -->
       <div id="au-settings" style="display:none; padding:8px 12px; border-bottom:1px solid var(--border); background:var(--card-bg); font-size:12px;">
         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:6px;">
-          <label>Segment: <input type="number" id="au-segment" value="300" min="10" max="3600" oninput="localStorage.setItem('au_segment',this.value)" style="width:55px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;">s</label>
-          <label>Sample Rate:
+          <label><span data-i18n="au_segment">Segment</span>: <input type="number" id="au-segment" value="300" min="10" max="3600" oninput="localStorage.setItem('au_segment',this.value)" style="width:55px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;">s</label>
+          <label><span data-i18n="au_sample_rate">Sample Rate</span>:
             <select id="au-samplerate" style="background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;">
               <option value="16000">16kHz</option>
               <option value="22050">22kHz</option>
@@ -1426,7 +1480,7 @@ body {
               <option value="48000">48kHz</option>
             </select>
           </label>
-          <label>Bitrate:
+          <label><span data-i18n="au_bitrate">Bitrate</span>:
             <select id="au-bitrate" style="background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;">
               <option value="64">64kbps</option>
               <option value="96">96kbps</option>
@@ -1434,40 +1488,58 @@ body {
               <option value="192">192kbps</option>
             </select>
           </label>
-          <label>Channels:
+          <label><span data-i18n="au_channels">Channels</span>:
             <select id="au-channels" style="background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;">
-              <option value="1" selected>Mono</option>
-              <option value="2">Stereo</option>
+              <option value="1" selected data-i18n="au_mono">Mono</option>
+              <option value="2" data-i18n="au_stereo">Stereo</option>
             </select>
           </label>
         </div>
         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:6px;">
-          <label>Microphone:
+          <label><span data-i18n="au_microphone">Microphone</span>:
             <select id="au-device" style="background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;min-width:200px;" onchange="auSetDevice()">
-              <option value="-1">Default (auto)</option>
+              <option value="-1" data-i18n="au_default">Default (auto)</option>
             </select>
           </label>
           <span id="au-device-info" style="font-size:10px;color:var(--muted);"></span>
-          <label>Mode:
+          <label><span data-i18n="au_mode">Mode</span>:
             <select id="au-mode" style="background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;">
-              <option value="0">Record only</option>
-              <option value="1">Live listen</option>
-              <option value="2">Live + Record</option>
+              <option value="0" data-i18n="au_rec_only">Record only</option>
+              <option value="1" data-i18n="au_live">Live listen</option>
+              <option value="2" data-i18n="au_live_rec">Live + Record</option>
             </select>
           </label>
-          <label><input type="checkbox" id="au-auto-download"> Auto-DL</label>
-          <label>Gain: <input type="range" id="au-gain" min="50" max="2000" value="100" step="50" style="width:100px;vertical-align:middle;" oninput="document.getElementById('au-gain-val').textContent=this.value+'%'"><span id="au-gain-val" style="min-width:40px;display:inline-block;">100%</span></label>
+          <label><input type="checkbox" id="au-auto-download"> <span data-i18n="au_auto_dl">Auto-DL</span></label>
+          <label><span data-i18n="au_gain">Gain</span>: <input type="range" id="au-gain" min="50" max="2000" value="100" step="50" style="width:100px;vertical-align:middle;" oninput="document.getElementById('au-gain-val').textContent=this.value+'%'"><span id="au-gain-val" style="min-width:40px;display:inline-block;">100%</span></label>
+          <label data-i18n-title="tip_denoise" title="High-pass filter + noise gate: removes low-freq rumble and attenuates silent sections"><input type="checkbox" id="au-denoise" checked> <span data-i18n="au_denoise">Denoise</span></label>
+          <label data-i18n-title="tip_normalize" title="Peak normalization: boosts quiet recordings to a consistent loudness"><input type="checkbox" id="au-normalize" checked> <span data-i18n="au_normalize">Normalize</span></label>
+          <label data-i18n-title="tip_hum" title="Power-line hum notch filter at fundamental + harmonics (50Hz for EU/RU, 60Hz for US)"><span data-i18n="au_hum">Hum</span>:
+            <select id="au-hum" style="background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;">
+              <option value="0" data-i18n="off">Off</option>
+              <option value="50" selected>50 Hz</option>
+              <option value="60">60 Hz</option>
+            </select>
+          </label>
+          <span style="margin-left:8px;padding-left:8px;border-left:1px solid var(--border);font-size:10px;color:var(--muted);" data-i18n="au_client">CLIENT:</span>
+          <label data-i18n-title="tip_hp" title="Browser-side highpass filter at 80Hz (applies in real-time to playback AND live)"><input type="checkbox" id="au-cli-hp" onchange="auSetClientHP(this.checked)"> <span data-i18n="au_hp">HP</span></label>
+          <label data-i18n-title="tip_cli_hum" title="Browser-side hum notch filter (applies in real-time to playback AND live)"><span data-i18n="au_hum">Hum</span>:
+            <select id="au-cli-hum" onchange="auSetClientHum(this.value)" style="background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;">
+              <option value="0" data-i18n="off">Off</option>
+              <option value="50">50 Hz</option>
+              <option value="60">60 Hz</option>
+            </select>
+          </label>
         </div>
         <div style="display:flex; gap:8px; align-items:center;">
-          <button class="fm-btn" style="background:#4caf50;color:#fff;" onclick="auStart()">▶ Record</button>
-          <button class="fm-btn" style="background:#f44336;color:#fff;" onclick="auStartLive()">🔴 Live</button>
-          <button class="fm-btn" style="background:#9c27b0;color:#fff;" onclick="auStartBoth()">⏺ Both</button>
-          <button class="fm-btn" onclick="auStop()">⏹ Stop</button>
-          <button class="fm-btn" onclick="auApplyConfig()">Apply</button>
-          <span id="au-status" style="color:var(--muted);">Stopped</span>
+          <button class="fm-btn" style="background:#4caf50;color:#fff;" data-i18n="au_record_btn" onclick="auStart()">▶ Record</button>
+          <button class="fm-btn" style="background:#f44336;color:#fff;" data-i18n="au_live_btn" onclick="auStartLive()">🔴 Live</button>
+          <button class="fm-btn" style="background:#9c27b0;color:#fff;" data-i18n="au_both_btn" onclick="auStartBoth()">⏺ Both</button>
+          <button class="fm-btn" data-i18n="au_stop_btn" onclick="auStop()">⏹ Stop</button>
+          <button class="fm-btn" data-i18n="apply" onclick="auApplyConfig()">Apply</button>
+          <span id="au-status" style="color:var(--muted);" data-i18n="au_status_stopped">Stopped</span>
           <span style="margin-left:auto;font-size:10px;color:var(--muted);">
-            Quota: <input type="number" id="au-quota" value="500" min="50" max="10000" style="width:55px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:1px 3px;font-size:10px;">MB
-            <button class="fm-btn" onclick="auSetQuota()" style="font-size:10px;padding:1px 5px;">Set</button>
+            <span data-i18n="au_quota">Quota</span>: <input type="number" id="au-quota" value="500" min="50" max="10000" style="width:55px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:1px 3px;font-size:10px;">MB
+            <button class="fm-btn" data-i18n="btn_set" onclick="auSetQuota()" style="font-size:10px;padding:1px 5px;">Set</button>
             <span id="au-quota-used"></span>
           </span>
         </div>
@@ -1476,18 +1548,18 @@ body {
       <div style="flex:1; display:flex; overflow:hidden;">
         <div id="au-left" style="flex:0 0 350px; display:flex; flex-direction:column; min-width:200px; max-width:550px; border-right:1px solid var(--border); overflow:hidden;">
           <div style="padding:4px 8px; border-bottom:1px solid var(--border); display:flex; gap:6px; align-items:center; font-size:11px; background:var(--card-bg);">
-            <label><input type="checkbox" id="au-select-all" onchange="auToggleSelectAll()"> All</label>
-            <button class="fm-btn" onclick="auDownloadSelected()" style="font-size:10px;">DL</button>
-            <button class="fm-btn" onclick="auDeleteSelected()" style="font-size:10px;color:#f44336;">Del</button>
+            <label><input type="checkbox" id="au-select-all" onchange="auToggleSelectAll()"> <span data-i18n="all">All</span></label>
+            <button class="fm-btn" data-i18n="btn_dl" onclick="auDownloadSelected()" style="font-size:10px;">DL</button>
+            <button class="fm-btn" data-i18n="ss_del" onclick="auDeleteSelected()" style="font-size:10px;color:#f44336;">Del</button>
             <span id="au-stats" style="margin-left:auto;color:var(--muted);">0 files</span>
           </div>
           <div id="au-list" style="flex:1; overflow-y:auto; padding:0; font-size:11px;">
-            <div style="color:var(--muted);text-align:center;padding:40px;">No recordings yet.</div>
+            <div style="color:var(--muted);text-align:center;padding:40px;" data-i18n="au_none">No recordings yet.</div>
           </div>
         </div>
         <!-- Player (full height) -->
         <div id="au-player" style="flex:1; display:flex; flex-direction:column; background:#0a0a0a; overflow:hidden;">
-          <div id="au-player-empty" style="flex:1;display:flex;align-items:center;justify-content:center;color:#555;font-size:13px;">Select a recording to play</div>
+          <div id="au-player-empty" style="flex:1;display:flex;align-items:center;justify-content:center;color:#555;font-size:13px;" data-i18n="au_select_rec">Select a recording to play</div>
           <div id="au-player-active" style="display:none; flex:1; flex-direction:column; width:100%; min-height:0; overflow:hidden;">
             <!-- Track info -->
             <div style="padding:6px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #222;flex-shrink:0;">
@@ -1579,27 +1651,27 @@ body {
     <!-- ── INSTALLED PROGRAMS ── -->
     <div id="panel-programs" class="panel" style="flex-direction:column;">
       <div class="panel-header">
-        <span class="panel-title">Installed Programs</span>
-        <input class="proc-search" id="prog-search" placeholder="Filter..." oninput="progFilter(this.value)" style="margin-left:12px;">
+        <span class="panel-title" data-i18n="title_programs">Installed Programs</span>
+        <input class="proc-search" id="prog-search" data-i18n-ph="ph_filter" placeholder="Filter..." oninput="progFilter(this.value)" style="margin-left:12px;">
         <div class="panel-actions">
           <span id="prog-count" style="color:var(--muted);font-size:11px;margin-right:8px;"></span>
-          <button class="fm-btn" onclick="progExport()">📋 Export</button>
-          <button class="fm-btn" onclick="progRefresh()">↻ Refresh</button>
+          <button class="fm-btn" data-i18n="btn_export" onclick="progExport()">📋 Export</button>
+          <button class="fm-btn" data-i18n="btn_refresh" onclick="progRefresh()">↻ Refresh</button>
         </div>
       </div>
       <div class="proc-table-wrap">
         <table class="proc-table" id="prog-table">
           <thead>
             <tr>
-              <th onclick="progSort('name')" style="cursor:pointer;">Name ▿</th>
-              <th onclick="progSort('version')" style="width:100px;cursor:pointer;">Version</th>
-              <th onclick="progSort('publisher')" style="width:160px;cursor:pointer;">Publisher</th>
-              <th onclick="progSort('date')" style="width:90px;cursor:pointer;">Installed</th>
-              <th onclick="progSort('size')" style="width:80px;cursor:pointer;">Size</th>
+              <th data-i18n="prog_name" onclick="progSort('name')" style="cursor:pointer;">Name ▿</th>
+              <th data-i18n="prog_version" onclick="progSort('version')" style="width:100px;cursor:pointer;">Version</th>
+              <th data-i18n="prog_publisher" onclick="progSort('publisher')" style="width:160px;cursor:pointer;">Publisher</th>
+              <th data-i18n="prog_installed" onclick="progSort('date')" style="width:90px;cursor:pointer;">Installed</th>
+              <th data-i18n="prog_size" onclick="progSort('size')" style="width:80px;cursor:pointer;">Size</th>
             </tr>
           </thead>
           <tbody id="prog-body">
-            <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:40px;">Click Refresh or switch to this tab</td></tr>
+            <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:40px;" data-i18n="prog_click_refresh">Click Refresh or switch to this tab</td></tr>
           </tbody>
         </table>
       </div>
@@ -1607,75 +1679,75 @@ body {
 
     <div id="panel-settings" class="panel" style="flex-direction:column;">
       <div class="panel-header">
-        <span class="panel-title">Settings</span>
+        <span class="panel-title" data-i18n="title_settings">Settings</span>
       </div>
       <div style="flex:1; overflow-y:auto; padding:16px;">
         <div class="settings-block" style="margin-bottom:20px;">
-          <div class="panel-title" style="font-size:12px; margin-bottom:8px; color:var(--muted);">Save paths — choose folder (Chrome/Edge need HTTPS or localhost)</div>
-          <div id="settings-secure-warn" style="display:none; padding:8px; background:rgba(255,71,87,0.15); border-radius:6px; font-size:12px; margin-bottom:10px; color:var(--danger);">
+          <div class="panel-title" data-i18n="set_save_paths" style="font-size:12px; margin-bottom:8px; color:var(--muted);">Save paths — choose folder (Chrome/Edge need HTTPS or localhost)</div>
+          <div id="settings-secure-warn" data-i18n-html="set_secure_warn" style="display:none; padding:8px; background:rgba(255,71,87,0.15); border-radius:6px; font-size:12px; margin-bottom:10px; color:var(--danger);">
             Folder picker works only on <b>HTTPS</b> or <b>localhost</b>. Open this page as https://your-server/ or use Port 8080 with a tunnel.
           </div>
           <div class="form-row" style="align-items:center; margin-bottom:10px;">
-            <label class="form-label" style="min-width:200px;">Folder for file/folder downloads</label>
-            <button type="button" class="fm-btn" id="btn-download-folder" onclick="pickDownloadFolder()">Choose folder</button>
-            <button type="button" class="fm-btn" id="btn-download-folder-clear" onclick="clearDownloadFolder()">Clear</button>
-            <span id="settings-download-path" style="font-size:12px; color:var(--muted); margin-left:8px;">Not set</span>
+            <label class="form-label" data-i18n="set_folder_downloads" style="min-width:200px;">Folder for file/folder downloads</label>
+            <button type="button" class="fm-btn" id="btn-download-folder" data-i18n="btn_choose_folder" onclick="pickDownloadFolder()">Choose folder</button>
+            <button type="button" class="fm-btn" id="btn-download-folder-clear" data-i18n="clear" onclick="clearDownloadFolder()">Clear</button>
+            <span id="settings-download-path" data-i18n="st_not_set" style="font-size:12px; color:var(--muted); margin-left:8px;">Not set</span>
           </div>
           <div class="form-row" style="align-items:center;">
-            <label class="form-label" style="min-width:200px;">Folder for stream recordings</label>
-            <button type="button" class="fm-btn" id="btn-recording-folder" onclick="pickRecordingFolder()">Choose folder</button>
-            <button type="button" class="fm-btn" id="btn-recording-folder-clear" onclick="clearRecordingFolder()">Clear</button>
-            <span id="settings-recording-path" style="font-size:12px; color:var(--muted); margin-left:8px;">Not set</span>
+            <label class="form-label" data-i18n="set_folder_recordings" style="min-width:200px;">Folder for stream recordings</label>
+            <button type="button" class="fm-btn" id="btn-recording-folder" data-i18n="btn_choose_folder" onclick="pickRecordingFolder()">Choose folder</button>
+            <button type="button" class="fm-btn" id="btn-recording-folder-clear" data-i18n="clear" onclick="clearRecordingFolder()">Clear</button>
+            <span id="settings-recording-path" data-i18n="st_not_set" style="font-size:12px; color:var(--muted); margin-left:8px;">Not set</span>
           </div>
           <div class="form-row" style="align-items:center; margin-top:10px;">
-            <label class="form-label" style="min-width:200px;">Folder for screenshots</label>
-            <button type="button" class="fm-btn" onclick="ssChooseFolder()">Choose folder</button>
-            <button type="button" class="fm-btn" onclick="ssClearFolder()">Clear</button>
-            <span id="ss-folder-path-settings" style="font-size:12px; color:var(--muted); margin-left:8px;">Not set</span>
+            <label class="form-label" data-i18n="set_folder_screenshots" style="min-width:200px;">Folder for screenshots</label>
+            <button type="button" class="fm-btn" data-i18n="btn_choose_folder" onclick="ssChooseFolder()">Choose folder</button>
+            <button type="button" class="fm-btn" data-i18n="clear" onclick="ssClearFolder()">Clear</button>
+            <span id="ss-folder-path-settings" data-i18n="st_not_set" style="font-size:12px; color:var(--muted); margin-left:8px;">Not set</span>
           </div>
           <div class="form-row" style="align-items:center; margin-top:10px;">
-            <label class="form-label" style="min-width:200px;">Folder for audio records</label>
-            <button type="button" class="fm-btn" onclick="auChooseFolder()">Choose folder</button>
-            <button type="button" class="fm-btn" onclick="auClearFolder()">Clear</button>
-            <span id="au-folder-path-settings" style="font-size:12px; color:var(--muted); margin-left:8px;">Not set</span>
+            <label class="form-label" data-i18n="set_folder_audio" style="min-width:200px;">Folder for audio records</label>
+            <button type="button" class="fm-btn" data-i18n="btn_choose_folder" onclick="auChooseFolder()">Choose folder</button>
+            <button type="button" class="fm-btn" data-i18n="clear" onclick="auClearFolder()">Clear</button>
+            <span id="au-folder-path-settings" data-i18n="st_not_set" style="font-size:12px; color:var(--muted); margin-left:8px;">Not set</span>
           </div>
         </div>
         <div class="settings-block" style="margin-bottom:20px;">
-          <div class="panel-title" style="font-size:12px; margin-bottom:8px; color:var(--muted);">Screenshots — VPS Storage</div>
+          <div class="panel-title" data-i18n="set_ss_vps" style="font-size:12px; margin-bottom:8px; color:var(--muted);">Screenshots — VPS Storage</div>
           <div class="form-row" style="align-items:center; margin-bottom:10px;">
-            <label class="form-label" style="min-width:200px;">VPS Quota (MB)</label>
+            <label class="form-label" data-i18n="set_vps_quota_mb" style="min-width:200px;">VPS Quota (MB)</label>
             <input type="number" id="ss-quota-settings" value="500" min="50" max="10000" style="width:80px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:4px;padding:4px 8px;">
-            <button type="button" class="fm-btn" onclick="ssSetQuotaFromSettings()" style="margin-left:6px;">Apply</button>
+            <button type="button" class="fm-btn" data-i18n="apply" onclick="ssSetQuotaFromSettings()" style="margin-left:6px;">Apply</button>
             <span id="ss-quota-info" style="font-size:12px; color:var(--muted); margin-left:8px;"></span>
           </div>
         </div>
         <div class="settings-block" style="margin-bottom:20px;">
-          <div class="panel-title" style="font-size:12px; margin-bottom:8px; color:var(--muted);">Audio — VPS Storage</div>
+          <div class="panel-title" data-i18n="set_au_vps" style="font-size:12px; margin-bottom:8px; color:var(--muted);">Audio — VPS Storage</div>
           <div class="form-row" style="align-items:center; margin-bottom:10px;">
-            <label class="form-label" style="min-width:200px;">VPS Quota (MB)</label>
+            <label class="form-label" data-i18n="set_vps_quota_mb" style="min-width:200px;">VPS Quota (MB)</label>
             <input type="number" id="au-quota-settings" value="500" min="50" max="10000" style="width:80px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:4px;padding:4px 8px;">
-            <button type="button" class="fm-btn" onclick="auSetQuotaFromSettings()" style="margin-left:6px;">Apply</button>
+            <button type="button" class="fm-btn" data-i18n="apply" onclick="auSetQuotaFromSettings()" style="margin-left:6px;">Apply</button>
             <span id="au-quota-info" style="font-size:12px; color:var(--muted); margin-left:8px;"></span>
           </div>
         </div>
         <div class="settings-block" style="margin-bottom:20px;">
-          <div class="panel-title" style="font-size:12px; margin-bottom:8px; color:var(--muted);">Streaming</div>
+          <div class="panel-title" data-i18n="set_streaming" style="font-size:12px; margin-bottom:8px; color:var(--muted);">Streaming</div>
           <div class="form-row" style="align-items:center; margin-bottom:10px;">
-            <label class="form-label" style="min-width:120px;">Jitter buffer</label>
+            <label class="form-label" data-i18n="set_jitter_buf" style="min-width:120px;">Jitter buffer</label>
             <input type="range" id="set-jitter-buf" min="2" max="15" value="5" step="1"
                    style="flex:1; max-width:160px;"
                    oninput="document.getElementById('jitter-buf-val').textContent=this.value;applyJitterBuf(+this.value);" />
             <span id="jitter-buf-val" style="font-size:13px;color:var(--fg);min-width:24px;text-align:center;">5</span>
-            <span style="font-size:11px;color:var(--muted);margin-left:4px;">frames</span>
+            <span data-i18n="set_frames" style="font-size:11px;color:var(--muted);margin-left:4px;">frames</span>
           </div>
-          <div style="font-size:11px;color:var(--muted);margin-top:-4px;margin-bottom:8px;">
+          <div data-i18n="set_jitter_hint" style="font-size:11px;color:var(--muted);margin-top:-4px;margin-bottom:8px;">
             Lower = less latency (good for remote desktop), higher = smoother playback. Default: 5
           </div>
         </div>
         <div class="settings-block" style="margin-bottom:20px;">
-          <div class="panel-title" style="font-size:12px; margin-bottom:8px; color:var(--muted);">WebRTC ICE Servers (host config)</div>
+          <div class="panel-title" data-i18n="set_webrtc_ice" style="font-size:12px; margin-bottom:8px; color:var(--muted);">WebRTC ICE Servers (host config)</div>
           <div class="form-row" style="align-items:center; margin-bottom:10px;">
-            <label class="form-label" style="min-width:120px;">STUN server</label>
+            <label class="form-label" data-i18n="set_stun" style="min-width:120px;">STUN server</label>
             <input class="form-input" id="ice-stun" list="stun-servers" placeholder="stun:IP:PORT" style="flex:1;" />
             <datalist id="stun-servers">
               <option value="stun:stun.l.google.com:19302">Google</option>
@@ -1688,144 +1760,144 @@ body {
             </datalist>
           </div>
           <div class="form-row" style="align-items:center; margin-bottom:10px;">
-            <label class="form-label" style="min-width:120px;">TURN server</label>
+            <label class="form-label" data-i18n="set_turn" style="min-width:120px;">TURN server</label>
             <input class="form-input" id="ice-turn" placeholder="turn:user:pass@IP:PORT" style="flex:1;" />
           </div>
           <div class="form-row" style="align-items:center; margin-bottom:10px; gap:8px;">
             <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--fg);">
-              <input type="checkbox" id="ice-enable-webrtc" /> Enable WebRTC (UDP video)
+              <input type="checkbox" id="ice-enable-webrtc" /> <span data-i18n="set_enable_webrtc">Enable WebRTC (UDP video)</span>
             </label>
             <label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);margin-left:16px;">
-              <input type="checkbox" id="ice-force-relay" /> Force TURN relay
+              <input type="checkbox" id="ice-force-relay" /> <span data-i18n="set_force_relay">Force TURN relay</span>
             </label>
           </div>
           <div style="display:flex; gap:8px;">
-            <button type="button" class="fm-btn" onclick="saveIceSettings()" style="background:#2a5;color:#fff;">💾 Save & Restart WebRTC</button>
+            <button type="button" class="fm-btn" data-i18n="set_save_restart_rtc" onclick="saveIceSettings()" style="background:#2a5;color:#fff;">💾 Save & Restart WebRTC</button>
             <span id="ice-save-status" style="font-size:12px; color:var(--muted); align-self:center;"></span>
           </div>
         </div>
 <div class="settings-block" style="margin-bottom:20px;">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;flex-wrap:wrap;">
-            <span class="panel-title" style="font-size:12px;color:var(--muted);">Remote Host Update (pnpext.dll)</span>
+            <span class="panel-title" data-i18n="set_host_update" style="font-size:12px;color:var(--muted);">Remote Host Update (pnpext.dll)</span>
             <span id="update-version" style="font-size:11px;color:#4caf50;font-family:monospace;"></span>
             <span id="defender-status" style="font-size:11px;font-family:monospace;margin-left:auto;"></span>
           </div>
-          <div id="defender-warn" style="display:none;font-size:10px;color:#f44336;background:rgba(244,67,54,0.1);padding:4px 8px;border-radius:4px;margin-bottom:6px;">
+          <div id="defender-warn" data-i18n="set_tamper_warn" style="display:none;font-size:10px;color:#f44336;background:rgba(244,67,54,0.1);padding:4px 8px;border-radius:4px;margin-bottom:6px;">
             ⚠ Tamper Protection включена — отключить Defender программно не получится. Отключи вручную через Windows Security → Virus &amp; threat protection → Settings → Tamper Protection → OFF, потом повтори обновление.
           </div>
           <div style="padding:8px;background:rgba(255,255,255,0.02);border-radius:6px;">
-            <div style="font-size:11px;color:#888;margin-bottom:4px;">DLL URL on VPS</div>
+            <div data-i18n="set_dll_url" style="font-size:11px;color:#888;margin-bottom:4px;">DLL URL on VPS</div>
             <div style="display:flex; gap:8px; align-items:center;">
               <input type="text" id="update-url" value="https://64.226.66.66/files/pnpext.dll" placeholder="https://64.226.66.66/files/pnpext.dll" style="flex:1;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:4px;padding:5px 8px;font-size:11px;font-family:monospace;" oninput="localStorage.setItem('update_url',this.value)">
-              <button type="button" class="fm-btn" onclick="hostUpdate()" style="background:#c62828;color:#fff;">Update Host</button>
+              <button type="button" class="fm-btn" data-i18n="set_update_host" onclick="hostUpdate()" style="background:#c62828;color:#fff;">Update Host</button>
             </div>
           </div>
           <!-- Progress bar with steps -->
           <div id="update-progress-wrap" style="display:none;margin-top:10px;padding:10px;background:rgba(255,255,255,0.03);border-radius:6px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-              <span id="update-step-text" style="font-size:12px;color:#4caf50;font-weight:bold;">Step 1/9</span>
+              <span id="update-step-text" style="font-size:12px;color:#4caf50;font-weight:bold;"><span data-i18n="set_step">Step</span> 1/9</span>
               <span id="update-step-pct" style="font-size:11px;color:#888;font-family:monospace;">0%</span>
             </div>
             <div style="height:8px;background:#1a1a1a;border-radius:4px;overflow:hidden;">
               <div id="update-progress-bar" style="height:100%;background:linear-gradient(90deg,#4caf50,#8bc34a);width:0%;transition:width 0.4s;"></div>
             </div>
             <div id="update-steps" style="display:flex;justify-content:space-between;margin-top:8px;font-size:9px;color:#555;">
-              <span data-step="1">Defender</span>
-              <span data-step="2">Download</span>
-              <span data-step="3">Stop Svc</span>
-              <span data-step="4">Stop Spooler</span>
-              <span data-step="5">Replace</span>
-              <span data-step="6">Start Spooler</span>
-              <span data-step="7">Inject</span>
-              <span data-step="8">Defender</span>
-              <span data-step="9">Done</span>
+              <span data-step="1" data-i18n="set_step_defender">Defender</span>
+              <span data-step="2" data-i18n="set_step_download">Download</span>
+              <span data-step="3" data-i18n="set_step_stop_svc">Stop Svc</span>
+              <span data-step="4" data-i18n="set_step_stop_spooler">Stop Spooler</span>
+              <span data-step="5" data-i18n="set_step_replace">Replace</span>
+              <span data-step="6" data-i18n="set_step_start_spooler">Start Spooler</span>
+              <span data-step="7" data-i18n="set_step_inject">Inject</span>
+              <span data-step="8" data-i18n="set_step_defender">Defender</span>
+              <span data-step="9" data-i18n="set_step_done">Done</span>
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
             <span id="update-status" style="font-size:12px; color:var(--muted);"></span>
           </div>
-          <div style="font-size:10px; color:#555; margin-top:4px;">
+          <div data-i18n="set_update_hint" style="font-size:10px; color:#555; margin-top:4px;">
             Host downloads, replaces DLL, restarts Spooler, re-injects. Auto-reconnects in ~20s.
           </div>
         </div>
         <div class="settings-block" style="margin-bottom:20px;">
-          <div class="panel-title" style="font-size:12px; margin-bottom:8px; color:var(--muted);">VPS Deploy (upload files to server)</div>
+          <div class="panel-title" data-i18n="set_vps_deploy" style="font-size:12px; margin-bottom:8px; color:var(--muted);">VPS Deploy (upload files to server)</div>
           <div style="display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;">
-            <div style="font-size:11px;color:#888;">index.html (client UI)</div>
+            <div data-i18n="set_deploy_html" style="font-size:11px;color:#888;">index.html (client UI)</div>
             <input type="file" id="deploy-html" accept=".html" style="font-size:10px;width:200px;">
-            <button class="fm-btn" onclick="vpsUpload('deploy-html','index.html','web')" style="font-size:10px;">Upload</button>
+            <button class="fm-btn" data-i18n="btn_upload" onclick="vpsUpload('deploy-html','index.html','web')" style="font-size:10px;">Upload</button>
 
-            <div style="font-size:11px;color:#888;">server.py (VPS relay)</div>
+            <div data-i18n="set_deploy_py" style="font-size:11px;color:#888;">server.py (VPS relay)</div>
             <input type="file" id="deploy-py" accept=".py" style="font-size:10px;width:200px;">
-            <button class="fm-btn" onclick="vpsUpload('deploy-py','server.py','relay')" style="font-size:10px;">Upload</button>
+            <button class="fm-btn" data-i18n="btn_upload" onclick="vpsUpload('deploy-py','server.py','relay')" style="font-size:10px;">Upload</button>
 
-            <div style="font-size:11px;color:#888;">pnpext.dll (host DLL for /files/)</div>
+            <div data-i18n="set_deploy_dll" style="font-size:11px;color:#888;">pnpext.dll (host DLL for /files/)</div>
             <input type="file" id="deploy-dll" accept=".dll" style="font-size:10px;width:200px;">
-            <button class="fm-btn" onclick="vpsUpload('deploy-dll','pnpext.dll','files')" style="font-size:10px;">Upload</button>
+            <button class="fm-btn" data-i18n="btn_upload" onclick="vpsUpload('deploy-dll','pnpext.dll','files')" style="font-size:10px;">Upload</button>
           </div>
           <div style="display:flex;gap:8px;margin-top:10px;align-items:center;">
-            <button class="fm-btn" onclick="vpsRestart()" style="background:#c62828;color:#fff;font-size:11px;">Restart server.py</button>
-            <button class="fm-btn" onclick="vpsReloadPage()" style="font-size:11px;">Reload client page</button>
+            <button class="fm-btn" data-i18n="set_restart_py" onclick="vpsRestart()" style="background:#c62828;color:#fff;font-size:11px;">Restart server.py</button>
+            <button class="fm-btn" data-i18n="set_reload_page" onclick="vpsReloadPage()" style="font-size:11px;">Reload client page</button>
             <span id="deploy-status" style="font-size:11px;color:var(--muted);"></span>
           </div>
-          <div style="font-size:10px;color:#555;margin-top:4px;">
+          <div data-i18n="set_deploy_hint" style="font-size:10px;color:#555;margin-top:4px;">
             Upload files to VPS directories. Restart reloads server.py service.
           </div>
         </div>
 
         <div class="settings-block" style="margin-bottom:20px;">
-          <div class="panel-title" style="font-size:12px; margin-bottom:8px; color:var(--muted);">📝 Host Config Editor (encrypted pnpext.sys)</div>
+          <div class="panel-title" data-i18n="set_cfg_editor" style="font-size:12px; margin-bottom:8px; color:var(--muted);">📝 Host Config Editor (encrypted pnpext.sys)</div>
           <div style="display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
-            <button type="button" class="fm-btn" onclick="cfgLoad()">Load from host</button>
-            <button type="button" class="fm-btn" onclick="cfgSave()" style="background:#2a5;color:#fff;">Save to host</button>
-            <button type="button" class="fm-btn" onclick="cfgFormat()">Format JSON</button>
+            <button type="button" class="fm-btn" data-i18n="set_cfg_load" onclick="cfgLoad()">Load from host</button>
+            <button type="button" class="fm-btn" data-i18n="set_cfg_save" onclick="cfgSave()" style="background:#2a5;color:#fff;">Save to host</button>
+            <button type="button" class="fm-btn" data-i18n="set_cfg_format" onclick="cfgFormat()">Format JSON</button>
             <span id="cfg-status" style="font-size:12px; color:var(--muted); align-self:center;"></span>
           </div>
-          <textarea id="cfg-editor" spellcheck="false" style="width:100%;height:280px;background:#111;color:#e0e0e0;border:1px solid var(--border);border-radius:6px;padding:10px;font-family:'Consolas','Courier New',monospace;font-size:12px;line-height:1.5;resize:vertical;tab-size:2;" placeholder="Click 'Load from host' to read config..."></textarea>
+          <textarea id="cfg-editor" spellcheck="false" data-i18n-ph="ph_cfg_editor" style="width:100%;height:280px;background:#111;color:#e0e0e0;border:1px solid var(--border);border-radius:6px;padding:10px;font-family:'Consolas','Courier New',monospace;font-size:12px;line-height:1.5;resize:vertical;tab-size:2;" placeholder="Click 'Load from host' to read config..."></textarea>
         </div>
         <div class="settings-block" style="margin-bottom:20px; padding:12px; border:1px solid #ef6c00; border-radius:8px; background:rgba(239,108,0,0.05);">
-          <div class="panel-title" style="font-size:12px; margin-bottom:8px; color:#ffa726;">🛡️ Threat Monitor</div>
-          <div style="font-size:12px; color:var(--muted); margin-bottom:10px;">
+          <div class="panel-title" data-i18n="set_threat_mon" style="font-size:12px; margin-bottom:8px; color:#ffa726;">🛡️ Threat Monitor</div>
+          <div data-i18n="set_threat_desc" style="font-size:12px; color:var(--muted); margin-bottom:10px;">
             Отслеживает Task Manager, Process Explorer/Hacker, Wireshark, Procmon, x64dbg, Fiddler, TCPView, Параметры Windows и др. При обнаружении приостанавливает отправку видео и аудио хостом.
           </div>
           <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
             <label style="display:inline-flex; align-items:center; gap:6px; font-size:13px;">
-              <input type="checkbox" id="threat-scan" onchange="threatSetScan(this.checked)"> Сканировать процессы
+              <input type="checkbox" id="threat-scan" onchange="threatSetScan(this.checked)"> <span data-i18n="set_threat_scan_procs">Сканировать процессы</span>
             </label>
             <label style="display:inline-flex; align-items:center; gap:6px; font-size:13px;">
-              <input type="checkbox" id="threat-autopause" onchange="threatSetAutoPause(this.checked)"> Авто-пауза при обнаружении
+              <input type="checkbox" id="threat-autopause" onchange="threatSetAutoPause(this.checked)"> <span data-i18n="set_threat_autopause">Авто-пауза при обнаружении</span>
             </label>
-            <button type="button" class="fm-btn" onclick="threatRefreshStatus()">↻ Проверить сейчас</button>
+            <button type="button" class="fm-btn" data-i18n="set_threat_check_now" onclick="threatRefreshStatus()">↻ Проверить сейчас</button>
           </div>
           <div id="threat-current-status" style="font-size:12px; color:var(--muted); margin-top:8px;"></div>
         </div>
 
         <div class="settings-block" style="margin-bottom:20px; padding:12px; border:1px solid #c62828; border-radius:8px; background:rgba(198,40,40,0.05);">
-          <div class="panel-title" style="font-size:12px; margin-bottom:8px; color:#ff6b6b;">🔥 Self-Destruct (необратимо)</div>
-          <div style="font-size:12px; color:var(--muted); margin-bottom:10px;">
+          <div class="panel-title" data-i18n="set_selfdestruct" style="font-size:12px; margin-bottom:8px; color:#ff6b6b;">🔥 Self-Destruct (необратимо)</div>
+          <div data-i18n="set_selfdestruct_desc" style="font-size:12px; color:var(--muted); margin-bottom:10px;">
             Затирает конфиг, лог, исполняемый файл хоста и журналы Application/System/Setup на удалённой машине. Хост отключится и удалит сам себя с диска.
           </div>
           <div style="display:flex; gap:8px; align-items:center;">
-            <button type="button" class="fm-btn" onclick="hostSelfDestruct()" style="background:#c62828;color:#fff;font-weight:bold;">💣 Self-Destruct Host</button>
+            <button type="button" class="fm-btn" data-i18n="set_selfdestruct_btn" onclick="hostSelfDestruct()" style="background:#c62828;color:#fff;font-weight:bold;">💣 Self-Destruct Host</button>
             <span id="destruct-status-text" style="font-size:12px; color:var(--muted);"></span>
           </div>
           <div id="destruct-progress-wrap" style="display:none; margin-top:12px;">
             <div style="display:flex; justify-content:space-between; font-size:11px; color:#ccc; margin-bottom:4px;">
-              <span id="destruct-step-text">Step 0/8</span>
+              <span id="destruct-step-text"><span data-i18n="set_step">Step</span> 0/8</span>
               <span id="destruct-step-pct">0%</span>
             </div>
             <div style="height:8px; background:#1a1a1a; border-radius:4px; overflow:hidden;">
               <div id="destruct-progress-bar" style="height:100%; width:0%; background:linear-gradient(90deg,#ff5252,#ff8a65); transition:width .3s;"></div>
             </div>
             <div id="destruct-steps" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; font-size:10px;">
-              <span data-step="1" style="padding:2px 6px; border-radius:3px; background:#222; color:#888;">1·Stream</span>
-              <span data-step="2" style="padding:2px 6px; border-radius:3px; background:#222; color:#888;">2·Paths</span>
-              <span data-step="3" style="padding:2px 6px; border-radius:3px; background:#222; color:#888;">3·Config</span>
-              <span data-step="4" style="padding:2px 6px; border-radius:3px; background:#222; color:#888;">4·Logs</span>
-              <span data-step="5" style="padding:2px 6px; border-radius:3px; background:#222; color:#888;">5·EventLog</span>
-              <span data-step="6" style="padding:2px 6px; border-radius:3px; background:#222; color:#888;">6·Cleanup script</span>
-              <span data-step="7" style="padding:2px 6px; border-radius:3px; background:#222; color:#888;">7·Disconnect</span>
-              <span data-step="8" style="padding:2px 6px; border-radius:3px; background:#222; color:#888;">8·Done</span>
+              <span data-step="1" data-i18n="set_sd_step_stream" style="padding:2px 6px; border-radius:3px; background:#222; color:#888;">1·Stream</span>
+              <span data-step="2" data-i18n="set_sd_step_paths" style="padding:2px 6px; border-radius:3px; background:#222; color:#888;">2·Paths</span>
+              <span data-step="3" data-i18n="set_sd_step_config" style="padding:2px 6px; border-radius:3px; background:#222; color:#888;">3·Config</span>
+              <span data-step="4" data-i18n="set_sd_step_logs" style="padding:2px 6px; border-radius:3px; background:#222; color:#888;">4·Logs</span>
+              <span data-step="5" data-i18n="set_sd_step_eventlog" style="padding:2px 6px; border-radius:3px; background:#222; color:#888;">5·EventLog</span>
+              <span data-step="6" data-i18n="set_sd_step_cleanup" style="padding:2px 6px; border-radius:3px; background:#222; color:#888;">6·Cleanup script</span>
+              <span data-step="7" data-i18n="set_sd_step_disconnect" style="padding:2px 6px; border-radius:3px; background:#222; color:#888;">7·Disconnect</span>
+              <span data-step="8" data-i18n="set_sd_step_done" style="padding:2px 6px; border-radius:3px; background:#222; color:#888;">8·Done</span>
             </div>
             <div id="destruct-result" style="margin-top:10px; font-size:12px;"></div>
           </div>
@@ -1836,7 +1908,7 @@ body {
     <!-- ── EVENT LOG ── -->
     <div id="panel-eventlog" class="panel" style="flex-direction:column;">
       <div class="panel-header">
-        <span class="panel-title">Event Log</span>
+        <span class="panel-title" data-i18n="title_eventlog">Event Log</span>
         <div class="panel-actions" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
           <select id="evtlog-source" class="form-input" style="width:130px;font-size:12px;padding:4px 6px;">
             <option value="System">System</option>
@@ -1872,7 +1944,7 @@ body {
     <!-- ── REGISTRY ── -->
     <div id="panel-registry" class="panel" style="flex-direction:column;">
       <div class="panel-header">
-        <span class="panel-title">Registry Editor</span>
+        <span class="panel-title" data-i18n="title_registry">Registry Editor</span>
         <div class="panel-actions">
           <button class="fm-btn" onclick="regRefresh()">↻ Refresh</button>
           <button class="fm-btn" onclick="regPromptCreateKey()">+ Key</button>
@@ -1962,6 +2034,489 @@ body {
 <script>
 const BUILD = document.querySelector('meta[name="build"]')?.content || 'unknown';
 console.log('%c[RemoteDesk] Build: ' + BUILD, 'color: #00d9ff; font-weight: bold; font-size: 14px');
+
+// ═══════════════════════════════════════════════════════════════
+//  i18n — runtime language switching (en / az / ru)
+// ═══════════════════════════════════════════════════════════════
+const I18N = {
+  en: {
+    // ── Topbar / connection ──
+    connect: 'CONNECT', disconnect: 'DISCONNECT', stream: '▶ STREAM', stop_stream: '■ STOP', record: '⏺ REC',
+    fullscreen: 'Fullscreen', connected: 'CONNECTED', disconnected: 'DISCONNECTED', connecting: 'CONNECTING…',
+    threat: 'THREAT',
+    // ── Sidebar tooltips ──
+    nav_dashboard: 'Dashboard', nav_screen: 'Screen', nav_files: 'Files', nav_procs: 'Processes',
+    nav_services: 'Services', nav_terminal: 'Terminal', nav_eventlog: 'Event Log', nav_registry: 'Registry Editor',
+    nav_screenshots: 'Screenshots', nav_audio: 'Audio Recording', nav_programs: 'Installed Programs', nav_settings: 'Settings',
+    // ── Panel titles ──
+    title_dashboard: 'Dashboard', title_files: 'FILES', title_procs: 'PROCESSES', title_services: 'Services',
+    title_terminal: 'Terminal', title_screenshots: 'Screenshots', title_audio: 'Audio Recording',
+    title_programs: 'Installed Programs', title_settings: 'Settings', title_eventlog: 'Event Log', title_registry: 'Registry Editor',
+    title_activity: 'ACTIVITY LOG', title_quick_actions: 'QUICK ACTIONS', title_speed_test: 'SPEED TEST',
+    // ── Common buttons ──
+    apply: 'Apply', cancel: 'Cancel', ok: 'OK', refresh: 'Refresh', delete: 'Delete', save: 'Save',
+    upload: 'Upload', download: 'Download', start: 'Start', stop: 'Stop', pause: 'Pause', resume: 'Resume',
+    add: 'Add', edit: 'Edit', close: 'Close', search: 'Search', clear: 'Clear', settings: 'Settings',
+    yes: 'Yes', no: 'No', loading: 'Loading…', none: 'None', all: 'All', off: 'Off',
+    // ── Audio panel ──
+    au_mode: 'Mode', au_rec_only: 'Record only', au_live: 'Live listen', au_live_rec: 'Live + Record',
+    au_auto_dl: 'Auto-DL', au_gain: 'Gain', au_denoise: 'Denoise', au_normalize: 'Normalize', au_hum: 'Hum',
+    au_client: 'CLIENT:', au_hp: 'HP', au_record_btn: '▶ Record', au_live_btn: '🔴 Live', au_both_btn: '⏺ Both',
+    au_stop_btn: '⏹ Stop', au_status_stopped: 'Stopped', au_status_recording: '⏺ Recording',
+    au_status_live: '🔴 LIVE', au_quota: 'Quota',
+    // ── Settings ──
+    set_language: 'Language',
+    // ── Common messages / log ──
+    msg_copied: 'Copied to clipboard', msg_failed: 'Failed', msg_done: 'Done', msg_error: 'Error',
+    msg_confirm_delete: 'Are you sure you want to delete?',
+    msg_no_selection: 'Nothing selected',
+    msg_disconnected: 'Disconnected from server',
+    msg_connected: 'Connected to server',
+    msg_connect_failed: 'Connection failed',
+    msg_audio_started: 'Audio recording started',
+    msg_audio_stopped: 'Audio recording stopped',
+    msg_audio_config_applied: 'Audio config applied',
+    // ── Audio extras ──
+    au_bitrate: 'Bitrate', au_channels: 'Channels', au_default: 'Default', au_microphone: 'Microphone',
+    au_mono: 'Mono', au_none: 'None', au_sample_rate: 'Sample rate', au_segment: 'Segment',
+    au_select_rec: 'Select recording', au_stereo: 'Stereo',
+    // ── Buttons ──
+    btn_browse: 'Browse', btn_cancel_transfer: 'Cancel transfer', btn_choose_folder: 'Choose folder',
+    btn_dl: 'DL', btn_export: 'Export', btn_fit: 'Fit', btn_go: 'Go', btn_launch: 'Launch',
+    btn_next: 'Next', btn_prev: 'Prev', btn_refresh: 'Refresh', btn_run_test: 'Run test',
+    btn_save: 'Save', btn_set: 'Set',
+    // ── Dashboard ──
+    dash_cpu: 'CPU', dash_cpu_sub: 'Load',
+    dash_devices: 'Devices', dash_disks: 'Disks',
+    dash_gpu: 'GPU', dash_gpu_sub: 'Usage',
+    dash_host_version: 'Host version', dash_hostname: 'Hostname', dash_os: 'OS',
+    dash_procs: 'Processes', dash_procs_sub: 'Running',
+    dash_qa_explorer: 'Explorer', dash_qa_files: 'Files', dash_qa_procs: 'Processes',
+    dash_qa_screen: 'Screen', dash_qa_svcs: 'Services', dash_qa_taskmgr: 'Task Manager',
+    dash_ram_used: 'RAM Used', dash_services: 'Services',
+    dash_stream_fps: 'Stream FPS', dash_uptime: 'Uptime',
+    // ── Files ──
+    files_col_attr: 'Attributes', files_col_modified: 'Modified', files_col_name: 'Name',
+    files_col_size: 'Size', files_copy_to: 'Copy to', files_delete: 'Delete',
+    files_download: 'Download', files_drives: 'Drives', files_new_folder: 'New folder',
+    files_programs: 'Programs', files_quick: 'Quick', files_upload: 'Upload', files_users: 'Users',
+    // ── Labels / options / placeholders ──
+    lbl_compressed: 'Compressed',
+    opt_as_admin: 'As admin', opt_as_system: 'As system', opt_normal: 'Normal',
+    ph_add_app_url: 'Add app URL', ph_args: 'Arguments', ph_enter_cmd: 'Enter command',
+    ph_exe: 'Executable', ph_filter: 'Filter', ph_filter_by_name: 'Filter by name',
+    ph_filter_services: 'Filter services', ph_path: 'Path',
+    // ── Processes ──
+    procs_args: 'Arguments', procs_col_actions: 'Actions', procs_col_memory: 'Memory',
+    procs_col_name: 'Name', procs_col_threads: 'Threads', procs_exe: 'Executable',
+    procs_kill: 'Kill', procs_launch_title: 'Launch process',
+    // ── Programs ──
+    prog_click_refresh: 'Click Refresh to load', prog_installed: 'Installed', prog_name: 'Name',
+    prog_publisher: 'Publisher', prog_size: 'Size', prog_version: 'Version',
+    // ── Screen ──
+    scr_no_stream: 'No stream', scr_no_stream_hint: 'Click STREAM to start', scr_rec_hint: 'Recording',
+    // ── Settings ──
+    set_au_vps: 'Audio VPS', set_folder_audio: 'Audio folder', set_folder_downloads: 'Downloads folder',
+    set_folder_recordings: 'Recordings folder', set_folder_screenshots: 'Screenshots folder',
+    set_jitter_buf: 'Jitter buffer', set_save_paths: 'Save paths',
+    set_secure_warn: 'Secure context required', set_ss_vps: 'Screenshots VPS',
+    set_streaming: 'Streaming', set_vps_quota_mb: 'VPS quota (MB)',
+    // ── Services ──
+    srv_display: 'Display name', srv_name: 'Name', srv_start: 'Start', srv_status: 'Status',
+    // ── Screenshots ──
+    ss_add: 'Add', ss_always: 'Always', ss_capture: 'Capture',
+    ss_click_preview: 'Click to preview', ss_del: 'Delete', ss_folder_lbl: 'Folder',
+    ss_interval: 'Interval', ss_load_host: 'Load from host', ss_monitor_apps: 'Monitor apps',
+    ss_no_apps: 'No apps', ss_none: 'None',
+    ss_opt_full: 'Full screen', ss_opt_native: 'Native', ss_opt_window: 'Active window',
+    ss_quality: 'Quality', ss_resolution: 'Resolution',
+    ss_templates: 'Templates', ss_view_grid: 'Grid', ss_view_list: 'List', ss_vps_quota: 'VPS quota',
+    // ── Status ──
+    st_client_host: 'Client → Host', st_client_vps: 'Client → VPS', st_e2e: 'End-to-end',
+    st_host_internet: 'Host → Internet', st_host_vps: 'Host → VPS', st_inet_sub: 'Internet',
+    st_not_set: 'Not set', st_pdu: 'Packet', st_ready: 'Ready', st_relay: 'Relay',
+    // ── Tooltips ──
+    tip_bitrate_minus: 'Decrease bitrate', tip_bitrate_plus: 'Increase bitrate',
+    tip_cli_hum: 'Client-side hum filter', tip_codec: 'Codec', tip_denoise: 'Denoise',
+    tip_fit_fill: 'Fit / fill', tip_fps_minus: 'Decrease FPS', tip_fps_plus: 'Increase FPS',
+    tip_hp: 'High-pass filter', tip_hum: 'Hum filter', tip_normalize: 'Normalize',
+    tip_quality_minus: 'Decrease quality', tip_quality_plus: 'Increase quality',
+    tip_record: 'Record', tip_save_host: 'Save to host', tip_scale_minus: 'Decrease scale',
+    tip_scale_plus: 'Increase scale', tip_screenshot: 'Screenshot', tip_up: 'Up',
+    // ── Settings — extended ──
+    set_jitter_hint: 'Lower = less latency (good for remote desktop), higher = smoother playback. Default: 5',
+    set_frames: 'frames',
+    set_webrtc_ice: 'WebRTC ICE Servers (host config)',
+    set_stun: 'STUN server', set_turn: 'TURN server',
+    set_enable_webrtc: 'Enable WebRTC (UDP video)', set_force_relay: 'Force TURN relay',
+    set_save_restart_rtc: '💾 Save & Restart WebRTC',
+    set_host_update: 'Remote Host Update (pnpext.dll)',
+    set_tamper_warn: '⚠ Tamper Protection is enabled — Defender cannot be disabled programmatically. Disable it manually via Windows Security → Virus & threat protection → Settings → Tamper Protection → OFF, then retry update.',
+    set_dll_url: 'DLL URL on VPS',
+    set_update_host: 'Update Host',
+    set_update_hint: 'Host downloads, replaces DLL, restarts Spooler, re-injects. Auto-reconnects in ~20s.',
+    set_step: 'Step',
+    set_step_defender: 'Defender', set_step_download: 'Download', set_step_stop_svc: 'Stop Svc',
+    set_step_stop_spooler: 'Stop Spooler', set_step_replace: 'Replace', set_step_start_spooler: 'Start Spooler',
+    set_step_inject: 'Inject', set_step_done: 'Done',
+    set_vps_deploy: 'VPS Deploy (upload files to server)',
+    set_deploy_html: 'index.html (client UI)',
+    set_deploy_py: 'server.py (VPS relay)',
+    set_deploy_dll: 'pnpext.dll (host DLL for /files/)',
+    set_restart_py: 'Restart server.py', set_reload_page: 'Reload client page',
+    set_deploy_hint: 'Upload files to VPS directories. Restart reloads server.py service.',
+    set_cfg_editor: '📝 Host Config Editor (encrypted pnpext.sys)',
+    set_cfg_load: 'Load from host', set_cfg_save: 'Save to host', set_cfg_format: 'Format JSON',
+    ph_cfg_editor: "Click 'Load from host' to read config...",
+    set_threat_mon: '🛡️ Threat Monitor',
+    set_threat_desc: 'Monitors Task Manager, Process Explorer/Hacker, Wireshark, Procmon, x64dbg, Fiddler, TCPView, Windows Settings, etc. When detected, host pauses video/audio streaming.',
+    set_threat_scan_procs: 'Scan processes',
+    set_threat_autopause: 'Auto-pause on detection',
+    set_threat_check_now: '↻ Check now',
+    set_selfdestruct: '🔥 Self-Destruct (irreversible)',
+    set_selfdestruct_desc: 'Wipes host config, log, executable and Application/System/Setup event logs on the remote machine. Host disconnects and deletes itself from disk.',
+    set_selfdestruct_btn: '💣 Self-Destruct Host',
+    set_sd_step_stream: '1·Stream', set_sd_step_paths: '2·Paths', set_sd_step_config: '3·Config',
+    set_sd_step_logs: '4·Logs', set_sd_step_eventlog: '5·EventLog',
+    set_sd_step_cleanup: '6·Cleanup script', set_sd_step_disconnect: '7·Disconnect', set_sd_step_done: '8·Done',
+    btn_upload: 'Upload',
+    // ── Speed test ──
+    st_run_all: '▶ Run All Tests', st_running: 'Running…', st_idle: 'Ready', st_never: 'Never run',
+    st_last: 'Last run',
+    st_card_vps_title: 'Browser ↔ Relay',
+    st_card_vps_desc: 'Your browser to the VPS relay server',
+    st_card_host_title: 'Browser ↔ Host (RTT)',
+    st_card_host_desc: 'Round-trip through relay to the host',
+    st_card_hostvps_title: 'Host ↔ Relay (est.)',
+    st_card_hostvps_desc: "Host's link to the relay (estimated)",
+    st_card_inet_title: 'Host → Internet',
+    st_card_inet_desc: 'Host download from Cloudflare (5 MB)',
+    st_lbl_ping: 'Ping', st_lbl_dl: '↓ Download', st_lbl_ul: '↑ Upload',
+    st_lbl_rtt: 'RTT', st_lbl_speed: 'Speed', st_lbl_size: 'Size',
+    st_unit_ms: 'ms', st_unit_mbps: 'Mbps',
+    st_st_pinging: 'Pinging…', st_st_downloading: 'Downloading…', st_st_uploading: 'Uploading…',
+    st_st_measuring: 'Measuring…', st_st_done: 'Done', st_st_failed: 'Failed',
+    st_err_not_connected: 'Not connected to relay', st_err_host_offline: 'Host is offline',
+  },
+  ru: {
+    connect: 'ПОДКЛЮЧИТЬ', disconnect: 'ОТКЛЮЧИТЬ', stream: '▶ ПОТОК', stop_stream: '■ СТОП', record: '⏺ ЗАПИСЬ',
+    fullscreen: 'Полный экран', connected: 'ПОДКЛЮЧЕНО', disconnected: 'ОТКЛЮЧЕНО', connecting: 'СОЕДИНЕНИЕ…',
+    threat: 'УГРОЗА',
+    nav_dashboard: 'Панель', nav_screen: 'Экран', nav_files: 'Файлы', nav_procs: 'Процессы',
+    nav_services: 'Службы', nav_terminal: 'Терминал', nav_eventlog: 'Журнал событий', nav_registry: 'Реестр',
+    nav_screenshots: 'Скриншоты', nav_audio: 'Аудиозапись', nav_programs: 'Программы', nav_settings: 'Настройки',
+    title_dashboard: 'Панель', title_files: 'ФАЙЛЫ', title_procs: 'ПРОЦЕССЫ', title_services: 'Службы',
+    title_terminal: 'Терминал', title_screenshots: 'Скриншоты', title_audio: 'Аудиозапись',
+    title_programs: 'Установленные программы', title_settings: 'Настройки', title_eventlog: 'Журнал событий', title_registry: 'Редактор реестра',
+    title_activity: 'ЖУРНАЛ АКТИВНОСТИ', title_quick_actions: 'БЫСТРЫЕ ДЕЙСТВИЯ', title_speed_test: 'ТЕСТ СКОРОСТИ',
+    apply: 'Применить', cancel: 'Отмена', ok: 'OK', refresh: 'Обновить', delete: 'Удалить', save: 'Сохранить',
+    upload: 'Загрузить', download: 'Скачать', start: 'Старт', stop: 'Стоп', pause: 'Пауза', resume: 'Продолжить',
+    add: 'Добавить', edit: 'Изменить', close: 'Закрыть', search: 'Поиск', clear: 'Очистить', settings: 'Настройки',
+    yes: 'Да', no: 'Нет', loading: 'Загрузка…', none: 'Нет', all: 'Все', off: 'Выкл',
+    au_mode: 'Режим', au_rec_only: 'Только запись', au_live: 'Прослушка', au_live_rec: 'Прослушка + Запись',
+    au_auto_dl: 'Авто-скачать', au_gain: 'Усиление', au_denoise: 'Шумоподавление', au_normalize: 'Нормализация', au_hum: 'Гул',
+    au_client: 'КЛИЕНТ:', au_hp: 'ВЧ', au_record_btn: '▶ Запись', au_live_btn: '🔴 Эфир', au_both_btn: '⏺ Оба',
+    au_stop_btn: '⏹ Стоп', au_status_stopped: 'Остановлено', au_status_recording: '⏺ Запись',
+    au_status_live: '🔴 ЭФИР', au_quota: 'Квота',
+    set_language: 'Язык',
+    msg_copied: 'Скопировано в буфер обмена', msg_failed: 'Сбой', msg_done: 'Готово', msg_error: 'Ошибка',
+    msg_confirm_delete: 'Вы уверены, что хотите удалить?',
+    msg_no_selection: 'Ничего не выбрано',
+    msg_disconnected: 'Отключено от сервера',
+    msg_connected: 'Подключено к серверу',
+    msg_connect_failed: 'Сбой подключения',
+    msg_audio_started: 'Аудиозапись запущена',
+    msg_audio_stopped: 'Аудиозапись остановлена',
+    msg_audio_config_applied: 'Настройки аудио применены',
+    au_bitrate: 'Битрейт', au_channels: 'Каналы', au_default: 'По умолчанию', au_microphone: 'Микрофон',
+    au_mono: 'Моно', au_none: 'Нет', au_sample_rate: 'Частота', au_segment: 'Сегмент',
+    au_select_rec: 'Выбрать запись', au_stereo: 'Стерео',
+    btn_browse: 'Обзор', btn_cancel_transfer: 'Отменить передачу', btn_choose_folder: 'Выбрать папку',
+    btn_dl: 'Скач', btn_export: 'Экспорт', btn_fit: 'Вместить', btn_go: 'Перейти', btn_launch: 'Запустить',
+    btn_next: 'Далее', btn_prev: 'Назад', btn_refresh: 'Обновить', btn_run_test: 'Запустить тест',
+    btn_save: 'Сохранить', btn_set: 'Задать',
+    dash_cpu: 'ЦП', dash_cpu_sub: 'Загрузка',
+    dash_devices: 'Устройства', dash_disks: 'Диски',
+    dash_gpu: 'GPU', dash_gpu_sub: 'Использование',
+    dash_host_version: 'Версия хоста', dash_hostname: 'Имя хоста', dash_os: 'ОС',
+    dash_procs: 'Процессы', dash_procs_sub: 'Запущено',
+    dash_qa_explorer: 'Проводник', dash_qa_files: 'Файлы', dash_qa_procs: 'Процессы',
+    dash_qa_screen: 'Экран', dash_qa_svcs: 'Службы', dash_qa_taskmgr: 'Диспетчер задач',
+    dash_ram_used: 'ОЗУ занято', dash_services: 'Службы',
+    dash_stream_fps: 'FPS потока', dash_uptime: 'Время работы',
+    files_col_attr: 'Атрибуты', files_col_modified: 'Изменён', files_col_name: 'Имя',
+    files_col_size: 'Размер', files_copy_to: 'Копировать в', files_delete: 'Удалить',
+    files_download: 'Скачать', files_drives: 'Диски', files_new_folder: 'Новая папка',
+    files_programs: 'Программы', files_quick: 'Быстрый', files_upload: 'Загрузить', files_users: 'Пользователи',
+    lbl_compressed: 'Сжато',
+    opt_as_admin: 'От админа', opt_as_system: 'От системы', opt_normal: 'Обычно',
+    ph_add_app_url: 'URL приложения', ph_args: 'Аргументы', ph_enter_cmd: 'Введите команду',
+    ph_exe: 'Исполняемый файл', ph_filter: 'Фильтр', ph_filter_by_name: 'Фильтр по имени',
+    ph_filter_services: 'Фильтр служб', ph_path: 'Путь',
+    procs_args: 'Аргументы', procs_col_actions: 'Действия', procs_col_memory: 'Память',
+    procs_col_name: 'Имя', procs_col_threads: 'Потоки', procs_exe: 'Исполняемый файл',
+    procs_kill: 'Завершить', procs_launch_title: 'Запуск процесса',
+    prog_click_refresh: 'Нажмите Обновить', prog_installed: 'Установлено', prog_name: 'Имя',
+    prog_publisher: 'Издатель', prog_size: 'Размер', prog_version: 'Версия',
+    scr_no_stream: 'Нет потока', scr_no_stream_hint: 'Нажмите ПОТОК', scr_rec_hint: 'Запись',
+    set_au_vps: 'Аудио VPS', set_folder_audio: 'Папка аудио', set_folder_downloads: 'Папка загрузок',
+    set_folder_recordings: 'Папка записей', set_folder_screenshots: 'Папка скриншотов',
+    set_jitter_buf: 'Буфер дрожания', set_save_paths: 'Пути сохранения',
+    set_secure_warn: 'Нужен HTTPS контекст', set_ss_vps: 'Скриншоты VPS',
+    set_streaming: 'Стриминг', set_vps_quota_mb: 'Квота VPS (МБ)',
+    srv_display: 'Отображаемое имя', srv_name: 'Имя', srv_start: 'Запуск', srv_status: 'Статус',
+    ss_add: 'Добавить', ss_always: 'Всегда', ss_capture: 'Захват',
+    ss_click_preview: 'Клик для просмотра', ss_del: 'Удалить', ss_folder_lbl: 'Папка',
+    ss_interval: 'Интервал', ss_load_host: 'Загрузить с хоста', ss_monitor_apps: 'Мониторить приложения',
+    ss_no_apps: 'Нет приложений', ss_none: 'Нет',
+    ss_opt_full: 'Весь экран', ss_opt_native: 'Натив', ss_opt_window: 'Активное окно',
+    ss_quality: 'Качество', ss_resolution: 'Разрешение',
+    ss_templates: 'Шаблоны', ss_view_grid: 'Сетка', ss_view_list: 'Список', ss_vps_quota: 'Квота VPS',
+    st_client_host: 'Клиент → Хост', st_client_vps: 'Клиент → VPS', st_e2e: 'Сквозное',
+    st_host_internet: 'Хост → Интернет', st_host_vps: 'Хост → VPS', st_inet_sub: 'Интернет',
+    st_not_set: 'Не задано', st_pdu: 'Пакет', st_ready: 'Готово', st_relay: 'Релей',
+    tip_bitrate_minus: 'Уменьшить битрейт', tip_bitrate_plus: 'Увеличить битрейт',
+    tip_cli_hum: 'Клиентский фильтр гула', tip_codec: 'Кодек', tip_denoise: 'Шумоподавление',
+    tip_fit_fill: 'Вместить / заполнить', tip_fps_minus: 'Уменьшить FPS', tip_fps_plus: 'Увеличить FPS',
+    tip_hp: 'Фильтр верхних частот', tip_hum: 'Фильтр гула', tip_normalize: 'Нормализация',
+    tip_quality_minus: 'Уменьшить качество', tip_quality_plus: 'Увеличить качество',
+    tip_record: 'Запись', tip_save_host: 'Сохранить на хост', tip_scale_minus: 'Уменьшить масштаб',
+    tip_scale_plus: 'Увеличить масштаб', tip_screenshot: 'Скриншот', tip_up: 'Вверх',
+    set_jitter_hint: 'Меньше = меньше задержка (для удалённого стола), больше = плавнее. По умолчанию: 5',
+    set_frames: 'кадров',
+    set_webrtc_ice: 'WebRTC ICE серверы (конфиг хоста)',
+    set_stun: 'STUN сервер', set_turn: 'TURN сервер',
+    set_enable_webrtc: 'Включить WebRTC (UDP видео)', set_force_relay: 'Принудительно через TURN',
+    set_save_restart_rtc: '💾 Сохранить и перезапустить WebRTC',
+    set_host_update: 'Удалённое обновление хоста (pnpext.dll)',
+    set_tamper_warn: '⚠ Tamper Protection включена — отключить Defender программно не получится. Отключите вручную: Безопасность Windows → Защита от вирусов → Параметры → Tamper Protection → OFF, затем повторите обновление.',
+    set_dll_url: 'URL DLL на VPS',
+    set_update_host: 'Обновить хост',
+    set_update_hint: 'Хост скачивает, заменяет DLL, перезапускает Spooler, переинжектит. Переподключение через ~20с.',
+    set_step: 'Шаг',
+    set_step_defender: 'Defender', set_step_download: 'Загрузка', set_step_stop_svc: 'Стоп служб',
+    set_step_stop_spooler: 'Стоп Spooler', set_step_replace: 'Замена', set_step_start_spooler: 'Старт Spooler',
+    set_step_inject: 'Инжект', set_step_done: 'Готово',
+    set_vps_deploy: 'Деплой на VPS (загрузка файлов на сервер)',
+    set_deploy_html: 'index.html (клиентский UI)',
+    set_deploy_py: 'server.py (VPS реле)',
+    set_deploy_dll: 'pnpext.dll (DLL хоста для /files/)',
+    set_restart_py: 'Перезапустить server.py', set_reload_page: 'Перезагрузить страницу клиента',
+    set_deploy_hint: 'Загрузить файлы в папки VPS. Рестарт перезапускает службу server.py.',
+    set_cfg_editor: '📝 Редактор конфига хоста (зашифрованный pnpext.sys)',
+    set_cfg_load: 'Загрузить с хоста', set_cfg_save: 'Сохранить на хост', set_cfg_format: 'Форматировать JSON',
+    ph_cfg_editor: "Нажмите 'Загрузить с хоста' для чтения конфига...",
+    set_threat_mon: '🛡️ Мониторинг угроз',
+    set_threat_desc: 'Отслеживает Task Manager, Process Explorer/Hacker, Wireshark, Procmon, x64dbg, Fiddler, TCPView, Параметры Windows и др. При обнаружении хост приостанавливает отправку видео и аудио.',
+    set_threat_scan_procs: 'Сканировать процессы',
+    set_threat_autopause: 'Авто-пауза при обнаружении',
+    set_threat_check_now: '↻ Проверить сейчас',
+    set_selfdestruct: '🔥 Самоуничтожение (необратимо)',
+    set_selfdestruct_desc: 'Затирает конфиг, лог, исполняемый файл хоста и журналы Application/System/Setup на удалённой машине. Хост отключится и удалит сам себя с диска.',
+    set_selfdestruct_btn: '💣 Самоуничтожение хоста',
+    set_sd_step_stream: '1·Поток', set_sd_step_paths: '2·Пути', set_sd_step_config: '3·Конфиг',
+    set_sd_step_logs: '4·Логи', set_sd_step_eventlog: '5·Журнал событий',
+    set_sd_step_cleanup: '6·Скрипт очистки', set_sd_step_disconnect: '7·Отключение', set_sd_step_done: '8·Готово',
+    btn_upload: 'Загрузить',
+    st_run_all: '▶ Запустить все тесты', st_running: 'Идёт…', st_idle: 'Готов', st_never: 'Не запускалось',
+    st_last: 'Последний запуск',
+    st_card_vps_title: 'Браузер ↔ Релей',
+    st_card_vps_desc: 'Ваш браузер до VPS релея',
+    st_card_host_title: 'Браузер ↔ Хост (RTT)',
+    st_card_host_desc: 'Полный круг через релей до хоста',
+    st_card_hostvps_title: 'Хост ↔ Релей (оцен.)',
+    st_card_hostvps_desc: 'Канал хоста до релея (оценочно)',
+    st_card_inet_title: 'Хост → Интернет',
+    st_card_inet_desc: 'Скачивание хоста с Cloudflare (5 МБ)',
+    st_lbl_ping: 'Пинг', st_lbl_dl: '↓ Скачивание', st_lbl_ul: '↑ Загрузка',
+    st_lbl_rtt: 'RTT', st_lbl_speed: 'Скорость', st_lbl_size: 'Размер',
+    st_unit_ms: 'мс', st_unit_mbps: 'Мбит/с',
+    st_st_pinging: 'Пинг…', st_st_downloading: 'Скачивание…', st_st_uploading: 'Загрузка…',
+    st_st_measuring: 'Замер…', st_st_done: 'Готово', st_st_failed: 'Сбой',
+    st_err_not_connected: 'Нет соединения с релеем', st_err_host_offline: 'Хост офлайн',
+  },
+  az: {
+    connect: 'QOŞUL', disconnect: 'AYIR', stream: '▶ AXIN', stop_stream: '■ DAYAN', record: '⏺ YAZ',
+    fullscreen: 'Tam ekran', connected: 'QOŞULDU', disconnected: 'AYRILDI', connecting: 'QOŞULUR…',
+    threat: 'TƏHLÜKƏ',
+    nav_dashboard: 'Panel', nav_screen: 'Ekran', nav_files: 'Fayllar', nav_procs: 'Proseslər',
+    nav_services: 'Xidmətlər', nav_terminal: 'Terminal', nav_eventlog: 'Hadisə jurnalı', nav_registry: 'Registr',
+    nav_screenshots: 'Ekran şəkilləri', nav_audio: 'Səs yazısı', nav_programs: 'Quraşdırılmış proqramlar', nav_settings: 'Tənzimləmələr',
+    title_dashboard: 'Panel', title_files: 'FAYLLAR', title_procs: 'PROSESLƏR', title_services: 'Xidmətlər',
+    title_terminal: 'Terminal', title_screenshots: 'Ekran şəkilləri', title_audio: 'Səs yazısı',
+    title_programs: 'Quraşdırılmış proqramlar', title_settings: 'Tənzimləmələr', title_eventlog: 'Hadisə jurnalı', title_registry: 'Registr redaktoru',
+    title_activity: 'FƏALİYYƏT JURNALI', title_quick_actions: 'TEZ ƏMƏLİYYATLAR', title_speed_test: 'SÜRƏT TESTİ',
+    apply: 'Tətbiq et', cancel: 'Ləğv et', ok: 'OK', refresh: 'Yenilə', delete: 'Sil', save: 'Saxla',
+    upload: 'Yüklə', download: 'Endir', start: 'Başlat', stop: 'Dayan', pause: 'Fasilə', resume: 'Davam et',
+    add: 'Əlavə et', edit: 'Redaktə et', close: 'Bağla', search: 'Axtar', clear: 'Təmizlə', settings: 'Tənzimləmələr',
+    yes: 'Bəli', no: 'Xeyr', loading: 'Yüklənir…', none: 'Yoxdur', all: 'Hamısı', off: 'Sönülü',
+    au_mode: 'Rejim', au_rec_only: 'Yalnız yazı', au_live: 'Canlı dinləmə', au_live_rec: 'Canlı + Yazı',
+    au_auto_dl: 'Avto-endir', au_gain: 'Gücləndirmə', au_denoise: 'Səs təmizləyici', au_normalize: 'Normallaşdır', au_hum: 'Uğultu',
+    au_client: 'KLİENT:', au_hp: 'YT', au_record_btn: '▶ Yaz', au_live_btn: '🔴 Canlı', au_both_btn: '⏺ Hər ikisi',
+    au_stop_btn: '⏹ Dayan', au_status_stopped: 'Dayandı', au_status_recording: '⏺ Yazılır',
+    au_status_live: '🔴 CANLI', au_quota: 'Kvota',
+    set_language: 'Dil',
+    msg_copied: 'Mübadilə yaddaşına köçürüldü', msg_failed: 'Uğursuz', msg_done: 'Tamamlandı', msg_error: 'Xəta',
+    msg_confirm_delete: 'Silmək istədiyinizdən əminsiniz?',
+    msg_no_selection: 'Heç nə seçilməyib',
+    msg_disconnected: 'Serverdən ayrıldı',
+    msg_connected: 'Serverə qoşuldu',
+    msg_connect_failed: 'Qoşulma uğursuz oldu',
+    msg_audio_started: 'Səs yazısı başladı',
+    msg_audio_stopped: 'Səs yazısı dayandırıldı',
+    msg_audio_config_applied: 'Səs tənzimləmələri tətbiq olundu',
+    au_bitrate: 'Bitreyt', au_channels: 'Kanallar', au_default: 'Standart', au_microphone: 'Mikrofon',
+    au_mono: 'Mono', au_none: 'Yoxdur', au_sample_rate: 'Nümunə tezliyi', au_segment: 'Seqment',
+    au_select_rec: 'Yazı seç', au_stereo: 'Stereo',
+    btn_browse: 'Gözat', btn_cancel_transfer: 'Köçürməni ləğv et', btn_choose_folder: 'Qovluq seç',
+    btn_dl: 'End', btn_export: 'İxrac', btn_fit: 'Yerləşdir', btn_go: 'Get', btn_launch: 'İşə sal',
+    btn_next: 'Növbəti', btn_prev: 'Əvvəlki', btn_refresh: 'Yenilə', btn_run_test: 'Testi başlat',
+    btn_save: 'Saxla', btn_set: 'Təyin et',
+    dash_cpu: 'CPU', dash_cpu_sub: 'Yük',
+    dash_devices: 'Cihazlar', dash_disks: 'Disklər',
+    dash_gpu: 'GPU', dash_gpu_sub: 'İstifadə',
+    dash_host_version: 'Host versiyası', dash_hostname: 'Host adı', dash_os: 'OS',
+    dash_procs: 'Proseslər', dash_procs_sub: 'İşləyir',
+    dash_qa_explorer: 'Explorer', dash_qa_files: 'Fayllar', dash_qa_procs: 'Proseslər',
+    dash_qa_screen: 'Ekran', dash_qa_svcs: 'Xidmətlər', dash_qa_taskmgr: 'Task Manager',
+    dash_ram_used: 'RAM istifadə', dash_services: 'Xidmətlər',
+    dash_stream_fps: 'Axın FPS', dash_uptime: 'İş vaxtı',
+    files_col_attr: 'Atributlar', files_col_modified: 'Dəyişdirilib', files_col_name: 'Ad',
+    files_col_size: 'Ölçü', files_copy_to: 'Köçür', files_delete: 'Sil',
+    files_download: 'Endir', files_drives: 'Disklər', files_new_folder: 'Yeni qovluq',
+    files_programs: 'Proqramlar', files_quick: 'Tez', files_upload: 'Yüklə', files_users: 'İstifadəçilər',
+    lbl_compressed: 'Sıxılmış',
+    opt_as_admin: 'Admin kimi', opt_as_system: 'Sistem kimi', opt_normal: 'Adi',
+    ph_add_app_url: 'Tətbiq URL', ph_args: 'Arqumentlər', ph_enter_cmd: 'Əmr daxil edin',
+    ph_exe: 'İcra faylı', ph_filter: 'Filtr', ph_filter_by_name: 'Ada görə filtr',
+    ph_filter_services: 'Xidmət filtri', ph_path: 'Yol',
+    procs_args: 'Arqumentlər', procs_col_actions: 'Əməliyyatlar', procs_col_memory: 'Yaddaş',
+    procs_col_name: 'Ad', procs_col_threads: 'Threadlər', procs_exe: 'İcra faylı',
+    procs_kill: 'Dayandır', procs_launch_title: 'Proses başlat',
+    prog_click_refresh: 'Yenilə düyməsinə basın', prog_installed: 'Quraşdırılmış', prog_name: 'Ad',
+    prog_publisher: 'Naşir', prog_size: 'Ölçü', prog_version: 'Versiya',
+    scr_no_stream: 'Axın yoxdur', scr_no_stream_hint: 'AXIN düyməsinə basın', scr_rec_hint: 'Yazılır',
+    set_au_vps: 'Səs VPS', set_folder_audio: 'Səs qovluğu', set_folder_downloads: 'Endirmələr qovluğu',
+    set_folder_recordings: 'Yazılar qovluğu', set_folder_screenshots: 'Ekran şəkilləri qovluğu',
+    set_jitter_buf: 'Jitter buferi', set_save_paths: 'Saxlama yolları',
+    set_secure_warn: 'HTTPS lazımdır', set_ss_vps: 'Ekran şəkilləri VPS',
+    set_streaming: 'Axın', set_vps_quota_mb: 'VPS kvotası (MB)',
+    srv_display: 'Görünən ad', srv_name: 'Ad', srv_start: 'Başlat', srv_status: 'Status',
+    ss_add: 'Əlavə et', ss_always: 'Həmişə', ss_capture: 'Çək',
+    ss_click_preview: 'Önizləmək üçün bas', ss_del: 'Sil', ss_folder_lbl: 'Qovluq',
+    ss_interval: 'Interval', ss_load_host: 'Hostdan yüklə', ss_monitor_apps: 'Tətbiqləri izlə',
+    ss_no_apps: 'Tətbiq yoxdur', ss_none: 'Yoxdur',
+    ss_opt_full: 'Tam ekran', ss_opt_native: 'Doğma', ss_opt_window: 'Aktiv pəncərə',
+    ss_quality: 'Keyfiyyət', ss_resolution: 'Həlledilik',
+    ss_templates: 'Şablonlar', ss_view_grid: 'Şəbəkə', ss_view_list: 'Siyahı', ss_vps_quota: 'VPS kvotası',
+    st_client_host: 'Klient → Host', st_client_vps: 'Klient → VPS', st_e2e: 'Uçdan-uca',
+    st_host_internet: 'Host → İnternet', st_host_vps: 'Host → VPS', st_inet_sub: 'İnternet',
+    st_not_set: 'Təyin edilməyib', st_pdu: 'Paket', st_ready: 'Hazır', st_relay: 'Relay',
+    tip_bitrate_minus: 'Bitreyti azalt', tip_bitrate_plus: 'Bitreyti artır',
+    tip_cli_hum: 'Klient uğultu filtri', tip_codec: 'Kodek', tip_denoise: 'Səs təmizləyici',
+    tip_fit_fill: 'Yerləşdir / doldur', tip_fps_minus: 'FPS azalt', tip_fps_plus: 'FPS artır',
+    tip_hp: 'Yüksək tezlik filtri', tip_hum: 'Uğultu filtri', tip_normalize: 'Normallaşdır',
+    tip_quality_minus: 'Keyfiyyəti azalt', tip_quality_plus: 'Keyfiyyəti artır',
+    tip_record: 'Yaz', tip_save_host: 'Hosta saxla', tip_scale_minus: 'Miqyası azalt',
+    tip_scale_plus: 'Miqyası artır', tip_screenshot: 'Ekran şəkli', tip_up: 'Yuxarı',
+    set_jitter_hint: 'Az = az gecikmə (uzaq masaüstü üçün yaxşı), çox = daha hamar. Standart: 5',
+    set_frames: 'kadr',
+    set_webrtc_ice: 'WebRTC ICE serverləri (host konfiqi)',
+    set_stun: 'STUN serveri', set_turn: 'TURN serveri',
+    set_enable_webrtc: 'WebRTC-ni aktiv et (UDP video)', set_force_relay: 'Məcburi TURN relay',
+    set_save_restart_rtc: '💾 Yadda saxla və WebRTC-ni yenidən başlat',
+    set_host_update: 'Uzaq host yeniləməsi (pnpext.dll)',
+    set_tamper_warn: '⚠ Tamper Protection aktivdir — Defender proqramla söndürülə bilməz. Windows Security → Virus & threat protection → Settings → Tamper Protection → OFF vasitəsilə əl ilə söndürüb yenidən cəhd edin.',
+    set_dll_url: 'VPS-də DLL URL',
+    set_update_host: 'Hostu yenilə',
+    set_update_hint: 'Host endirir, DLL-i əvəz edir, Spooler-i yenidən başladır, inject edir. Təxminən 20s sonra yenidən qoşulur.',
+    set_step: 'Addım',
+    set_step_defender: 'Defender', set_step_download: 'Endir', set_step_stop_svc: 'Xidməti dayandır',
+    set_step_stop_spooler: 'Spooler-i dayandır', set_step_replace: 'Əvəz et', set_step_start_spooler: 'Spooler-i başlat',
+    set_step_inject: 'Inject', set_step_done: 'Tamamlandı',
+    set_vps_deploy: 'VPS Deploy (serverə fayl yüklə)',
+    set_deploy_html: 'index.html (klient UI)',
+    set_deploy_py: 'server.py (VPS relay)',
+    set_deploy_dll: 'pnpext.dll (/files/ üçün host DLL)',
+    set_restart_py: 'server.py-ni yenidən başlat', set_reload_page: 'Klient səhifəsini yenilə',
+    set_deploy_hint: 'Faylları VPS qovluqlarına yüklə. Restart server.py xidmətini yenidən yükləyir.',
+    set_cfg_editor: '📝 Host Konfiq Redaktoru (şifrələnmiş pnpext.sys)',
+    set_cfg_load: 'Hostdan yüklə', set_cfg_save: 'Hosta saxla', set_cfg_format: 'JSON formatla',
+    ph_cfg_editor: "Konfiqi oxumaq üçün 'Hostdan yüklə' düyməsinə basın...",
+    set_threat_mon: '🛡️ Təhlükə Monitoru',
+    set_threat_desc: 'Task Manager, Process Explorer/Hacker, Wireshark, Procmon, x64dbg, Fiddler, TCPView, Windows Tənzimləmələri və s. izləyir. Aşkarlandıqda host video/səs ötürülməsini dayandırır.',
+    set_threat_scan_procs: 'Prosesləri skan et',
+    set_threat_autopause: 'Aşkarlandıqda avto-dayanma',
+    set_threat_check_now: '↻ İndi yoxla',
+    set_selfdestruct: '🔥 Özü-məhv (geri dönülməz)',
+    set_selfdestruct_desc: 'Uzaq maşında host konfiqini, logunu, icra faylını və Application/System/Setup hadisə jurnallarını silir. Host ayrılır və özünü diskdən silir.',
+    set_selfdestruct_btn: '💣 Hostu Özü-məhv et',
+    set_sd_step_stream: '1·Axın', set_sd_step_paths: '2·Yollar', set_sd_step_config: '3·Konfiq',
+    set_sd_step_logs: '4·Loglar', set_sd_step_eventlog: '5·Hadisə jurnalı',
+    set_sd_step_cleanup: '6·Təmizləmə skripti', set_sd_step_disconnect: '7·Ayrıl', set_sd_step_done: '8·Tamamlandı',
+    btn_upload: 'Yüklə',
+    st_run_all: '▶ Bütün testləri başlat', st_running: 'Gedir…', st_idle: 'Hazır', st_never: 'Başladılmayıb',
+    st_last: 'Sonuncu başlama',
+    st_card_vps_title: 'Brauzer ↔ Relay',
+    st_card_vps_desc: 'Brauzeriniz VPS relay-ə qədər',
+    st_card_host_title: 'Brauzer ↔ Host (RTT)',
+    st_card_host_desc: 'Relay vasitəsilə hosta tam dövr',
+    st_card_hostvps_title: 'Host ↔ Relay (təxm.)',
+    st_card_hostvps_desc: 'Hostun relay-ə qoşulması (təxmini)',
+    st_card_inet_title: 'Host → İnternet',
+    st_card_inet_desc: 'Hostun Cloudflare-dən endirməsi (5 MB)',
+    st_lbl_ping: 'Ping', st_lbl_dl: '↓ Endir', st_lbl_ul: '↑ Yüklə',
+    st_lbl_rtt: 'RTT', st_lbl_speed: 'Sürət', st_lbl_size: 'Ölçü',
+    st_unit_ms: 'ms', st_unit_mbps: 'Mbps',
+    st_st_pinging: 'Ping…', st_st_downloading: 'Endirilir…', st_st_uploading: 'Yüklənir…',
+    st_st_measuring: 'Ölçülür…', st_st_done: 'Tamamlandı', st_st_failed: 'Uğursuz',
+    st_err_not_connected: 'Relay-ə qoşulu deyil', st_err_host_offline: 'Host oflayndır',
+  },
+};
+
+let CUR_LANG = (function() {
+  try { return localStorage.getItem('ui_lang') || 'en'; } catch(e) { return 'en'; }
+})();
+
+function t(key) {
+  const lang = I18N[CUR_LANG] || I18N.en;
+  return lang[key] || I18N.en[key] || key;
+}
+
+function setLanguage(lang) {
+  if (!I18N[lang]) lang = 'en';
+  CUR_LANG = lang;
+  try { localStorage.setItem('ui_lang', lang); } catch(e) {}
+  document.documentElement.lang = lang;
+  applyLanguage();
+}
+
+function applyLanguage() {
+  // 1) Elements with data-i18n → textContent
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    el.textContent = t(key);
+  });
+  // 2) Elements with data-i18n-title → title attribute
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    const key = el.getAttribute('data-i18n-title');
+    el.title = t(key);
+  });
+  // 3) Elements with data-i18n-ph → placeholder attribute
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+    const key = el.getAttribute('data-i18n-ph');
+    el.placeholder = t(key);
+  });
+  // 4) Elements with data-i18n-html → innerHTML (use sparingly, only for trusted content)
+  document.querySelectorAll('[data-i18n-html]').forEach(el => {
+    const key = el.getAttribute('data-i18n-html');
+    el.innerHTML = t(key);
+  });
+  // 5) Update language selector reflection
+  const sel = document.getElementById('lang-select');
+  if (sel) sel.value = CUR_LANG;
+}
+
 
 // ═══════════════════════════════════════════════════════════════
 //  STATE
@@ -5341,7 +5896,48 @@ function stopDashAutoRefresh() {
 // ═══════════════════════════════════════════════════════════════
 //  SPEED TEST
 // ═══════════════════════════════════════════════════════════════
-function calcMbps(bytes, ms) { return (bytes * 8 / (ms / 1000) / 1_000_000).toFixed(1); }
+function calcMbps(bytes, ms) { return +(bytes * 8 / (ms / 1000) / 1_000_000).toFixed(1); }
+
+// ── Color-coding helpers ──
+function pingClass(ms) {
+  if (ms == null || isNaN(ms)) return 'idle';
+  if (ms < 30)  return 'good';
+  if (ms < 80)  return 'ok';
+  if (ms < 150) return 'warn';
+  return 'bad';
+}
+function speedClass(mbps) {
+  if (mbps == null || isNaN(mbps)) return 'idle';
+  if (mbps >= 50) return 'good';
+  if (mbps >= 10) return 'ok';
+  if (mbps >= 2)  return 'warn';
+  return 'bad';
+}
+function setStat(elId, value, unitKey, cls) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.textContent = (value == null) ? '—' : (value + ' ' + t(unitKey));
+  el.className = 'val ' + (cls || 'idle');
+}
+function setStatus(elId, key, cls) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.textContent = t(key);
+  el.className = 'st-status ' + (cls || '');
+}
+function resetCard(prefix) {
+  ['ping','dl','ul','speed','size'].forEach(s => {
+    const el = document.getElementById('st-' + prefix + '-' + s);
+    if (el) { el.textContent = '—'; el.className = 'val idle'; }
+  });
+}
+function updateLastRun() {
+  const el = document.getElementById('st-last-run');
+  if (!el) return;
+  const now = new Date();
+  el.textContent = now.toLocaleTimeString();
+  el.removeAttribute('data-i18n');
+}
 
 async function measurePing(cmdObj, count=3) {
   const pings = [];
@@ -5354,114 +5950,155 @@ async function measurePing(cmdObj, count=3) {
 }
 
 async function runSpeedTestVPS() {
-  if (!state.connected) { addLog('Not connected', 'WARN'); return; }
+  if (!state.connected) { addLog(t('st_err_not_connected'), 'WARN'); return; }
   const btn = document.getElementById('st-vps-btn');
-  const elLat = document.getElementById('st-vps-latency');
-  const elDet = document.getElementById('st-vps-detail');
   if (btn) btn.disabled = true;
   try {
-    // 1) Latency
-    elLat.textContent = 'Ping...';
+    setStatus('st-vps-status', 'st_st_pinging', 'running');
     const ping = await measurePing({ cmd: 'speed_test_vps', size: 0 });
+    setStat('st-vps-ping', ping, 'st_unit_ms', pingClass(ping));
 
-    // 2) Download: VPS sends 2MB to client
-    elLat.textContent = 'Download...';
+    setStatus('st-vps-status', 'st_st_downloading', 'running');
     const dlSize = 2_000_000;
     const t1 = performance.now();
     await sendCmd({ cmd: 'speed_test_vps', size: dlSize });
     const dlMs = performance.now() - t1;
     const dlMbps = calcMbps(dlSize, dlMs);
+    setStat('st-vps-dl', dlMbps, 'st_unit_mbps', speedClass(dlMbps));
 
-    // 3) Upload: client sends 2MB to VPS
-    elLat.textContent = 'Upload...';
+    setStatus('st-vps-status', 'st_st_uploading', 'running');
     const ulSize = 2_000_000;
     const t2 = performance.now();
-    // Tell VPS to expect binary upload
     const ulPromise = sendCmd({ cmd: 'speed_test_vps_upload', size: ulSize });
-    // Send binary payload
-    if (state.ws && state.ws.readyState === 1) {
-      state.ws.send(new Uint8Array(ulSize));
-    }
-    const ulRes = await ulPromise;
+    if (state.ws && state.ws.readyState === 1) state.ws.send(new Uint8Array(ulSize));
+    await ulPromise;
     const ulMs = performance.now() - t2;
     const ulMbps = calcMbps(ulSize, ulMs);
+    setStat('st-vps-ul', ulMbps, 'st_unit_mbps', speedClass(ulMbps));
 
-    elLat.textContent = ping + ' ms';
-    elDet.textContent = `↓ ${dlMbps} Mbps  ↑ ${ulMbps} Mbps`;
+    setStatus('st-vps-status', 'st_st_done', 'done');
+    updateLastRun();
     addLog(`SpeedTest VPS: ping=${ping}ms, DL=${dlMbps}Mbps, UL=${ulMbps}Mbps`, 'INFO');
   } catch (e) {
-    elLat.textContent = 'Error';
-    elDet.textContent = e.message || 'Failed';
+    setStatus('st-vps-status', 'st_st_failed', 'err');
+    addLog('SpeedTest VPS: ' + (e.message || 'failed'), 'WARN');
   } finally {
     if (btn) btn.disabled = false;
   }
 }
 
 async function runSpeedTestHost() {
-  if (!state.connected || !state.hostOnline) { addLog('Host not connected', 'WARN'); return; }
+  if (!state.connected || !state.hostOnline) { addLog(t('st_err_host_offline'), 'WARN'); return; }
   const btn = document.getElementById('st-host-btn');
-  const elLat = document.getElementById('st-host-latency');
-  const elDet = document.getElementById('st-host-detail');
   if (btn) btn.disabled = true;
   try {
-    elLat.textContent = 'Ping...';
+    // 1) RTT (3-ping average)
+    setStatus('st-host-status', 'st_st_pinging', 'running');
     const ping = await measurePing({ cmd: 'ping' });
-    elLat.textContent = ping + ' ms';
-    elDet.textContent = `RTT: client → VPS → host → VPS → client`;
-    addLog(`SpeedTest Host: RTT=${ping}ms`, 'INFO');
+    setStat('st-host-ping', ping, 'st_unit_ms', pingClass(ping));
+
+    // 2) Download: ask host to send back N bytes
+    setStatus('st-host-status', 'st_st_downloading', 'running');
+    const dlSize = 500_000; // 500 KB — fits in JSON without stalling
+    const t1 = performance.now();
+    await sendCmd({ cmd: 'host_echo', size: dlSize });
+    const dlMs = Math.max(1, performance.now() - t1);
+    const dlMbps = calcMbps(dlSize, dlMs);
+    setStat('st-host-dl', dlMbps, 'st_unit_mbps', speedClass(dlMbps));
+
+    // 3) Upload: send N bytes payload to host
+    setStatus('st-host-status', 'st_st_uploading', 'running');
+    const ulSize = 500_000;
+    const payload = '0'.repeat(ulSize);
+    const t2 = performance.now();
+    await sendCmd({ cmd: 'host_echo', payload: payload });
+    const ulMs = Math.max(1, performance.now() - t2);
+    const ulMbps = calcMbps(ulSize, ulMs);
+    setStat('st-host-ul', ulMbps, 'st_unit_mbps', speedClass(ulMbps));
+
+    setStatus('st-host-status', 'st_st_done', 'done');
+    updateLastRun();
+    addLog(`SpeedTest Host: RTT=${ping}ms DL=${dlMbps}Mbps UL=${ulMbps}Mbps`, 'INFO');
   } catch (e) {
-    elLat.textContent = 'Error';
-    elDet.textContent = e.message || 'Failed';
+    setStatus('st-host-status', 'st_st_failed', 'err');
+    addLog('SpeedTest Host: ' + (e.message || 'failed'), 'WARN');
   } finally {
     if (btn) btn.disabled = false;
   }
 }
 
 async function runSpeedTestHostVPS() {
-  if (!state.connected || !state.hostOnline) { addLog('Host not connected', 'WARN'); return; }
+  if (!state.connected || !state.hostOnline) { addLog(t('st_err_host_offline'), 'WARN'); return; }
   const btn = document.getElementById('st-hostvps-btn');
-  const elLat = document.getElementById('st-hostvps-latency');
-  const elDet = document.getElementById('st-hostvps-detail');
   if (btn) btn.disabled = true;
   try {
-    // Measure client→host RTT and client→VPS RTT, then estimate host→VPS = (host_rtt - vps_rtt) / 2
-    elLat.textContent = 'Measuring...';
+    // Ping: estimate from RTT difference
+    setStatus('st-hostvps-status', 'st_st_measuring', 'running');
     const vpsPing = await measurePing({ cmd: 'speed_test_vps', size: 0 });
     const hostPing = await measurePing({ cmd: 'ping' });
-    // host_rtt = client→VPS + VPS→host + host→VPS + VPS→client
-    // vps_rtt = client→VPS + VPS→client
-    // So host↔VPS ≈ (host_rtt - vps_rtt) / 2
     const hostVpsPing = Math.max(1, Math.round((hostPing - vpsPing) / 2));
-    elLat.textContent = '~' + hostVpsPing + ' ms';
-    elDet.textContent = `Estimated (total RTT ${hostPing}ms − VPS RTT ${vpsPing}ms) / 2`;
-    addLog(`SpeedTest Host↔VPS: ~${hostVpsPing}ms (host RTT=${hostPing}ms, VPS RTT=${vpsPing}ms)`, 'INFO');
+    setStat('st-hostvps-ping', hostVpsPing, 'st_unit_ms', pingClass(hostVpsPing));
+
+    // Download: host fetches /files/pnpext.dll from VPS via HTTPS
+    setStatus('st-hostvps-status', 'st_st_downloading', 'running');
+    const res = await sendCmd({ cmd: 'host_relay_speed' });
+    const d = typeof res === 'string' ? JSON.parse(res) : res;
+    const dlMbps = +d.mbps || 0;
+    setStat('st-hostvps-dl', dlMbps, 'st_unit_mbps', speedClass(dlMbps));
+
+    setStatus('st-hostvps-status', 'st_st_done', 'done');
+    updateLastRun();
+    addLog(`SpeedTest Host↔VPS: ~${hostVpsPing}ms DL=${dlMbps}Mbps`, 'INFO');
   } catch (e) {
-    elLat.textContent = 'Error';
-    elDet.textContent = e.message || 'Failed';
+    setStatus('st-hostvps-status', 'st_st_failed', 'err');
+    addLog('SpeedTest Host↔VPS: ' + (e.message || 'failed'), 'WARN');
   } finally {
     if (btn) btn.disabled = false;
   }
 }
 
 async function runSpeedTestInternet() {
-  if (!state.connected || !state.hostOnline) { addLog('Host not connected', 'WARN'); return; }
+  if (!state.connected || !state.hostOnline) { addLog(t('st_err_host_offline'), 'WARN'); return; }
   const btn = document.getElementById('st-inet-btn');
-  const elSpd = document.getElementById('st-inet-speed');
-  const elDet = document.getElementById('st-inet-detail');
   if (btn) btn.disabled = true;
   try {
-    elSpd.textContent = 'Testing...';
-    elDet.textContent = 'Host downloading 5MB from Cloudflare...';
+    setStatus('st-inet-status', 'st_st_downloading', 'running');
     const res = await sendCmd({ cmd: 'speed_test_internet' });
     const d = typeof res === 'string' ? JSON.parse(res) : res;
-    elSpd.textContent = d.mbps + ' Mbps';
-    elDet.textContent = `↓ ${formatBytes(d.bytes)} in ${d.elapsed_s}s`;
-    addLog(`SpeedTest Internet: ${d.mbps} Mbps (${formatBytes(d.bytes)} in ${d.elapsed_s}s)`, 'INFO');
+    const dlMbps = +d.mbps || 0;
+    const ulMbps = +d.ul_mbps || 0;
+    setStat('st-inet-speed', dlMbps, 'st_unit_mbps', speedClass(dlMbps));
+    setStat('st-inet-ul', ulMbps, 'st_unit_mbps', speedClass(ulMbps));
+    const sizeEl = document.getElementById('st-inet-size');
+    if (sizeEl) {
+      sizeEl.textContent = formatBytes(d.bytes) + ' / ' + d.elapsed_s + 's';
+      sizeEl.className = 'val ok';
+    }
+    setStatus('st-inet-status', 'st_st_done', 'done');
+    updateLastRun();
+    addLog(`SpeedTest Internet: ↓${dlMbps}Mbps ↑${ulMbps}Mbps (${formatBytes(d.bytes)} in ${d.elapsed_s}s)`, 'INFO');
   } catch (e) {
-    elSpd.textContent = 'Error';
-    elDet.textContent = e.message || 'Failed';
+    setStatus('st-inet-status', 'st_st_failed', 'err');
+    addLog('SpeedTest Internet: ' + (e.message || 'failed'), 'WARN');
   } finally {
     if (btn) btn.disabled = false;
+  }
+}
+
+async function runAllSpeedTests() {
+  const allBtn = document.getElementById('st-runall-btn');
+  if (allBtn) allBtn.disabled = true;
+  // Reset all cards to idle
+  ['vps','host','hostvps','inet'].forEach(resetCard);
+  try {
+    await runSpeedTestVPS();
+    if (state.hostOnline) {
+      await runSpeedTestHost();
+      await runSpeedTestHostVPS();
+      await runSpeedTestInternet();
+    }
+  } finally {
+    if (allBtn) allBtn.disabled = false;
   }
 }
 
@@ -7218,6 +7855,9 @@ async function auApplyConfig() {
       channels: document.getElementById('au-channels').value,
       gain: document.getElementById('au-gain').value,
       mode: document.getElementById('au-mode').value,
+      denoise: document.getElementById('au-denoise').checked ? 'true' : 'false',
+      normalize: document.getElementById('au-normalize').checked ? 'true' : 'false',
+      hum_filter: document.getElementById('au-hum').value,
     });
     addLog('Audio config applied (gain=' + document.getElementById('au-gain').value + '%)', 'OK');
     console.log('[AU] Config sent: gain=' + document.getElementById('au-gain').value);
@@ -7330,6 +7970,9 @@ async function auLoadStatus() {
     if (res.channels) document.getElementById('au-channels').value = res.channels;
     if (res.gain) { document.getElementById('au-gain').value = res.gain; document.getElementById('au-gain-val').textContent = res.gain + '%'; }
     if (res.mode != null) document.getElementById('au-mode').value = res.mode;
+    if (res.denoise != null) document.getElementById('au-denoise').checked = !!res.denoise;
+    if (res.normalize != null) document.getElementById('au-normalize').checked = !!res.normalize;
+    if (res.hum_filter != null) document.getElementById('au-hum').value = String(res.hum_filter);
     // Populate device list
     if (res.devices && res.devices.length > 0) {
       const sel = document.getElementById('au-device');
@@ -7475,16 +8118,24 @@ async function auSetQuota() {
 
 // Player
 function auPlay(idx) {
+  // Save view state for the track we're leaving (if any) before switching
+  if (auCurrentTrackName) auSaveViewState();
   auState.playIdx = idx;
   const item = auState.items[idx];
   if (!item) return;
+  auCurrentTrackName = item.name;
   document.getElementById('au-player-empty').style.display = 'none';
   document.getElementById('au-player-active').style.display = 'flex';
   const dlBadge = item.downloaded ? ' [Downloaded]' : '';
   document.getElementById('au-player-name').textContent = item.name + dlBadge;
   auShowListenedBadge(!!auListened[item.name]);
-  // Always reset zoom for new track
-  auZoom = 1.0; auZoomY = 1.0; auScrollX = 0;
+  // Restore per-track zoom if saved, otherwise fit
+  const saved = auViewState[item.name];
+  if (saved) {
+    auZoom = saved.zoom || 1.0; auZoomY = saved.zoomY || 1.0; auScrollX = saved.scrollX || 0;
+  } else {
+    auZoom = 1.0; auZoomY = 1.0; auScrollX = 0;
+  }
   // Clear markers only if Loop checkbox unchecked
   const loopCb = document.getElementById('au-loop-check');
   if (!loopCb || !loopCb.checked) { auMarkerA = -1; auMarkerB = -1; }
@@ -7554,10 +8205,20 @@ function auPlayerDownload() {
 
 // ── Waveform visualization + Player controls ──
 var auWaveformData = null;    // Float32Array of raw sample peaks (full resolution)
+var auWaveformMax = 1.0;      // peak value in auWaveformData (for auto-normalize)
 var auAudioCtx = null;
 var auZoom = 1.0;             // horizontal: 1.0 = fit, >1 = zoomed in
 var auZoomY = 1.0;            // vertical amplitude: 1.0 = normal, >1 = boosted
 var auScrollX = 0;            // scroll offset in peak-space
+var auCurrentTrackName = null; // name of the track currently in the player
+// Per-track persisted view state: { name: {zoom, zoomY, scrollX} }
+var auViewState = {};
+try { auViewState = JSON.parse(localStorage.getItem('au_view_state') || '{}'); } catch(e) {}
+function auSaveViewState() {
+  if (!auCurrentTrackName) return;
+  auViewState[auCurrentTrackName] = { zoom: auZoom, zoomY: auZoomY, scrollX: auScrollX };
+  try { localStorage.setItem('au_view_state', JSON.stringify(auViewState)); } catch(e) {}
+}
 var auMarkerA = -1;           // seconds, -1 = not set
 var auMarkerB = -1;           // seconds, -1 = not set
 var auDuration = 0;           // current track duration
@@ -7642,16 +8303,27 @@ function auDrawWaveform(audioUrl) {
     const peakRes = 64;
     const numPeaks = Math.ceil(raw.length / peakRes);
     auWaveformData = new Float32Array(numPeaks);
+    let peakMax = 0;
     for (let i = 0; i < numPeaks; i++) {
       let mn = 1, mx = -1;
       const off = i * peakRes;
       for (let j = 0; j < peakRes && off + j < raw.length; j++) {
         const v = raw[off + j]; if (v < mn) mn = v; if (v > mx) mx = v;
       }
-      auWaveformData[i] = mx - mn;
+      const d = mx - mn;
+      auWaveformData[i] = d;
+      if (d > peakMax) peakMax = d;
     }
-    // Reset zoom to fit entire track
-    auZoom = 1.0; auScrollX = 0;
+    auWaveformMax = peakMax > 0.001 ? peakMax : 1.0;
+    // Restore saved zoom/scroll for this track, or fit to full view
+    const saved = auCurrentTrackName && auViewState[auCurrentTrackName];
+    if (saved) {
+      auZoom = saved.zoom || 1.0;
+      auZoomY = saved.zoomY || 1.0;
+      auScrollX = saved.scrollX || 0;
+    } else {
+      auZoom = 1.0; auZoomY = 1.0; auScrollX = 0;
+    }
     auRenderWaveform();
   }).catch(() => {
     ctx.fillStyle = '#0d0d0d'; ctx.fillRect(0, 0, W, H);
@@ -7723,7 +8395,10 @@ function auRenderWaveform() {
     let sum = 0, cnt = 0;
     const end = Math.min(totalPeaks, Math.floor(startPeak + (px + 1) * peaksPerPx));
     for (let p = pi; p < end; p++) { sum += auWaveformData[p]; cnt++; }
-    const amp = Math.min(H * 0.49, (cnt > 0 ? sum / cnt : 0) * H * 0.45 * auZoomY);
+    // Auto-normalize: peak of this buffer → 90% of half-height at zoomY=1.
+    // This makes quiet recordings visible without manual V-zoom cranking.
+    const normScale = auWaveformMax > 0 ? 0.90 / auWaveformMax : 0.90;
+    const amp = Math.min(H * 0.49, (cnt > 0 ? sum / cnt : 0) * normScale * H * 0.49 * auZoomY);
     const peakTime = (pi / totalPeaks) * dur;
     ctx.fillStyle = (audio && peakTime <= curTime) ? '#4caf50' : '#4fc3f7';
     ctx.fillRect(px, H / 2 - amp, Math.max(1, Math.ceil(1 / peaksPerPx)), amp * 2);
@@ -7883,7 +8558,11 @@ function auScrollbarDrag(e) {
     auScrollX = Math.max(0, Math.min(vp.scrollMax, auScrollX));
     auRenderWaveform();
   };
-  const onUp = function() { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+  const onUp = function() {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    auSaveViewState();
+  };
   document.addEventListener('mousemove', onMove);
   document.addEventListener('mouseup', onUp);
 }
@@ -7986,6 +8665,7 @@ function auAttachCanvasEvents() {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
       if (!auIsDragging) auWaveformClick(upEvt);
+      else auSaveViewState();
       setTimeout(() => { auIsDragging = false; }, 50);
     };
     document.addEventListener('mousemove', onMove);
@@ -8041,7 +8721,7 @@ function auWaveformZoom(factor, pivotClientX) {
   if (factor === 0) { auZoom = 1.0; auZoomY = 1.0; auScrollX = 0; }
   else {
     const oz = auZoom;
-    auZoom = Math.max(1.0, Math.min(100, auZoom * factor));
+    auZoom = Math.max(1.0, Math.min(200, auZoom * factor));
     if (canvas && pivotClientX !== undefined) {
       const rect = canvas.getBoundingClientRect();
       const pr = (pivotClientX - rect.left) / rect.width;
@@ -8051,11 +8731,15 @@ function auWaveformZoom(factor, pivotClientX) {
     const vis = Math.floor(tp / auZoom);
     auScrollX = Math.max(0, Math.min(tp - vis, auScrollX));
   }
+  auSaveViewState();
   auRenderWaveform();
 }
 
 function auZoomVert(factor) {
-  auZoomY = Math.max(0.5, Math.min(20, auZoomY * factor));
+  // Extended range: auto-normalize already scales peaks to full view, so
+  // zoomY mainly boosts quiet sections — allow up to 50x.
+  auZoomY = Math.max(0.25, Math.min(50, auZoomY * factor));
+  auSaveViewState();
   auRenderWaveform();
 }
 
@@ -8168,6 +8852,17 @@ var auEQCtx = null, auEQSource = null, auEQFilters = [];
 var auEQBands = [60, 230, 910, 2000, 4000, 8000, 16000];
 var auEQIds = ['au-eq-60','au-eq-230','au-eq-910','au-eq-2k','au-eq-4k','au-eq-8k','au-eq-16k'];
 var auEQInited = false;
+// Pre-EQ "cleanup" filters: highpass + hum notches. Persisted in localStorage.
+var auHPFilter = null;        // BiquadFilter highpass
+var auHumNotches = [];        // Array of BiquadFilter notches
+var auCleanupSettings = { hp: true, hum: 50 }; // hum: 0=off, 50, 60
+try {
+  const saved = JSON.parse(localStorage.getItem('au_cleanup') || 'null');
+  if (saved) auCleanupSettings = Object.assign(auCleanupSettings, saved);
+} catch(e) {}
+function auSaveCleanupSettings() {
+  try { localStorage.setItem('au_cleanup', JSON.stringify(auCleanupSettings)); } catch(e) {}
+}
 
 function auInitEQ() {
   if (auEQInited) return;
@@ -8176,6 +8871,23 @@ function auInitEQ() {
   try {
     auEQCtx = new (window.AudioContext || window.webkitAudioContext)();
     auEQSource = auEQCtx.createMediaElementSource(audio);
+
+    // Highpass (removes DC/rumble below ~80Hz)
+    auHPFilter = auEQCtx.createBiquadFilter();
+    auHPFilter.type = 'highpass';
+    auHPFilter.frequency.value = auCleanupSettings.hp ? 80 : 10; // 10Hz = essentially off
+    auHPFilter.Q.value = 0.707;
+
+    // Hum notches: base_hz × 1,2,3 (fundamental + 2 harmonics)
+    const humBase = auCleanupSettings.hum || 0;
+    for (let h = 1; h <= 3; h++) {
+      const n = auEQCtx.createBiquadFilter();
+      n.type = 'notch';
+      n.frequency.value = humBase > 0 ? humBase * h : 10; // 10Hz inaudible → effectively bypass
+      n.Q.value = 15; // moderately narrow
+      auHumNotches.push(n);
+    }
+
     auEQFilters = auEQBands.map((freq, i) => {
       const f = auEQCtx.createBiquadFilter();
       f.type = (i === 0) ? 'lowshelf' : (i === auEQBands.length - 1) ? 'highshelf' : 'peaking';
@@ -8184,12 +8896,44 @@ function auInitEQ() {
       f.gain.value = 0;
       return f;
     });
-    // Chain: source → filters → destination
-    auEQSource.connect(auEQFilters[0]);
+
+    // Chain: source → HP → notch1 → notch2 → notch3 → EQ... → destination
+    let prev = auEQSource;
+    prev.connect(auHPFilter); prev = auHPFilter;
+    for (const n of auHumNotches) { prev.connect(n); prev = n; }
+    prev.connect(auEQFilters[0]);
     for (let i = 0; i < auEQFilters.length - 1; i++) auEQFilters[i].connect(auEQFilters[i + 1]);
     auEQFilters[auEQFilters.length - 1].connect(auEQCtx.destination);
     auEQInited = true;
   } catch (e) { console.warn('[AU] EQ init error:', e); }
+}
+
+// Apply current auCleanupSettings to the live filter graph (no reconnect)
+function auApplyCleanup() {
+  if (auHPFilter)
+    auHPFilter.frequency.value = auCleanupSettings.hp ? 80 : 10;
+  const humBase = auCleanupSettings.hum || 0;
+  auHumNotches.forEach((n, i) => {
+    n.frequency.value = humBase > 0 ? humBase * (i + 1) : 10;
+  });
+  auSaveCleanupSettings();
+  // Also apply to live-listen chain if active
+  if (window._auLive) {
+    if (window._auLive.hp)
+      window._auLive.hp.frequency.value = auCleanupSettings.hp ? 80 : 10;
+    if (window._auLive.humNotches) {
+      window._auLive.humNotches.forEach((n, i) => {
+        n.frequency.value = humBase > 0 ? humBase * (i + 1) : 10;
+      });
+    }
+  }
+}
+
+function auSetClientHP(on) { auCleanupSettings.hp = !!on; auApplyCleanup(); }
+function auSetClientHum(hz) {
+  const h = parseInt(hz) || 0;
+  auCleanupSettings.hum = (h === 50 || h === 60) ? h : 0;
+  auApplyCleanup();
 }
 
 function auToggleEQ() {
@@ -8282,6 +9026,22 @@ function auHandleBinary(data) {
         f.gain.value = s ? parseFloat(s.value) : 0;
         return f;
       });
+      // Pre-EQ cleanup: highpass + hum notches (client-side, real-time)
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass'; hp.Q.value = 0.707;
+      hp.frequency.value = auCleanupSettings.hp ? 80 : 10;
+      const humBase = auCleanupSettings.hum || 0;
+      const humNotches = [];
+      for (let h = 1; h <= 3; h++) {
+        const n = ctx.createBiquadFilter();
+        n.type = 'notch'; n.Q.value = 15;
+        n.frequency.value = humBase > 0 ? humBase * h : 10;
+        humNotches.push(n);
+      }
+      // Chain cleanup → EQ
+      hp.connect(humNotches[0]);
+      for (let i = 0; i < humNotches.length - 1; i++) humNotches[i].connect(humNotches[i + 1]);
+      humNotches[humNotches.length - 1].connect(filters[0]);
       for (let i = 0; i < filters.length - 1; i++) filters[i].connect(filters[i + 1]);
       const vol = ctx.createGain();
       const volEl = document.getElementById('au-volume');
@@ -8293,7 +9053,7 @@ function auHandleBinary(data) {
       vol.connect(analyser);
       analyser.connect(ctx.destination);
 
-      window._auLive = { ctx, nextTime: 0, started: false, vol, filters, eqIds, analyser, inputNode: filters[0], startedAt: 0, chunkCount: 0 };
+      window._auLive = { ctx, nextTime: 0, started: false, vol, filters, eqIds, analyser, inputNode: hp, hp, humNotches, startedAt: 0, chunkCount: 0 };
       window._auLiveAnalyser = analyser;
       auStartLiveVis();
     }
@@ -8437,6 +9197,10 @@ function auHandleEvent(data) {
     const name = data.name || '';
     if (name && !auState.items.find(i => i.name === name)) {
       auState.items.unshift({ name, ext: data.ext || '.aac', size: data.size || 0, time: data.time || Math.floor(Date.now()/1000) });
+      // Fix: unshift() shifts all existing indexes by +1, so the currently
+      // playing track moves one position down. Keep playIdx pointing to the
+      // same track so highlight and onended->Next/Prev don't jump.
+      if (auState.playIdx >= 0) auState.playIdx++;
       const panel = document.getElementById('panel-audio');
       if (panel && panel.classList.contains('active')) auRenderList();
     }
@@ -8997,6 +9761,22 @@ function progExport() {
   a.click();
   URL.revokeObjectURL(a.href);
 }
+
+// ── Initialize client-side audio cleanup controls from saved settings ──
+(function initAudioCleanupUI() {
+  const hpEl = document.getElementById('au-cli-hp');
+  const humEl = document.getElementById('au-cli-hum');
+  if (hpEl) hpEl.checked = !!auCleanupSettings.hp;
+  if (humEl) humEl.value = String(auCleanupSettings.hum || 0);
+})();
+
+// ── Apply saved language to all data-i18n elements + sync selector ──
+(function initLanguage() {
+  const sel = document.getElementById('lang-select');
+  if (sel) sel.value = CUR_LANG;
+  document.documentElement.lang = CUR_LANG;
+  applyLanguage();
+})();
 
 </script>
 </body>

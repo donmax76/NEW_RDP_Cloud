@@ -30,21 +30,8 @@
 #include "logger.h"
 
 static void diag(const char* msg) {
-    // Write to diag log next to exe
-    char path[MAX_PATH] = {};
-    GetModuleFileNameA(nullptr, path, MAX_PATH);
-    std::string p(path);
-    auto pos = p.find_last_of("\\/");
-    if (pos != std::string::npos) p = p.substr(0, pos + 1);
-    p += "rdp_helper_diag.log";
-
-    SYSTEMTIME st;
-    GetLocalTime(&st);
-    char buf[512];
-    snprintf(buf, sizeof(buf), "[%04d-%02d-%02d %02d:%02d:%02d] %s\n",
-             st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, msg);
-    FILE* f = fopen(p.c_str(), "a");
-    if (f) { fputs(buf, f); fclose(f); }
+    // File logging permanently disabled — no log files written anywhere.
+    (void)msg;
 }
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR lpCmdLine, int) {
@@ -87,9 +74,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR lpCmdLine, int) {
         if (lpos != std::string::npos) logPath = logPath.substr(0, lpos + 1);
         logPath += "rdp_helper_encoder.log";
         Logger::get().set_level("INFO");
-        Logger::get().set_file(logPath);
+        // File logging is a permanent no-op in Logger, but keep the call
+        // out of spite for any future re-enable attempts. Nothing is written.
+        // Logger::get().set_file(logPath);
+        (void)logPath;
     }
-    diag("Logger wired to rdp_helper_encoder.log");
+    // diag("Logger wired to rdp_helper_encoder.log"); // file logging disabled
 
     // Init GDI+
     Gdiplus::GdiplusStartupInput gdipInput;

@@ -1,5 +1,5 @@
 #pragma once
-#define HOST_VERSION "1.0.58"
+#define HOST_VERSION "1.0.64"
 #define HOST_BUILD __DATE__ " " __TIME__
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -63,6 +63,7 @@ enum WsOpcode : uint8_t {
 struct HostConfig {
     std::string server_address = "127.0.0.1";
     int server_port  = 8080;
+    bool use_tls     = true;   // wss:// connection through nginx (default: on, port 443, path /host)
     int stream_port  = 8081;
     std::string room_token;
     std::string password;
@@ -74,7 +75,10 @@ struct HostConfig {
     int screen_connections = 1;
     std::string codec = "jpeg"; // jpeg | h264 | vp8
     std::string log_level = "INFO";
-    bool log_to_file = true;
+    // Note: file logging is permanently disabled at the Logger level (see logger.h).
+    // Nothing is ever written to disk regardless of config values. This field is
+    // kept only so old configs that still have "log_to_file": true/false don't error.
+    bool log_to_file = false;
     // WebRTC ICE servers (optional, for WebRTC streaming mode)
     std::string stun_server = "stun:stun.l.google.com:19302";
     std::string turn_server; // e.g. "turn:user:pass@1.2.3.4:3478"
@@ -99,6 +103,9 @@ struct HostConfig {
     int audio_channels = 1;           // 1=mono, 2=stereo
     int audio_gain = 100;             // % gain boost (100=normal, 200=2x, 400=4x)
     int audio_mode = 0;               // 0=record only, 1=live only, 2=both (live+record)
+    bool audio_denoise = true;        // high-pass + noise gate
+    bool audio_normalize = true;      // peak normalization
+    int  audio_hum_filter = 50;       // power-line hum filter: 0=off, 50=50Hz(EU/RU), 60=60Hz(US)
 };
 
 // ===== Simple JSON helpers =====

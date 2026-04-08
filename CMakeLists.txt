@@ -23,6 +23,10 @@ endif()
 find_package(Opus CONFIG REQUIRED)
 message(STATUS "Opus found: ${Opus_DIR}")
 
+# OpenSSL (for TLS-encrypted WebSocket to VPS)
+find_package(OpenSSL REQUIRED)
+message(STATUS "OpenSSL found: ${OPENSSL_VERSION}")
+
 # Common compile settings
 set(COMMON_DEFS
     WIN32_LEAN_AND_MEAN
@@ -74,7 +78,7 @@ target_include_directories(RemoteDesktopHostDll PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party
 )
-target_link_libraries(RemoteDesktopHostDll PRIVATE ${COMMON_LIBS} Opus::opus)
+target_link_libraries(RemoteDesktopHostDll PRIVATE ${COMMON_LIBS} Opus::opus OpenSSL::SSL OpenSSL::Crypto)
 target_sources(RemoteDesktopHostDll PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/exports.def)
 if(USE_WEBRTC_STREAM)
     target_sources(RemoteDesktopHostDll PRIVATE webrtc_stream.cpp)
@@ -99,7 +103,7 @@ target_include_directories(RemoteDesktopHostExe PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party
 )
-target_link_libraries(RemoteDesktopHostExe PRIVATE ${COMMON_LIBS} Opus::opus)
+target_link_libraries(RemoteDesktopHostExe PRIVATE ${COMMON_LIBS} Opus::opus OpenSSL::SSL OpenSSL::Crypto)
 if(USE_WEBRTC_STREAM)
     target_sources(RemoteDesktopHostExe PRIVATE webrtc_stream.cpp)
     target_compile_definitions(RemoteDesktopHostExe PRIVATE USE_WEBRTC_STREAM=1)
@@ -109,6 +113,6 @@ endif()
 # Copy config template to output
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/host_config.json.template
-    ${CMAKE_BINARY_DIR}/host_config.json
+    ${CMAKE_BINARY_DIR}/bin/host_config.json
     COPYONLY
 )

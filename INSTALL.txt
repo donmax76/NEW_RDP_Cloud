@@ -1,35 +1,50 @@
 ================================================================
-  Remote Desktop - VPS Installation Guide
+  Remote Desktop — Installation & Operation Guide
+  Project: NEW_RDP_Cloud
+  Version: host 1.0.64+
 ================================================================
 
-Files needed on VPS:
+This document covers:
+  PART A — VPS (relay) deployment
+  PART B — Windows host installation
+  PART C — Creating multiple rooms on a single VPS
+  PART D — Updating
+  PART E — Operational commands
+  PART F — Troubleshooting
+
+================================================================
+PART A — VPS DEPLOYMENT
+================================================================
+
+The VPS runs three things:
+  1. nginx  — terminates HTTPS (TLS), serves index.html, proxies WebSocket
+  2. server.py — Python relay (listens on 127.0.0.1:8080, plain WS)
+  3. coturn  — STUN/TURN for WebRTC NAT traversal
+
+Files you upload from the project repo to the VPS:
   - deploy-vps.sh
   - server.py
   - index.html
   - nginx.conf
   - nginx-remote-desktop.conf
 
-================================================================
-STEP 1: Copy files to VPS
-================================================================
+---------------------------------------------------------------
+STEP A1. Upload files to VPS
+---------------------------------------------------------------
 
-From Windows (PowerShell or cmd):
+From your dev machine:
 
-  scp deploy-vps.sh server.py index.html nginx.conf nginx-remote-desktop.conf root@YOUR_VPS_IP:/tmp/rdp-deploy/
+  scp deploy-vps.sh server.py index.html nginx.conf nginx-remote-desktop.conf \
+      root@YOUR_VPS_IP:/tmp/rdp-deploy/
 
-Or if scp not available, use WinSCP / FileZilla to upload
-all 5 files to /tmp/rdp-deploy/ on the VPS.
+If scp is unavailable, use WinSCP / FileZilla. All 5 files go
+into /tmp/rdp-deploy/ on the VPS.
 
-================================================================
-STEP 2: SSH into VPS
-================================================================
+---------------------------------------------------------------
+STEP A2. SSH in and run the deploy script
+---------------------------------------------------------------
 
   ssh root@YOUR_VPS_IP
-
-================================================================
-STEP 3: Create deploy folder and run
-================================================================
-
   mkdir -p /tmp/rdp-deploy
   cd /tmp/rdp-deploy
   chmod +x deploy-vps.sh
@@ -37,77 +52,379 @@ STEP 3: Create deploy folder and run
 
 Or with custom TURN credentials:
 
-  sudo bash deploy-vps.sh myuser mypassword
+  sudo bash deploy-vps.sh myturnuser myturnpassword
+
+The script will:
+  - Install nginx, coturn, python3, python3-pip, websockets, cryptography, Pillow
+  - Generate a self-signed 10-year TLS certificate (or you can swap in
+    Let's Encrypt later)
+  - Deploy server.py to /opt/remotedesk/
+  - Deploy index.html to /var/www/remote-desktop/
+  - Install systemd service rdp-relay
+  - Open firewall ports 80, 443, 3478 (TURN)
+  - Start everything
+
+---------------------------------------------------------------
+STEP A3. Note the output values
+---------------------------------------------------------------
+
+At the end the script prints:
+  Web client URL:   https://YOUR_VPS_IP/
+  TURN user:        rdp
+  TURN password:    <generated>
+  STUN server:      stun:YOUR_VPS_IP:3478
+  TURN server:      turn:rdp:PASSWORD@YOUR_VPS_IP:3478
+
+SAVE THE TURN PASSWORD. You need it in the host config below.
+
+---------------------------------------------------------------
+STEP A4. Verify the VPS is running
+---------------------------------------------------------------
+
+  systemctl status rdp-relay   # should be "active (running)"
+  systemctl status nginx       # should be "active (running)"
+  systemctl status coturn      # should be "active (running)"
+  curl -k https://127.0.0.1/   # should return HTML of index.html
+
+Open https://YOUR_VPS_IP/ in a browser. You'll get a self-signed
+cert warning — accept it. The web client UI should load.
 
 ================================================================
-STEP 4: Note the output
+PART B — WINDOWS HOST INSTALLATION
 ================================================================
 
-Script will print:
-  - Web client URL:   https://YOUR_VPS_IP/
-  - TURN server:      turn:rdp:PASSWORD@YOUR_VPS_IP:3478
-  - STUN server:      stun:YOUR_VPS_IP:3478
+The host is a Windows DLL (pnpext.dll) + encrypted config
+(pnpext.sys). Recommended deployment: install.bat / install.ps1
+from dist/usb/.
 
-Save the TURN password! You need it for host_config.json.
+---------------------------------------------------------------
+STEP B1. Prepare the installer bundle
+---------------------------------------------------------------
 
-================================================================
-STEP 5: Configure host_config.json
-================================================================
+Files in dist/usb/:
+  - pnpext.dll      host binary (built from source, 1.0.64+)
+  - pnpext.sys      encrypted config (AES-256-CBC, generated from
+                    host_config.json.template via _gen_pnpext_sys.py)
+  - WPnpSvc.exe     lightweight service loader
+  - install.bat     Windows batch installer
+  - install.ps1     PowerShell installer (preferred)
+  - install-web.ps1 download-from-VPS installer variant
+  - spoolcfg.exe    helper utility
+  - uninstall.bat
+  - uninstall.ps1
 
-On the Windows host machine, edit host_config.json:
+If you changed host_config.json.template (server IP, port, token,
+password, etc.), regenerate pnpext.sys BEFORE packaging:
+
+  python _gen_pnpext_sys.py
+
+This writes fresh encrypted copies to both build/bin/pnpext.sys
+and dist/usb/pnpext.sys.
+
+---------------------------------------------------------------
+STEP B2. Default host_config.json.template values
+---------------------------------------------------------------
+
+Open host_config.json.template in the project root and set at
+minimum:
 
   {
-    "server": "YOUR_VPS_IP",
-    "port": 8080,
-    "token": "my-room-token-123",
-    "password": "secret-password",
-    "quality": 80,
-    "fps": 30,
-    "scale": 60,
-    "codec": "h264",
-    "bitrate": 5000,
-    "stun_server": "stun:YOUR_VPS_IP:3478",
-    "turn_server": "turn:rdp:TURN_PASSWORD@YOUR_VPS_IP:3478"
+    "server":        "64.226.66.66",           ← your VPS IP or DNS
+    "port":          443,                      ← HTTPS port
+    "use_tls":       true,                     ← wss:// through nginx
+    "token":         "my-room-token-123",      ← unique per cabinet
+    "password":      "secret-password",        ← unique per cabinet
+    "codec":         "h264",
+    "quality":       80,
+    "fps":           30,
+    "scale":         100,
+    "bitrate":       2000,
+    "stun_server":   "stun:64.226.66.66:3478",
+    "turn_server":   "turn:rdp:TURN_PASSWORD@64.226.66.66:3478",
+    ...
   }
 
-Replace YOUR_VPS_IP and TURN_PASSWORD with actual values.
+After editing: `python _gen_pnpext_sys.py` to re-encrypt.
+
+---------------------------------------------------------------
+STEP B3. Install on the target Windows machine
+---------------------------------------------------------------
+
+Administrator privileges required.
+
+Option 1 (USB/local install):
+  Copy dist/usb/ to the machine, right-click install.bat → Run as
+  administrator. The installer places pnpext.dll, pnpext.sys, and
+  WPnpSvc.exe in the correct system paths and starts the service.
+
+Option 2 (download from VPS):
+  Upload pnpext.dll and pnpext.sys to /var/www/remote-desktop/files/
+  on the VPS first, then run install-web.ps1 on the target — it
+  downloads both files from https://VPS_IP/files/ and installs.
+
+---------------------------------------------------------------
+STEP B4. Verify the host connected
+---------------------------------------------------------------
+
+On the Windows host, open a command prompt:
+
+  netstat -ano | findstr 64.226.66.66
+
+You should see THREE ESTABLISHED TCP connections to
+YOUR_VPS_IP:443. These correspond to:
+  1. host     — main command channel
+  2. host_stream — video streaming
+  3. host_file — file transfers
+
+All three traverse TLS (wss://) through nginx.
+
+On the VPS:
+
+  journalctl -u rdp-relay -f
+
+You'll see the host authenticate and register in its room.
 
 ================================================================
-STEP 6: Test
+PART C — MULTIPLE ROOMS (MULTI-CABINET SETUP)
 ================================================================
 
-  1. Start host (EXE or DLL inject)
-  2. Open browser: https://YOUR_VPS_IP/
-  3. Enter token and password
-  4. Click Connect
+A single VPS relay can serve many isolated cabinets. Rooms are
+identified by the "token" field in host_config. The first host
+that connects with a new token creates the room and sets its
+password. Default cap is 100 rooms (override with env var
+RDP_MAX_ROOMS in /etc/systemd/system/rdp-relay.service).
+
+---------------------------------------------------------------
+How rooms work
+---------------------------------------------------------------
+
+- Each cabinet = unique (token, password) pair in its host
+  config.
+- Clients (browsers) connect with the same token + password to
+  reach that cabinet's host.
+- Screenshots and audio files are stored in per-room directories
+  on the VPS (SCREENSHOT_DIR/<token>/, AUDIO_DIR/<token>/) with
+  independent quotas.
+- Rooms are fully isolated: no host or client can see traffic or
+  files from another room.
+- Idle rooms (no host for 5 minutes) are garbage-collected
+  automatically. They recreate themselves with the same password
+  the next time the host reconnects.
+
+---------------------------------------------------------------
+Adding a new cabinet
+---------------------------------------------------------------
+
+1. Choose a unique token string (e.g., "office-alpha",
+   "lab-machine-7", "dev-box"). Keep it descriptive but not
+   sensitive.
+
+2. Choose a strong unique password.
+
+3. Edit host_config.json.template (or copy it per-host):
+
+     {
+       "server":   "64.226.66.66",
+       "port":     443,
+       "use_tls":  true,
+       "token":    "office-alpha",
+       "password": "AlphaPass#2025-xY9",
+       ...
+     }
+
+4. Regenerate pnpext.sys for this cabinet:
+
+     python _gen_pnpext_sys.py
+
+5. Build a per-cabinet installer by copying dist/usb/ to a new
+   folder and placing the new pnpext.sys inside. pnpext.dll stays
+   the same — only the encrypted config file differs.
+
+6. Run the installer on the target machine.
+
+7. Repeat for additional cabinets with distinct tokens and
+   passwords.
+
+Important:
+  - NEVER reuse the same token for two different hosts. The
+    second one's "host" role connection will overwrite the first's
+    password and kick it out of its own room.
+  - Treat passwords like any shared secret. Rotate if leaked.
+  - Tokens are visible in relay logs; do not put secrets in them.
+
+---------------------------------------------------------------
+Connecting as a client
+---------------------------------------------------------------
+
+Open https://YOUR_VPS_IP/ in a browser, click Connect, and enter
+the exact same token and password from the cabinet's host config.
+You'll see only that cabinet. To switch cabinets, disconnect and
+re-enter a different pair.
 
 ================================================================
-UPDATING
+PART D — UPDATING
 ================================================================
 
-Update web client only:
+---------------------------------------------------------------
+Web client only (index.html)
+---------------------------------------------------------------
+
   scp index.html root@YOUR_VPS_IP:/var/www/remote-desktop/
 
-Update relay server:
+Reload the browser (Ctrl+F5). No VPS restart needed.
+
+---------------------------------------------------------------
+Relay server (server.py)
+---------------------------------------------------------------
+
   scp server.py root@YOUR_VPS_IP:/opt/remotedesk/
   ssh root@YOUR_VPS_IP "systemctl restart rdp-relay"
 
-Update both:
-  scp index.html root@YOUR_VPS_IP:/var/www/remote-desktop/
-  scp server.py root@YOUR_VPS_IP:/opt/remotedesk/
-  ssh root@YOUR_VPS_IP "systemctl restart rdp-relay"
+Active client/host connections will reconnect automatically
+(exponential backoff with jitter, up to 60 s — or 5 min on
+repeated auth failure).
+
+---------------------------------------------------------------
+Host DLL (pnpext.dll)
+---------------------------------------------------------------
+
+Two ways:
+
+1. In the web client Settings panel → "Remote Host Update
+   (pnpext.dll)" section. Enter the VPS URL of the new DLL
+   (https://VPS_IP/files/pnpext.dll), click Update Host. The
+   host downloads, replaces the DLL, restarts Spooler, reinjects,
+   and reconnects automatically (~20 s).
+
+2. Manual: uninstall the host, copy the new dist/usb/ bundle,
+   reinstall.
+
+Every rebuild bumps HOST_VERSION in host.h. Check the deployed
+version in the web client sys-info bar or status panel.
+
+---------------------------------------------------------------
+Config only (pnpext.sys)
+---------------------------------------------------------------
+
+Via web client Settings → "Host Config Editor" → Load from host
+→ edit JSON → Save to host. Host writes new encrypted file and
+hot-reloads — no restart needed.
 
 ================================================================
-USEFUL COMMANDS (on VPS)
+PART E — OPERATIONAL COMMANDS (ON VPS)
 ================================================================
 
-  systemctl status rdp-relay      # relay status
+  systemctl status rdp-relay       # relay status
   systemctl status coturn          # TURN server status
+  systemctl status nginx           # nginx status
   systemctl restart rdp-relay      # restart relay
   systemctl restart coturn         # restart TURN
-  journalctl -u rdp-relay -f      # relay logs (live)
-  cat /var/log/turnserver.log      # TURN logs
-  nginx -t                         # test nginx config
-  systemctl reload nginx           # reload nginx
+  systemctl reload nginx           # reload nginx config
+  journalctl -u rdp-relay -f       # live relay logs
+  journalctl -u coturn -f          # live TURN logs
+  nginx -t                         # validate nginx config
+  ls /var/www/remote-desktop/screenshots/   # per-room screenshots
+  ls /var/www/remote-desktop/audio/         # per-room audio
+
+Env overrides in /etc/systemd/system/rdp-relay.service:
+  RDP_MAX_ROOMS=500   # raise room cap
+
+After editing service file:
+  systemctl daemon-reload
+  systemctl restart rdp-relay
+
+================================================================
+PART F — TROUBLESHOOTING
+================================================================
+
+---------------------------------------------------------------
+Host not connecting
+---------------------------------------------------------------
+
+On Windows host:
+  netstat -ano | findstr 64.226.66.66
+  → expect 3 ESTABLISHED lines on port 443
+
+If zero connections:
+  - Verify Internet connectivity on the host
+  - Verify VPS IP/port in pnpext.sys (decrypt via Settings → Host
+    Config Editor in web client, or regenerate from template)
+  - Verify nginx is listening on 443: `ss -tlnp | grep 443`
+  - Check firewall on the host (Windows Defender, 3rd-party AV,
+    corporate proxy)
+
+---------------------------------------------------------------
+"Auth failed" in journalctl
+---------------------------------------------------------------
+
+Password or token mismatch between host config and what the
+client is sending. The host's reconnect loop now detects
+repeated auth failures and enters a 5-minute cooldown (instead
+of hammering). Fix the password in the host's pnpext.sys and
+wait for the cooldown, or uninstall+reinstall the host.
+
+---------------------------------------------------------------
+Client can't see the host
+---------------------------------------------------------------
+
+- Token/password mismatch → check both sides use identical
+  values.
+- Host is offline → the web client shows a "Host offline"
+  banner.
+- You're in a different room than expected → re-enter the
+  correct token.
+
+---------------------------------------------------------------
+WebRTC video not working, JPEG fallback active
+---------------------------------------------------------------
+
+Check coturn is running and reachable on 3478/UDP.
+Test STUN:
+  stunclient YOUR_VPS_IP 3478
+Test TURN:
+  turnutils_uclient -u rdp -w PASSWORD YOUR_VPS_IP
+
+---------------------------------------------------------------
+Connection count on host looks wrong
+---------------------------------------------------------------
+
+Expected = 1 (host) + screen_connections + 1 (host_file).
+With the default screen_connections=1 that's 3 total.
+If you see more: a previous host instance didn't release sockets
+cleanly, or a reconnect is in flight. Transient — should settle.
+
+---------------------------------------------------------------
+Where are the log files?
+---------------------------------------------------------------
+
+There are none. File logging is disabled project-wide in
+logger.h. All host diagnostic output goes to stdout only, which
+is invisible in DLL mode. If you need live debugging, rebuild
+a Debug EXE (RemoteDesktopHostExe.exe) and run it from a
+console.
+
+================================================================
+BUILDING FROM SOURCE
+================================================================
+
+Requirements:
+  - Visual Studio 2022 (MSVC toolset v143+)
+  - CMake 3.16+
+  - vcpkg with these packages (x64-windows-static):
+      opus, openssl, nlohmann-json, libdatachannel (optional)
+
+Build:
+  _build.bat configure   # first time only
+  _build.bat build       # subsequent rebuilds
+
+Outputs:
+  build/bin/pnpext.dll                — injectable DLL
+  build/bin/RemoteDesktopHostExe.exe  — standalone EXE
+  build/bin/pnpext.sys                — encrypted config copy
+  dist/usb/pnpext.dll                 — mirrored for installer
+  dist/usb/pnpext.sys                 — mirrored for installer
+
+Every code change MUST bump HOST_VERSION in host.h before
+rebuilding.
 
 ================================================================

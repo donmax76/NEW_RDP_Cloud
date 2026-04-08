@@ -16,11 +16,9 @@ public:
         else min_level_=INFO_L;
     }
 
-    void set_file(const std::string& path) {
-        std::lock_guard<std::mutex> lk(mu_);
-        if (file_.is_open()) file_.close();
-        file_.open(path, std::ios::app);
-    }
+    // Intentionally a no-op: file logging is disabled project-wide.
+    // All log output goes to stdout (console) only.
+    void set_file(const std::string& /*path*/) { /* disabled */ }
 
     void log(Level lvl, const std::string& msg) {
         if (lvl < min_level_) return;
@@ -38,7 +36,7 @@ public:
         std::string line = std::string("[") + ts + "][" + names[lvl] + "] " + msg;
         std::lock_guard<std::mutex> lk(mu_);
         std::cout << line << "\n";
-        if (file_.is_open()) file_ << line << "\n" << std::flush;
+        // File logging intentionally disabled — nothing is written to disk.
     }
 
     void info (const std::string& m){ log(INFO_L, m); }
@@ -49,7 +47,6 @@ public:
 private:
     Logger() = default;
     std::mutex mu_;
-    std::ofstream file_;
     Level min_level_ = INFO_L;
 };
 

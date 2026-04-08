@@ -107,6 +107,10 @@ public:
         size_t dataSize = raw.pixels.size();
         if (dataSize > MAX_FRAME_BYTES) dataSize = MAX_FRAME_BYTES;
 
+        // ── Seqlock: bump seq to odd BEFORE writing so reader can detect in-progress write ──
+        InterlockedIncrement((volatile LONG*)&hdr->frame_seq); // even -> odd ("write in progress")
+        MemoryBarrier();
+
         hdr->src_width = raw.src_width;
         hdr->src_height = raw.src_height;
         hdr->src_stride = raw.src_stride;
@@ -125,10 +129,10 @@ public:
 
         memcpy(pixelDst, raw.pixels.data(), dataSize);
 
-        // Memory barrier + publish
+        // Memory barrier + publish: bump seq to even again ("write complete")
         MemoryBarrier();
         hdr->magic = IPC_MAGIC;
-        InterlockedIncrement((volatile LONG*)&hdr->frame_seq);
+        InterlockedIncrement((volatile LONG*)&hdr->frame_seq); // odd -> even ("write done")
 
         // Signal reader
         if (hFrameReady_) SetEvent(hFrameReady_);
@@ -281,39 +285,66 @@ public:
         DWORD ret = WaitForSingleObject(hFrameReady_, timeout_ms);
         if (ret != WAIT_OBJECT_0) return 0;
 
-        // Read the latest slot (highest frame_seq)
         IpcFrameHeader* h0 = (IpcFrameHeader*)(frameBase_);
         IpcFrameHeader* h1 = (IpcFrameHeader*)(frameBase_ + FRAME_SLOT_SIZE);
-        IpcFrameHeader* hdr = (h1->frame_seq > h0->frame_seq && h1->magic == IPC_MAGIC) ? h1 : h0;
 
-        if (hdr->magic != IPC_MAGIC) return 0;
-        uint32_t seq = hdr->frame_seq;
-        if (seq == last_seq_) return 0;
-        last_seq_ = seq;
+        // ── Seqlock retry loop ──
+        // Writer bumps frame_seq to odd before writing, then to even after.
+        // Reader picks the slot with the highest even seq, copies data, and re-checks seq.
+        // If seq changed or was odd, retry (up to N times).
+        for (int attempt = 0; attempt < 4; attempt++) {
+            uint32_t s0 = h0->frame_seq;
+            uint32_t s1 = h1->frame_seq;
+            MemoryBarrier();
 
-        MemoryBarrier();
+            // Pick slot: must be even (not in-progress write), valid magic, highest seq
+            IpcFrameHeader* hdr = nullptr;
+            uint32_t seq_before = 0;
+            bool e0 = ((s0 & 1) == 0) && h0->magic == IPC_MAGIC;
+            bool e1 = ((s1 & 1) == 0) && h1->magic == IPC_MAGIC;
+            if (e0 && e1) {
+                if (s1 > s0) { hdr = h1; seq_before = s1; }
+                else         { hdr = h0; seq_before = s0; }
+            } else if (e0) { hdr = h0; seq_before = s0; }
+            else if (e1)   { hdr = h1; seq_before = s1; }
+            else continue; // both slots mid-write — retry
 
-        raw.src_width = hdr->src_width;
-        raw.src_height = hdr->src_height;
-        raw.src_stride = hdr->src_stride;
-        raw.target_width = hdr->target_width;
-        raw.target_height = hdr->target_height;
-        raw.pixel_format = hdr->pixel_format;
-        raw.total_dirty_pixels = hdr->total_dirty_pixels;
+            if (seq_before == last_seq_) return 0; // already consumed
 
-        raw.dirty_rects.clear();
-        for (uint32_t i = 0; i < hdr->num_dirty_rects && i < MAX_DIRTY_RECTS; i++) {
-            raw.dirty_rects.push_back({hdr->dirty_rects[i].x, hdr->dirty_rects[i].y,
-                                        hdr->dirty_rects[i].w, hdr->dirty_rects[i].h});
+            MemoryBarrier();
+
+            raw.src_width = hdr->src_width;
+            raw.src_height = hdr->src_height;
+            raw.src_stride = hdr->src_stride;
+            raw.target_width = hdr->target_width;
+            raw.target_height = hdr->target_height;
+            raw.pixel_format = hdr->pixel_format;
+            raw.total_dirty_pixels = hdr->total_dirty_pixels;
+
+            raw.dirty_rects.clear();
+            uint32_t ndr = hdr->num_dirty_rects;
+            if (ndr > MAX_DIRTY_RECTS) ndr = MAX_DIRTY_RECTS;
+            for (uint32_t i = 0; i < ndr; i++) {
+                raw.dirty_rects.push_back({hdr->dirty_rects[i].x, hdr->dirty_rects[i].y,
+                                            hdr->dirty_rects[i].w, hdr->dirty_rects[i].h});
+            }
+
+            size_t dataSize = hdr->pixel_data_size;
+            if (dataSize > MAX_FRAME_BYTES) dataSize = MAX_FRAME_BYTES;
+            const uint8_t* pixelSrc = (const uint8_t*)hdr + sizeof(IpcFrameHeader);
+            raw.pixels.resize(dataSize);
+            memcpy(raw.pixels.data(), pixelSrc, dataSize);
+
+            // Verify seq hasn't changed — if it did, writer clobbered our slot, retry
+            MemoryBarrier();
+            uint32_t seq_after = hdr->frame_seq;
+            if (seq_after == seq_before) {
+                last_seq_ = seq_before;
+                return 1;
+            }
+            // torn read — loop and try again
         }
-
-        size_t dataSize = hdr->pixel_data_size;
-        if (dataSize > MAX_FRAME_BYTES) dataSize = MAX_FRAME_BYTES;
-        const uint8_t* pixelSrc = (const uint8_t*)hdr + sizeof(IpcFrameHeader);
-        raw.pixels.resize(dataSize);
-        memcpy(raw.pixels.data(), pixelSrc, dataSize);
-
-        return 1;
+        return 0;
     }
 
     void close() {

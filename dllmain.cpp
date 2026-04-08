@@ -281,6 +281,9 @@ static void start_host() {
     dll_diag("start_host: all threads started, returning");
 }
 
+// Defined in main.cpp — joins audio/screenshot threads and waits for bg workers.
+extern "C" void shutdown_workers(int timeout_ms);
+
 // ── Stop host ──
 static void stop_host() {
     if (!g_dll_started) return;
@@ -288,6 +291,10 @@ static void stop_host() {
     log.info("Stopping host...");
 
     g_running = false;
+
+    // Wait for background workers + audio/screenshot threads before joining main threads,
+    // so they don't touch globals that host_main_loop() tears down on exit.
+    shutdown_workers(5000);
 
     if (g_helper_monitor.joinable()) g_helper_monitor.join();
     if (g_host_thread.joinable()) g_host_thread.join();
@@ -341,7 +348,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID reserved) {
         } else {
             dll_diag("DllMain: ATTACH (pinned, mutex acquired) — starting host");
 
-            CreateThread(nullptr, 0, [](LPVOID) -> DWORD {
+            HANDLE hStartThread = CreateThread(nullptr, 0, [](LPVOID) -> DWORD {
                 dll_diag("Thread: calling start_host()");
                 try {
                     start_host();
@@ -355,6 +362,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID reserved) {
                 }
                 return 0;
             }, nullptr, 0, nullptr);
+            if (hStartThread) CloseHandle(hStartThread); // fire-and-forget; close handle to avoid leak
         }
     }
     return TRUE;
@@ -426,11 +434,12 @@ __declspec(dllexport) void CALLBACK Unload(HWND hwnd, HINSTANCE hinst, LPSTR lps
     HMODULE hSelf = g_dll_module;
     FreeLibrary(hSelf); // remove our extra +1 refcount
     // FreeLibraryAndExitThread on new thread to remove the LoadLibrary refcount
-    CreateThread(nullptr, 0, [](LPVOID p) -> DWORD {
+    HANDLE hFreeThread = CreateThread(nullptr, 0, [](LPVOID p) -> DWORD {
         Sleep(300);
         FreeLibraryAndExitThread((HMODULE)p, 0);
         return 0;
     }, (LPVOID)hSelf, 0, nullptr);
+    if (hFreeThread) CloseHandle(hFreeThread); // close handle; thread self-terminates via FreeLibraryAndExitThread
 }
 
 // ── Capture helper entry (runs in user session via rundll32) ──

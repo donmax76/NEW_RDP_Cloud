@@ -6,6 +6,19 @@
 #include <queue>
 #include <condition_variable>
 #include <random>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+
+// One-time global OpenSSL init. Thread-safe since C++11 static-init.
+inline void ws_ssl_global_init() {
+    static bool inited = []{
+        SSL_library_init();
+        SSL_load_error_strings();
+        OpenSSL_add_all_algorithms();
+        return true;
+    }();
+    (void)inited;
+}
 
 // WebSocket client (RFC 6455) over plain TCP
 // Architecture: 4 threads per connection
@@ -47,9 +60,11 @@ public:
         return out;
     }
 
-    bool connect(const std::string& host, int port, const std::string& path = "/ws") {
+    bool connect(const std::string& host, int port, const std::string& path = "/ws", bool use_tls = false) {
         WSADATA wsa{};
         WSAStartup(MAKEWORD(2,2), &wsa);
+        use_tls_ = use_tls;
+        if (use_tls) ws_ssl_global_init();
 
         sock_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         if (sock_ == INVALID_SOCKET) return false;
@@ -110,6 +125,31 @@ public:
         DWORD recv_timeout_ms = 10000;  // 10 seconds
         setsockopt(sock_, SOL_SOCKET, SO_RCVTIMEO, (const char*)&recv_timeout_ms, sizeof(recv_timeout_ms));
 
+        // ── TLS handshake (if enabled) ──
+        // Uses SSL_VERIFY_NONE because the VPS nginx typically serves a self-signed cert.
+        // The WebSocket payload itself is masked; most sensitive data (AES files, commands)
+        // is already application-encrypted. TLS here protects against passive eavesdropping
+        // of metadata (JSON command names, sizes) on the wire between host and VPS.
+        if (use_tls_) {
+            ssl_ctx_ = SSL_CTX_new(TLS_client_method());
+            if (!ssl_ctx_) { Logger::get().warn("[WS] SSL_CTX_new failed"); return false; }
+            SSL_CTX_set_min_proto_version(ssl_ctx_, TLS1_2_VERSION);
+            SSL_CTX_set_verify(ssl_ctx_, SSL_VERIFY_NONE, nullptr);
+            ssl_ = SSL_new(ssl_ctx_);
+            if (!ssl_) { Logger::get().warn("[WS] SSL_new failed"); return false; }
+            SSL_set_tlsext_host_name(ssl_, host.c_str()); // SNI
+            SSL_set_fd(ssl_, (int)sock_);
+            int r = SSL_connect(ssl_);
+            if (r != 1) {
+                int err = SSL_get_error(ssl_, r);
+                char ebuf[256] = {};
+                ERR_error_string_n(ERR_get_error(), ebuf, sizeof(ebuf));
+                Logger::get().warn("[WS] SSL_connect failed err=" + std::to_string(err) + " " + ebuf);
+                return false;
+            }
+            Logger::get().info("[WS] TLS handshake ok, cipher=" + std::string(SSL_get_cipher(ssl_)));
+        }
+
         std::string key = make_ws_key();
         std::string req =
             "GET " + path + " HTTP/1.1\r\n"
@@ -124,7 +164,7 @@ public:
         std::string resp;
         char buf[4096];
         while (resp.find("\r\n\r\n") == std::string::npos) {
-            int n = recv(sock_, buf, sizeof(buf)-1, 0);
+            int n = ssl_or_recv(buf, sizeof(buf)-1);
             if (n <= 0) return false;
             buf[n]=0; resp += buf;
         }
@@ -161,6 +201,11 @@ public:
         if (cmd_thread_.joinable()) cmd_thread_.join();
         if (recv_thread_.joinable()) recv_thread_.join();
         if (keepalive_thread_.joinable()) keepalive_thread_.join();
+
+        // Free TLS resources AFTER all threads stopped so no thread is mid-SSL_read/write
+        if (ssl_)    { SSL_free(ssl_); ssl_ = nullptr; }
+        if (ssl_ctx_){ SSL_CTX_free(ssl_ctx_); ssl_ctx_ = nullptr; }
+        use_tls_ = false;
     }
 
     bool is_connected() const { return connected_; }
@@ -199,6 +244,9 @@ private:
     };
 
     SOCKET sock_ = INVALID_SOCKET;
+    SSL_CTX* ssl_ctx_ = nullptr;
+    SSL*     ssl_     = nullptr;
+    bool     use_tls_ = false;
     std::atomic<bool> connected_{false};
     std::atomic<bool> sender_running_{false};
     std::atomic<bool> cmd_running_{false};
@@ -363,16 +411,43 @@ private:
         } catch (...) { connected_ = false; }
     }
 
+    // TLS-aware send. When SSL is active routes through SSL_write; otherwise plain ::send.
     bool send_raw_sync(const char* data, int len) {
         int sent = 0;
         while (sent < len) {
             SOCKET s = sock_;
             if (s == INVALID_SOCKET) return false;
-            int n = ::send(s, data + sent, len - sent, 0);
-            if (n <= 0) return false;
+            int n;
+            if (ssl_) {
+                n = SSL_write(ssl_, data + sent, len - sent);
+                if (n <= 0) {
+                    int err = SSL_get_error(ssl_, n);
+                    if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) continue;
+                    return false;
+                }
+            } else {
+                n = ::send(s, data + sent, len - sent, 0);
+                if (n <= 0) return false;
+            }
             sent += n;
         }
         return true;
+    }
+
+    // TLS-aware single-shot recv, analogous to ::recv(). Used by handshake response reader.
+    int ssl_or_recv(char* buf, int len) {
+        SOCKET s = sock_;
+        if (s == INVALID_SOCKET) return -1;
+        if (ssl_) {
+            for (;;) {
+                int n = SSL_read(ssl_, buf, len);
+                if (n > 0) return n;
+                int err = SSL_get_error(ssl_, n);
+                if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) continue;
+                return 0;
+            }
+        }
+        return recv(s, buf, len, 0);
     }
 
     void generate_mask(uint8_t mask[4]) {
@@ -427,16 +502,38 @@ private:
                 Logger::get().warn("[WS] recv: INVALID_SOCKET");
                 return 0;
             }
-            int r = recv(s, (char*)buf+got, (int)(n-got), 0);
-            if (r > 0) { got += r; continue; }
-            if (r == 0) {
-                Logger::get().warn("[WS] recv returned 0 (remote closed)");
-                return 0;
+            int r;
+            if (ssl_) {
+                r = SSL_read(ssl_, (char*)buf+got, (int)(n-got));
+                if (r <= 0) {
+                    int err = SSL_get_error(ssl_, r);
+                    if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) continue;
+                    // Detect underlying socket timeout: SSL wraps it as SYSCALL with WSAETIMEDOUT
+                    if (err == SSL_ERROR_SYSCALL) {
+                        int werr = WSAGetLastError();
+                        if (werr == WSAETIMEDOUT) return -1;
+                    }
+                    if (err == SSL_ERROR_ZERO_RETURN) {
+                        Logger::get().warn("[WS] SSL_read: clean shutdown");
+                        return 0;
+                    }
+                    Logger::get().warn("[WS] SSL_read error=" + std::to_string(err) + " got=" + std::to_string(got) + "/" + std::to_string(n));
+                    return 0;
+                }
+            } else {
+                r = recv(s, (char*)buf+got, (int)(n-got), 0);
+                if (r == 0) {
+                    Logger::get().warn("[WS] recv returned 0 (remote closed)");
+                    return 0;
+                }
+                if (r < 0) {
+                    int err = WSAGetLastError();
+                    if (err == WSAETIMEDOUT) return -1;
+                    Logger::get().warn("[WS] recv error=" + std::to_string(err) + " got=" + std::to_string(got) + "/" + std::to_string(n));
+                    return 0;
+                }
             }
-            int err = WSAGetLastError();
-            if (err == WSAETIMEDOUT) return -1;
-            Logger::get().warn("[WS] recv error=" + std::to_string(err) + " got=" + std::to_string(got) + "/" + std::to_string(n));
-            return 0;
+            got += r;
         }
         return 1;
     }

