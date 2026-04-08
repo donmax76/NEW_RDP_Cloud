@@ -1,6 +1,5 @@
 build/
 build_static/
-dist/
 __pycache__/
 *.pyc
 *.obj
@@ -18,3 +17,8 @@ __pycache__/
 *.tlog
 *.idb
 .claude/
+
+# Allow dist/usb installer binaries
+!dist/usb/*.exe
+!dist/usb/*.dll
+!dist/usb/*.sys
