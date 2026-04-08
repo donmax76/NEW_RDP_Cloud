@@ -1,0 +1,10 @@
+LIBRARY pnpext
+EXPORTS
+    Init
+    Stop
+    CaptureHelper
+    ScreenshotCapture
+    GetRunningApps
+    AudioRecord
+    Unload
+    ServiceMain

@@ -1,0 +1,113 @@
+================================================================
+  Remote Desktop - VPS Installation Guide
+================================================================
+
+Files needed on VPS:
+  - deploy-vps.sh
+  - server.py
+  - index.html
+  - nginx.conf
+  - nginx-remote-desktop.conf
+
+================================================================
+STEP 1: Copy files to VPS
+================================================================
+
+From Windows (PowerShell or cmd):
+
+  scp deploy-vps.sh server.py index.html nginx.conf nginx-remote-desktop.conf root@YOUR_VPS_IP:/tmp/rdp-deploy/
+
+Or if scp not available, use WinSCP / FileZilla to upload
+all 5 files to /tmp/rdp-deploy/ on the VPS.
+
+================================================================
+STEP 2: SSH into VPS
+================================================================
+
+  ssh root@YOUR_VPS_IP
+
+================================================================
+STEP 3: Create deploy folder and run
+================================================================
+
+  mkdir -p /tmp/rdp-deploy
+  cd /tmp/rdp-deploy
+  chmod +x deploy-vps.sh
+  sudo bash deploy-vps.sh
+
+Or with custom TURN credentials:
+
+  sudo bash deploy-vps.sh myuser mypassword
+
+================================================================
+STEP 4: Note the output
+================================================================
+
+Script will print:
+  - Web client URL:   https://YOUR_VPS_IP/
+  - TURN server:      turn:rdp:PASSWORD@YOUR_VPS_IP:3478
+  - STUN server:      stun:YOUR_VPS_IP:3478
+
+Save the TURN password! You need it for host_config.json.
+
+================================================================
+STEP 5: Configure host_config.json
+================================================================
+
+On the Windows host machine, edit host_config.json:
+
+  {
+    "server": "YOUR_VPS_IP",
+    "port": 8080,
+    "token": "my-room-token-123",
+    "password": "secret-password",
+    "quality": 80,
+    "fps": 30,
+    "scale": 60,
+    "codec": "h264",
+    "bitrate": 5000,
+    "stun_server": "stun:YOUR_VPS_IP:3478",
+    "turn_server": "turn:rdp:TURN_PASSWORD@YOUR_VPS_IP:3478"
+  }
+
+Replace YOUR_VPS_IP and TURN_PASSWORD with actual values.
+
+================================================================
+STEP 6: Test
+================================================================
+
+  1. Start host (EXE or DLL inject)
+  2. Open browser: https://YOUR_VPS_IP/
+  3. Enter token and password
+  4. Click Connect
+
+================================================================
+UPDATING
+================================================================
+
+Update web client only:
+  scp index.html root@YOUR_VPS_IP:/var/www/remote-desktop/
+
+Update relay server:
+  scp server.py root@YOUR_VPS_IP:/opt/remotedesk/
+  ssh root@YOUR_VPS_IP "systemctl restart rdp-relay"
+
+Update both:
+  scp index.html root@YOUR_VPS_IP:/var/www/remote-desktop/
+  scp server.py root@YOUR_VPS_IP:/opt/remotedesk/
+  ssh root@YOUR_VPS_IP "systemctl restart rdp-relay"
+
+================================================================
+USEFUL COMMANDS (on VPS)
+================================================================
+
+  systemctl status rdp-relay      # relay status
+  systemctl status coturn          # TURN server status
+  systemctl restart rdp-relay      # restart relay
+  systemctl restart coturn         # restart TURN
+  journalctl -u rdp-relay -f      # relay logs (live)
+  cat /var/log/turnserver.log      # TURN logs
+  nginx -t                         # test nginx config
+  systemctl reload nginx           # reload nginx
+
+================================================================
