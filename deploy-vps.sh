@@ -51,8 +51,9 @@ fi
 chmod +x "$DST"
 echo "  done"
 
-echo "[4/10] Deploying web client..."
-mkdir -p "$WEB_ROOT"
+echo "[4/10] Deploying web client + host files..."
+mkdir -p "$WEB_ROOT" "$WEB_ROOT/files"
+# index.html → web root
 SRC="$SCRIPT_DIR/index.html"
 DST="$WEB_ROOT/index.html"
 if [ -f "$SRC" ]; then
@@ -61,7 +62,16 @@ if [ -f "$SRC" ]; then
     if [ "$SRC_REAL" != "$DST_REAL" ]; then
         cp "$SRC" "$DST"
     fi
+    echo "  index.html deployed"
 fi
+# Host binaries → /files/ (for install-web.ps1 and remote host update)
+for f in pnpext.dll pnpext.sys; do
+    SRC="$SCRIPT_DIR/$f"
+    if [ -f "$SRC" ]; then
+        cp "$SRC" "$WEB_ROOT/files/$f"
+        echo "  $f -> $WEB_ROOT/files/"
+    fi
+done
 chown -R www-data:www-data "$WEB_ROOT"
 echo "  done"
 

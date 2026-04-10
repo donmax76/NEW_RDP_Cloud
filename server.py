@@ -4,7 +4,7 @@ RemoteDesktop VPS Server - WebSocket Relay
 Bridges C++ host <--> Web client
 Version: 2024-03-12-v3 (stream throttle + diagnostics)
 """
-SERVER_VERSION = "2024-03-12-v3"
+SERVER_VERSION = "1.0.95"
 
 import asyncio
 import websockets
@@ -467,7 +467,7 @@ PORT = int(os.environ.get("RDP_PORT", "8080"))
 ADMIN_TOKEN = os.environ.get("RDP_ADMIN_TOKEN", "change-me-admin-token")
 MAX_ROOMS = int(os.environ.get("RDP_MAX_ROOMS", "100"))
 MAX_CLIENTS_PER_ROOM = int(os.environ.get("RDP_MAX_CLIENTS", "10"))
-PING_INTERVAL = 2    # Very frequent pings — prevent NIC power-save (like TeamViewer traffic)
+PING_INTERVAL = 10   # 10s ping interval (2s was too aggressive, wasted event loop time during file transfers)
 PING_TIMEOUT = 120
 SSL_CERT = os.environ.get("RDP_SSL_CERT", "")
 SSL_KEY  = os.environ.get("RDP_SSL_KEY", "")
@@ -676,6 +676,7 @@ async def handler(websocket, path: str):
             "user_id": user_id,
             "role": role,
             "host_online": room.host is not None,
+            "server_version": SERVER_VERSION,
         }))
         
         log.info(f"Auth OK: role={role} token={token[:8]}... id={user_id} from={remote}")
@@ -729,39 +730,9 @@ async def handler(websocket, path: str):
                     if len(raw_msg) >= 4 and raw_msg[:4] in (b'SCRN', b'SCR2'):
                         enqueue_scrn_to_stream_clients(room, raw_msg)
                 elif role == "host_file":
-                    # host_file: text messages may contain routing hints
-                    if isinstance(raw_msg, str):
-                        try:
-                            fmsg = json.loads(raw_msg)
-                            rt = fmsg.get("_route_binary_to", "")
-                            if rt:
-                                room._pending_file_targets.append(rt)
-                                continue
-                        except:
-                            pass
-                    # host_file sends FILE chunks → targeted delivery to requesting client.
-                    # If a _route_binary_to hint was queued, send to that client's file_recv
-                    # connections only. Otherwise fall back to round-robin (legacy).
-                    target_uid = ""
-                    if hasattr(room, '_pending_file_targets') and room._pending_file_targets:
-                        target_uid = room._pending_file_targets.pop(0)
+                    # host_file sends FILE chunks → round-robin to file_recv clients
                     fc_list = list(room.file_clients.values())
-                    if target_uid:
-                        # Find file_recv connections belonging to this client
-                        # file_recv user_ids contain the parent client's id prefix
-                        targeted = [fc for fc in fc_list if getattr(fc, '_parent_client', '') == target_uid]
-                        if not targeted:
-                            targeted = fc_list  # fallback to all
-                        if targeted:
-                            idx = room._file_rr % len(targeted)
-                            room._file_rr += 1
-                            fc = targeted[idx]
-                            try:
-                                await fc.ws.send(raw_msg)
-                                fc.bytes_sent += len(raw_msg)
-                            except:
-                                room.file_clients.pop(fc.user_id, None)
-                    elif fc_list:
+                    if fc_list:
                         idx = room._file_rr % len(fc_list)
                         room._file_rr += 1
                         fc = fc_list[idx]

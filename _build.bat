@@ -5,6 +5,8 @@ cd /d D:\Android_Projects\NEW_RDP_Cloud
 if "%1"=="configure" (
     cmake -B build -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=D:/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static
 ) else (
+    REM Auto-bump version across host.h + index.html + server.py
+    python D:\Android_Projects\NEW_RDP_Cloud\_bump_version.py
     cmake --build build -- /nologo
     if errorlevel 1 exit /b 1
     REM Mirror DLL to dist/usb so installer bundle always has the latest build
