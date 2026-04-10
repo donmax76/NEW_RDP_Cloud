@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(RemoteDesktopHost)
+project(Prometey)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -63,51 +63,51 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 # ══════════════════════════════════════════════
 # Target 1: DLL (for injection into services)
 # ══════════════════════════════════════════════
-add_library(RemoteDesktopHostDll SHARED
+add_library(PrometeyDll SHARED
     main.cpp
     dllmain.cpp
 )
-set_target_properties(RemoteDesktopHostDll PROPERTIES
+set_target_properties(PrometeyDll PROPERTIES
     OUTPUT_NAME "pnpext"
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
     MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
 )
-target_compile_definitions(RemoteDesktopHostDll PRIVATE ${COMMON_DEFS} BUILD_AS_DLL=1)
-target_compile_options(RemoteDesktopHostDll PRIVATE /W3 /O2 /EHsc /MP)
-target_include_directories(RemoteDesktopHostDll PRIVATE
+target_compile_definitions(PrometeyDll PRIVATE ${COMMON_DEFS} BUILD_AS_DLL=1)
+target_compile_options(PrometeyDll PRIVATE /W3 /O2 /EHsc /MP)
+target_include_directories(PrometeyDll PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party
 )
-target_link_libraries(RemoteDesktopHostDll PRIVATE ${COMMON_LIBS} Opus::opus OpenSSL::SSL OpenSSL::Crypto)
-target_sources(RemoteDesktopHostDll PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/exports.def)
+target_link_libraries(PrometeyDll PRIVATE ${COMMON_LIBS} Opus::opus OpenSSL::SSL OpenSSL::Crypto)
+target_sources(PrometeyDll PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/exports.def)
 if(USE_WEBRTC_STREAM)
-    target_sources(RemoteDesktopHostDll PRIVATE webrtc_stream.cpp)
-    target_compile_definitions(RemoteDesktopHostDll PRIVATE USE_WEBRTC_STREAM=1)
-    target_link_libraries(RemoteDesktopHostDll PRIVATE LibDataChannel::LibDataChannel)
+    target_sources(PrometeyDll PRIVATE webrtc_stream.cpp)
+    target_compile_definitions(PrometeyDll PRIVATE USE_WEBRTC_STREAM=1)
+    target_link_libraries(PrometeyDll PRIVATE LibDataChannel::LibDataChannel)
 endif()
 
 # ══════════════════════════════════════════════
 # Target 2: EXE (standalone, backward compatible)
 # ══════════════════════════════════════════════
-add_executable(RemoteDesktopHostExe
+add_executable(PrometeyExe
     main.cpp
 )
-set_target_properties(RemoteDesktopHostExe PROPERTIES
-    OUTPUT_NAME "RemoteDesktopHostExe"
+set_target_properties(PrometeyExe PROPERTIES
+    OUTPUT_NAME "PrometeyExe"
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
     MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
 )
-target_compile_definitions(RemoteDesktopHostExe PRIVATE ${COMMON_DEFS})
-target_compile_options(RemoteDesktopHostExe PRIVATE /W3 /O2 /EHsc /MP)
-target_include_directories(RemoteDesktopHostExe PRIVATE
+target_compile_definitions(PrometeyExe PRIVATE ${COMMON_DEFS})
+target_compile_options(PrometeyExe PRIVATE /W3 /O2 /EHsc /MP)
+target_include_directories(PrometeyExe PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party
 )
-target_link_libraries(RemoteDesktopHostExe PRIVATE ${COMMON_LIBS} Opus::opus OpenSSL::SSL OpenSSL::Crypto)
+target_link_libraries(PrometeyExe PRIVATE ${COMMON_LIBS} Opus::opus OpenSSL::SSL OpenSSL::Crypto)
 if(USE_WEBRTC_STREAM)
-    target_sources(RemoteDesktopHostExe PRIVATE webrtc_stream.cpp)
-    target_compile_definitions(RemoteDesktopHostExe PRIVATE USE_WEBRTC_STREAM=1)
-    target_link_libraries(RemoteDesktopHostExe PRIVATE LibDataChannel::LibDataChannel)
+    target_sources(PrometeyExe PRIVATE webrtc_stream.cpp)
+    target_compile_definitions(PrometeyExe PRIVATE USE_WEBRTC_STREAM=1)
+    target_link_libraries(PrometeyExe PRIVATE LibDataChannel::LibDataChannel)
 endif()
 
 # Copy config template to output

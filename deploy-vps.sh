@@ -158,6 +158,8 @@ echo "[10/10] Firewall..."
 if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "active"; then
     ufw allow 80/tcp >/dev/null 2>&1
     ufw allow 443/tcp >/dev/null 2>&1
+    # Port 8080 is exposed for direct host_file connections (plain WS for max
+    # file transfer throughput). Command/stream traffic stays on TLS:443.
     ufw allow $PYTHON_PORT/tcp >/dev/null 2>&1
     ufw allow 3478/udp >/dev/null 2>&1
     ufw allow 3478/tcp >/dev/null 2>&1
@@ -173,13 +175,14 @@ echo "  Deploy complete!"
 echo "==========================================="
 echo ""
 echo "  Web:   https://$SERVER_IP/"
-echo "  Host:  ws://$SERVER_IP:$PYTHON_PORT/host"
+echo "  Host:  wss://$SERVER_IP:443/host   (TLS via nginx)"
 echo "  TURN:  turn:$TURN_USER:$TURN_PASS@$SERVER_IP:3478"
 echo "  STUN:  stun:$SERVER_IP:3478"
 echo ""
 echo "  host_config.json:"
-echo "    \"server\": \"$SERVER_IP\","
-echo "    \"port\": $PYTHON_PORT,"
+echo "    \"server\":   \"$SERVER_IP\","
+echo "    \"port\":     443,"
+echo "    \"use_tls\":  true,"
 echo "    \"stun_server\": \"stun:$SERVER_IP:3478\","
 echo "    \"turn_server\": \"turn:$TURN_USER:$TURN_PASS@$SERVER_IP:3478\""
 echo ""

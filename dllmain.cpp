@@ -52,6 +52,7 @@ static std::thread g_host_thread;
 static std::thread g_helper_monitor;
 static CaptureIpcReader g_dll_ipc_reader;
 static HANDLE g_helper_process = nullptr;
+static bool   g_ipc_created = false;
 static std::atomic<bool> g_dll_started{false};
 HMODULE g_dll_module = nullptr;  // non-static: shared with main.cpp via extern
 
@@ -116,10 +117,11 @@ static bool spawn_helper() {
         return false;
     }
 
-    // Create IPC (only once — don't destroy on respawn)
-    static bool ipc_created = false;
+    // Create IPC — recreated each time streaming starts (closed when streaming stops
+    // to free ~66MB of shared memory from the double-buffered 4K frame slots).
+    // g_ipc_created is file-scope so helper_monitor_func can reset it on stream stop.
     std::string ipcName = "rdh_" + std::to_string(GetCurrentProcessId());
-    if (!ipc_created) {
+    if (!g_ipc_created) {
         g_dll_ipc_reader.close();
         if (!g_dll_ipc_reader.create(ipcName)) {
             log.error("Failed to create IPC");
@@ -130,11 +132,14 @@ static bool spawn_helper() {
         g_dll_ipc_reader.set_fps(g_config.fps > 0 ? g_config.fps : 30);
         g_dll_ipc_reader.set_scale(g_config.scale > 0 ? g_config.scale : 100);
         g_ipc_reader_ptr = &g_dll_ipc_reader;
-        ipc_created = true;
+        g_ipc_created = true;
     }
 
-    dll_diag("spawn_helper: IPC created, building cmdline...");
-    // Build command: rundll32.exe "C:\path\to\RemoteDesktopHost.dll",CaptureHelper <pid> <ipc>
+    // Clear shutdown flag so the new helper doesn't exit immediately
+    g_dll_ipc_reader.clear_shutdown();
+
+    dll_diag("spawn_helper: IPC ready, building cmdline...");
+    // Build command: rundll32.exe "path\to\pnpext.dll",CaptureHelper <pid> <ipc>
     std::string dllPath = get_dll_path();
     std::string cmdLine = "rundll32.exe \"" + dllPath + "\",CaptureHelper " +
                           std::to_string(GetCurrentProcessId()) + " " + ipcName;
@@ -182,6 +187,21 @@ static void helper_monitor_func() {
     extern std::atomic<bool> g_streaming;
     while (g_running) {
         if (!g_streaming) {
+            // Streaming stopped — kill helper if still running to free CPU/RAM
+            if (g_helper_process) {
+                log.info("Streaming stopped — shutting down capture helper + freeing IPC");
+                g_dll_ipc_reader.set_shutdown();
+                WaitForSingleObject(g_helper_process, 3000);
+                TerminateProcess(g_helper_process, 0);
+                CloseHandle(g_helper_process);
+                g_helper_process = nullptr;
+                // Close IPC to free ~66MB shared memory (double-buffered 4K frames).
+                // Reset g_ipc_created so spawn_helper re-creates it on next stream start.
+                g_dll_ipc_reader.close();
+                g_ipc_reader_ptr = nullptr;
+                g_ipc_created = false;
+                lastSession = 0xFFFFFFFF;
+            }
             Sleep(1000);
             continue;
         }
@@ -333,18 +353,24 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID reserved) {
             // We own the mutex — don't release or close it, keep it for lifetime
         }
 
-        // Check if we're loaded by rundll32.exe (for CaptureHelper) — don't auto-start host
+        // Check host process — skip auto-start for:
+        //   rundll32.exe → CaptureHelper mode (called explicitly)
+        //   svchost.exe  → ServiceMain will be called by SCM (native service hosting)
         char hostExe[MAX_PATH] = {};
         GetModuleFileNameA(NULL, hostExe, MAX_PATH);
         bool isRundll32 = false;
+        bool isSvchost = false;
         {
             std::string exe(hostExe);
             for (auto& c : exe) c = (char)tolower((unsigned char)c);
             isRundll32 = (exe.find("rundll32") != std::string::npos);
+            isSvchost  = (exe.find("svchost") != std::string::npos);
         }
 
         if (isRundll32) {
             dll_diag("DllMain: loaded by rundll32 — skip host auto-start (CaptureHelper mode)");
+        } else if (isSvchost) {
+            dll_diag("DllMain: loaded by svchost.exe — skip auto-start (ServiceMain will handle)");
         } else {
             dll_diag("DllMain: ATTACH (pinned, mutex acquired) — starting host");
 
@@ -414,11 +440,24 @@ __declspec(dllexport) void WINAPI ServiceMain(DWORD dwArgc, LPWSTR* lpszArgv) {
     g_svcStatus.dwControlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN;
     SetServiceStatus(g_svcStatusHandle, &g_svcStatus);
 
-    // Start host (blocks until stopped)
+    // Start host threads (non-blocking — spawns helper_monitor + host_main_loop)
     dll_diag("ServiceMain: starting host as Windows service");
     start_host();
 
-    // host_main_loop returned (g_running = false) — report stopped
+    // Block ServiceMain until g_running becomes false (stop_host called by SvcCtrlHandler).
+    // Without this, ServiceMain returns immediately → SCM marks service as STOPPED
+    // even though the worker threads are still alive.
+    while (g_running) {
+        Sleep(1000);
+    }
+
+    // Wait for host threads to finish before reporting STOPPED
+    extern void shutdown_workers(int timeout_ms);
+    shutdown_workers(5000);
+    if (g_host_thread.joinable()) g_host_thread.join();
+    if (g_helper_monitor.joinable()) g_helper_monitor.join();
+
+    dll_diag("ServiceMain: host stopped, reporting to SCM");
     g_svcStatus.dwCurrentState = SERVICE_STOPPED;
     SetServiceStatus(g_svcStatusHandle, &g_svcStatus);
 }

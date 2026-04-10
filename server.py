@@ -504,7 +504,8 @@ class Room:
     _total_frames_dropped: int = 0
     _total_bytes_out: int = 0
     _total_stats_time: float = field(default_factory=time.time)
-    _pending_binary_targets: list = field(default_factory=list)  # Queue of targets for pipelined FILE routing
+    _pending_binary_targets: list = field(default_factory=list)  # Queue of targets for pipelined binary routing
+    _pending_file_targets: list = field(default_factory=list)    # Queue of targets for host_file → file_recv routing
 
     def is_full(self) -> bool:
         return len(self.clients) >= MAX_CLIENTS_PER_ROOM
@@ -663,6 +664,7 @@ async def handler(websocket, path: str):
             elif role == "stream":
                 room.stream_clients[user_id] = conn
             elif role == "file_recv":
+                conn._parent_client = msg.get("parent_client", "")
                 room.file_clients[user_id] = conn
             else:
                 room.clients[user_id] = conn
@@ -702,6 +704,10 @@ async def handler(websocket, path: str):
                 await room.host.ws.send(make_event("client_joined", {"user_id": user_id}))
             except:
                 pass
+        # Notify ALL clients about current client count (for "another operator online" badge)
+        if role == "client":
+            n = len(room.clients)
+            await broadcast_to_clients(room, make_event("clients_online", {"count": n}))
         
         # ── Message relay loop ─────────────────────────────────────────────
         async for raw_msg in websocket:
@@ -723,10 +729,39 @@ async def handler(websocket, path: str):
                     if len(raw_msg) >= 4 and raw_msg[:4] in (b'SCRN', b'SCR2'):
                         enqueue_scrn_to_stream_clients(room, raw_msg)
                 elif role == "host_file":
-                    # host_file sends FILE chunks → round-robin across file_recv clients
-                    # Each file_recv = separate TCP connection = separate congestion window
+                    # host_file: text messages may contain routing hints
+                    if isinstance(raw_msg, str):
+                        try:
+                            fmsg = json.loads(raw_msg)
+                            rt = fmsg.get("_route_binary_to", "")
+                            if rt:
+                                room._pending_file_targets.append(rt)
+                                continue
+                        except:
+                            pass
+                    # host_file sends FILE chunks → targeted delivery to requesting client.
+                    # If a _route_binary_to hint was queued, send to that client's file_recv
+                    # connections only. Otherwise fall back to round-robin (legacy).
+                    target_uid = ""
+                    if hasattr(room, '_pending_file_targets') and room._pending_file_targets:
+                        target_uid = room._pending_file_targets.pop(0)
                     fc_list = list(room.file_clients.values())
-                    if fc_list:
+                    if target_uid:
+                        # Find file_recv connections belonging to this client
+                        # file_recv user_ids contain the parent client's id prefix
+                        targeted = [fc for fc in fc_list if getattr(fc, '_parent_client', '') == target_uid]
+                        if not targeted:
+                            targeted = fc_list  # fallback to all
+                        if targeted:
+                            idx = room._file_rr % len(targeted)
+                            room._file_rr += 1
+                            fc = targeted[idx]
+                            try:
+                                await fc.ws.send(raw_msg)
+                                fc.bytes_sent += len(raw_msg)
+                            except:
+                                room.file_clients.pop(fc.user_id, None)
+                    elif fc_list:
                         idx = room._file_rr % len(fc_list)
                         room._file_rr += 1
                         fc = fc_list[idx]
@@ -1213,11 +1248,15 @@ async def handler(websocket, path: str):
             
             if conn.role == "host":
                 await broadcast_to_clients(room, make_event("host_offline", {}))
-            elif conn.role == "client" and room.host:
-                try:
-                    await room.host.ws.send(make_event("client_left", {"user_id": conn.user_id}))
-                except:
-                    pass
+            elif conn.role == "client":
+                if room.host:
+                    try:
+                        await room.host.ws.send(make_event("client_left", {"user_id": conn.user_id}))
+                    except:
+                        pass
+                # Notify remaining clients about updated client count
+                n = len(room.clients)
+                await broadcast_to_clients(room, make_event("clients_online", {"count": n}))
 
 async def broadcast_to_clients(room: Room, msg):
     """Send text/FILE messages to command clients only (not stream-only connections)."""

@@ -246,6 +246,7 @@ public:
     void set_fps(int fps)     { if (ctrl_) { ctrl_->fps = fps; InterlockedIncrement((volatile LONG*)&ctrl_->ctrl_seq); } }
     void set_scale(int scale) { if (ctrl_) { ctrl_->scale = scale; InterlockedIncrement((volatile LONG*)&ctrl_->ctrl_seq); } }
     void set_shutdown()       { if (ctrl_) InterlockedExchange(&ctrl_->shutdown, 1); }
+    void clear_shutdown()     { if (ctrl_) InterlockedExchange(&ctrl_->shutdown, 0); }
     void set_parent_pid(DWORD pid) { if (ctrl_) ctrl_->parent_pid = pid; }
 
     // Read threat info (host ← helper)

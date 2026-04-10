@@ -2,11 +2,30 @@
 #include "host.h"
 #include "logger.h"
 #include <winsvc.h>
+#include <unordered_map>
 
 class ProcessManager {
 public:
-    // Returns JSON list of running processes
+    // Returns JSON list of running processes with CPU% (delta-based).
+    // First call returns cpu=0 for all (no prior snapshot). Subsequent calls
+    // compute CPU% from the delta of kernel+user time since the previous call.
     static std::string get_process_list() {
+        // ── CPU% tracking state ──
+        static std::unordered_map<DWORD, ULONGLONG> prev_cpu_times; // pid → (kernel+user) in 100ns
+        static ULONGLONG prev_wall_100ns = 0; // wall clock in 100ns units
+
+        SYSTEM_INFO si{};
+        GetSystemInfo(&si);
+        int num_cpus = (int)si.dwNumberOfProcessors;
+        if (num_cpus < 1) num_cpus = 1;
+
+        ULONGLONG now_wall_100ns = GetTickCount64() * 10000ULL; // ms → 100ns
+        ULONGLONG wall_delta = (prev_wall_100ns > 0) ? (now_wall_100ns - prev_wall_100ns) : 0;
+        // Avoid division by zero / nonsensical results if called too quickly
+        if (wall_delta < 500ULL * 10000ULL) wall_delta = 0; // need at least 500ms gap
+
+        std::unordered_map<DWORD, ULONGLONG> cur_cpu_times;
+
         std::ostringstream json;
         json << "{\"cmd\":\"process_list_result\",\"processes\":[";
 
@@ -27,24 +46,50 @@ public:
 
                 DWORD pid = pe.th32ProcessID;
                 SIZE_T mem_kb = 0;
-                HANDLE ph = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION|PROCESS_VM_READ, FALSE, pid);
+                int cpu_pct = 0;
+                ULONGLONG total_time = 0;
+
+                HANDLE ph = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_VM_READ, FALSE, pid);
                 if (ph) {
                     PROCESS_MEMORY_COUNTERS pmc{};
                     if (GetProcessMemoryInfo(ph, &pmc, sizeof(pmc)))
-                        mem_kb = pmc.WorkingSetSize / 1024; // convert bytes -> KB
+                        mem_kb = pmc.WorkingSetSize / 1024;
+
+                    FILETIME ftCreate{}, ftExit{}, ftKernel{}, ftUser{};
+                    if (GetProcessTimes(ph, &ftCreate, &ftExit, &ftKernel, &ftUser)) {
+                        ULARGE_INTEGER k, u;
+                        k.LowPart = ftKernel.dwLowDateTime; k.HighPart = ftKernel.dwHighDateTime;
+                        u.LowPart = ftUser.dwLowDateTime;   u.HighPart = ftUser.dwHighDateTime;
+                        total_time = k.QuadPart + u.QuadPart;
+
+                        if (wall_delta > 0) {
+                            auto it = prev_cpu_times.find(pid);
+                            if (it != prev_cpu_times.end()) {
+                                ULONGLONG cpu_delta = (total_time > it->second) ? (total_time - it->second) : 0;
+                                cpu_pct = (int)(cpu_delta * 100 / (wall_delta * num_cpus));
+                                if (cpu_pct > 100) cpu_pct = 100;
+                            }
+                        }
+                    }
                     CloseHandle(ph);
                 }
+                cur_cpu_times[pid] = total_time;
 
                 if (!first) json << ",";
                 json << "{\"pid\":" << pid
                      << ",\"name\":\"" << json_escape(name) << "\""
                      << ",\"memory\":" << mem_kb
+                     << ",\"cpu\":" << cpu_pct
                      << ",\"threads\":" << pe.cntThreads << "}";
                 first = false;
             } while (Process32NextW(snap, &pe));
         }
         CloseHandle(snap);
         json << "]}";
+
+        prev_cpu_times = std::move(cur_cpu_times);
+        prev_wall_100ns = now_wall_100ns;
+
         return json.str();
     }
 

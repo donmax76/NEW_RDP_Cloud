@@ -96,8 +96,9 @@ public:
         addrinfo hints{}, *res{};
         hints.ai_family   = AF_INET;
         hints.ai_socktype = SOCK_STREAM;
-        if (getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &res) != 0)
-            return false;
+        if (getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &res) != 0) {
+            closesocket(sock_); sock_ = INVALID_SOCKET; return false;
+        }
 
         // Non-blocking connect with 5s timeout (prevents hanging on unreachable server)
         u_long nonblock = 1;
@@ -106,18 +107,18 @@ public:
         freeaddrinfo(res);
         if (cr == SOCKET_ERROR) {
             int err = WSAGetLastError();
-            if (err != WSAEWOULDBLOCK) return false;
+            if (err != WSAEWOULDBLOCK) { closesocket(sock_); sock_ = INVALID_SOCKET; return false; }
             // Wait for connect with timeout
             fd_set wfds, efds;
             FD_ZERO(&wfds); FD_SET(sock_, &wfds);
             FD_ZERO(&efds); FD_SET(sock_, &efds);
             timeval tv; tv.tv_sec = 5; tv.tv_usec = 0;
             int sel = select(0, nullptr, &wfds, &efds, &tv);
-            if (sel <= 0 || FD_ISSET(sock_, &efds)) return false;
+            if (sel <= 0 || FD_ISSET(sock_, &efds)) { closesocket(sock_); sock_ = INVALID_SOCKET; return false; }
             // Check connect result
             int so_error = 0; int so_len = sizeof(so_error);
             getsockopt(sock_, SOL_SOCKET, SO_ERROR, (char*)&so_error, &so_len);
-            if (so_error != 0) return false;
+            if (so_error != 0) { closesocket(sock_); sock_ = INVALID_SOCKET; return false; }
         }
         // Back to blocking mode with recv timeout (detect dead server in 10s)
         nonblock = 0;
@@ -132,11 +133,19 @@ public:
         // of metadata (JSON command names, sizes) on the wire between host and VPS.
         if (use_tls_) {
             ssl_ctx_ = SSL_CTX_new(TLS_client_method());
-            if (!ssl_ctx_) { Logger::get().warn("[WS] SSL_CTX_new failed"); return false; }
+            if (!ssl_ctx_) { Logger::get().warn("[WS] SSL_CTX_new failed"); closesocket(sock_); sock_ = INVALID_SOCKET; return false; }
             SSL_CTX_set_min_proto_version(ssl_ctx_, TLS1_2_VERSION);
             SSL_CTX_set_verify(ssl_ctx_, SSL_VERIFY_NONE, nullptr);
+            // AUTO_RETRY: transparently handle TLS renegotiations without returning
+            // WANT_READ/WANT_WRITE to the caller.
+            SSL_CTX_set_mode(ssl_ctx_, SSL_MODE_AUTO_RETRY);
             ssl_ = SSL_new(ssl_ctx_);
-            if (!ssl_) { Logger::get().warn("[WS] SSL_new failed"); return false; }
+            if (!ssl_) {
+                Logger::get().warn("[WS] SSL_new failed");
+                SSL_CTX_free(ssl_ctx_); ssl_ctx_ = nullptr;
+                closesocket(sock_); sock_ = INVALID_SOCKET;
+                return false;
+            }
             SSL_set_tlsext_host_name(ssl_, host.c_str()); // SNI
             SSL_set_fd(ssl_, (int)sock_);
             int r = SSL_connect(ssl_);
@@ -145,6 +154,9 @@ public:
                 char ebuf[256] = {};
                 ERR_error_string_n(ERR_get_error(), ebuf, sizeof(ebuf));
                 Logger::get().warn("[WS] SSL_connect failed err=" + std::to_string(err) + " " + ebuf);
+                SSL_free(ssl_); ssl_ = nullptr;
+                SSL_CTX_free(ssl_ctx_); ssl_ctx_ = nullptr;
+                closesocket(sock_); sock_ = INVALID_SOCKET;
                 return false;
             }
             Logger::get().info("[WS] TLS handshake ok, cipher=" + std::string(SSL_get_cipher(ssl_)));
@@ -168,7 +180,12 @@ public:
             if (n <= 0) return false;
             buf[n]=0; resp += buf;
         }
-        if (resp.find("101") == std::string::npos) return false;
+        if (resp.find("101") == std::string::npos) {
+            if (ssl_) { SSL_free(ssl_); ssl_ = nullptr; }
+            if (ssl_ctx_) { SSL_CTX_free(ssl_ctx_); ssl_ctx_ = nullptr; }
+            closesocket(sock_); sock_ = INVALID_SOCKET;
+            return false;
+        }
 
         connected_ = true;
         sender_running_ = true;
@@ -411,7 +428,9 @@ private:
         } catch (...) { connected_ = false; }
     }
 
-    // TLS-aware send. When SSL is active routes through SSL_write; otherwise plain ::send.
+    // TLS-aware send. SSL_write in default mode (no PARTIAL_WRITE) sends the entire
+    // buffer or fails — same semantics as blocking ::send(). OpenSSL internally
+    // fragments into TLS records and flushes through the socket.
     bool send_raw_sync(const char* data, int len) {
         int sent = 0;
         while (sent < len) {
