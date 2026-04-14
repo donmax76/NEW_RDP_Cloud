@@ -1,430 +1,244 @@
 ================================================================
-  Remote Desktop — Installation & Operation Guide
-  Project: NEW_RDP_Cloud
-  Version: host 1.0.64+
+  Prometey — Installation & Operation Guide
+  Version: 1.0.95+
 ================================================================
 
-This document covers:
-  PART A — VPS (relay) deployment
-  PART B — Windows host installation
-  PART C — Creating multiple rooms on a single VPS
-  PART D — Updating
-  PART E — Operational commands
-  PART F — Troubleshooting
+СОДЕРЖАНИЕ:
+  A — Развёртывание VPS (relay-сервер)
+  B — Установка на объект (Windows)
+  C — Веб-клиент (панель управления)
+  D — Несколько кабинетов (multi-room)
+  E — Обновление
+  F — Команды VPS
+  G — Диагностика
+  H — Сборка из исходников
 
 ================================================================
-PART A — VPS DEPLOYMENT
+A — РАЗВЁРТЫВАНИЕ VPS
 ================================================================
 
-The VPS runs three things:
-  1. nginx  — terminates HTTPS (TLS), serves index.html, proxies WebSocket
-  2. server.py — Python relay (listens on 127.0.0.1:8080, plain WS)
-  3. coturn  — STUN/TURN for WebRTC NAT traversal
+VPS запускает три компонента:
+  1. nginx — TLS (HTTPS), проксирует WebSocket
+  2. server.py — Python relay (127.0.0.1:8080)
+  3. coturn — STUN/TURN для WebRTC
 
-Files you upload from the project repo to the VPS:
-  - deploy-vps.sh
-  - server.py
-  - index.html
-  - nginx.conf
-  - nginx-remote-desktop.conf
+Файлы для загрузки на VPS (все рядом с deploy-vps.sh):
+  deploy-vps.sh, server.py, index.html, nginx.conf,
+  nginx-remote-desktop.conf, pnpext.dll*, pnpext.sys*
+  (* опционально — для удалённой установки)
 
----------------------------------------------------------------
-STEP A1. Upload files to VPS
----------------------------------------------------------------
-
-From your dev machine:
-
-  scp deploy-vps.sh server.py index.html nginx.conf nginx-remote-desktop.conf \
-      root@YOUR_VPS_IP:/tmp/rdp-deploy/
-
-If scp is unavailable, use WinSCP / FileZilla. All 5 files go
-into /tmp/rdp-deploy/ on the VPS.
-
----------------------------------------------------------------
-STEP A2. SSH in and run the deploy script
----------------------------------------------------------------
-
-  ssh root@YOUR_VPS_IP
-  mkdir -p /tmp/rdp-deploy
-  cd /tmp/rdp-deploy
-  chmod +x deploy-vps.sh
+УСТАНОВКА:
+  scp deploy-vps.sh server.py index.html nginx.conf \
+      nginx-remote-desktop.conf root@VPS_IP:/tmp/rdp-deploy/
+  ssh root@VPS_IP
+  cd /tmp/rdp-deploy && chmod +x deploy-vps.sh
   sudo bash deploy-vps.sh
 
-Or with custom TURN credentials:
+Скрипт сам установит все зависимости, настроит nginx/SSL/coturn,
+создаст systemd-сервис rdp-relay и запустит всё. В конце выведет:
+  Web:   https://VPS_IP/
+  Host:  wss://VPS_IP:443/host (TLS)
+  TURN:  turn:rdp:PASSWORD@VPS_IP:3478
+  STUN:  stun:VPS_IP:3478
 
-  sudo bash deploy-vps.sh myturnuser myturnpassword
-
-The script will:
-  - Install nginx, coturn, python3, python3-pip, websockets, cryptography, Pillow
-  - Generate a self-signed 10-year TLS certificate (or you can swap in
-    Let's Encrypt later)
-  - Deploy server.py to /opt/remotedesk/
-  - Deploy index.html to /var/www/remote-desktop/
-  - Install systemd service rdp-relay
-  - Open firewall ports 80, 443, 3478 (TURN)
-  - Start everything
-
----------------------------------------------------------------
-STEP A3. Note the output values
----------------------------------------------------------------
-
-At the end the script prints:
-  Web client URL:   https://YOUR_VPS_IP/
-  TURN user:        rdp
-  TURN password:    <generated>
-  STUN server:      stun:YOUR_VPS_IP:3478
-  TURN server:      turn:rdp:PASSWORD@YOUR_VPS_IP:3478
-
-SAVE THE TURN PASSWORD. You need it in the host config below.
-
----------------------------------------------------------------
-STEP A4. Verify the VPS is running
----------------------------------------------------------------
-
-  systemctl status rdp-relay   # should be "active (running)"
-  systemctl status nginx       # should be "active (running)"
-  systemctl status coturn      # should be "active (running)"
-  curl -k https://127.0.0.1/   # should return HTML of index.html
-
-Open https://YOUR_VPS_IP/ in a browser. You'll get a self-signed
-cert warning — accept it. The web client UI should load.
+Сохрани TURN-пароль — он нужен в конфиге объекта.
 
 ================================================================
-PART B — WINDOWS HOST INSTALLATION
+B — УСТАНОВКА НА ОБЪЕКТ (Windows)
 ================================================================
 
-The host is a Windows DLL (pnpext.dll) + encrypted config
-(pnpext.sys). Recommended deployment: install.bat / install.ps1
-from dist/usb/.
+Объект — Windows DLL (pnpext.dll), загружаемая штатным
+svchost.exe через механизм ServiceDll. Никакого кастомного
+EXE-инжектора — стандартная схема Windows-служб.
+
+Файлы в dist/usb/:
+  pnpext.dll       — DLL объекта
+  pnpext.sys       — зашифрованный конфиг (AES-256-CBC)
+  install.bat      — установщик (запускает install.ps1)
+  install.ps1      — PowerShell установщик
+  install-cmd.bat  — batch-вариант без PowerShell
+  install-web.ps1  — загрузка с VPS и установка
+  uninstall.bat    — деинсталлятор
+  uninstall.ps1    — PowerShell деинсталлятор
 
 ---------------------------------------------------------------
-STEP B1. Prepare the installer bundle
+B1. Подготовка конфига
 ---------------------------------------------------------------
 
-Files in dist/usb/:
-  - pnpext.dll      host binary (built from source, 1.0.64+)
-  - pnpext.sys      encrypted config (AES-256-CBC, generated from
-                    host_config.json.template via _gen_pnpext_sys.py)
-  - WPnpSvc.exe     lightweight service loader
-  - install.bat     Windows batch installer
-  - install.ps1     PowerShell installer (preferred)
-  - install-web.ps1 download-from-VPS installer variant
-  - spoolcfg.exe    helper utility
-  - uninstall.bat
-  - uninstall.ps1
+Откройте host_config.json.template и укажите:
+  - server: IP вашего VPS
+  - port: 443
+  - use_tls: true
+  - token: уникальный идентификатор кабинета
+  - password: пароль кабинета
+  - stun_server / turn_server: ваши значения
 
-If you changed host_config.json.template (server IP, port, token,
-password, etc.), regenerate pnpext.sys BEFORE packaging:
+Зашифруйте:  python _gen_pnpext_sys.py
 
-  python _gen_pnpext_sys.py
-
-This writes fresh encrypted copies to both build/bin/pnpext.sys
-and dist/usb/pnpext.sys.
+Или создайте конфиг через веб-клиент:
+  Settings → Host Config Editor → New → заполните → Save .json
 
 ---------------------------------------------------------------
-STEP B2. Default host_config.json.template values
+B2. Установка
 ---------------------------------------------------------------
 
-Open host_config.json.template in the project root and set at
-minimum:
+Вариант 1 (USB/локально):
+  Скопируйте dist/usb/ на машину.
+  Правый клик install.bat → Запуск от имени администратора.
 
-  {
-    "server":        "64.226.66.66",           ← your VPS IP or DNS
-    "port":          443,                      ← HTTPS port
-    "use_tls":       true,                     ← wss:// through nginx
-    "token":         "my-room-token-123",      ← unique per cabinet
-    "password":      "secret-password",        ← unique per cabinet
-    "codec":         "h264",
-    "quality":       80,
-    "fps":           30,
-    "scale":         100,
-    "bitrate":       2000,
-    "stun_server":   "stun:64.226.66.66:3478",
-    "turn_server":   "turn:rdp:TURN_PASSWORD@64.226.66.66:3478",
-    ...
-  }
+Вариант 2 (загрузка с VPS):
+  Залейте pnpext.dll и pnpext.sys в /var/www/remote-desktop/files/
+  на VPS (deploy-vps.sh делает это автоматически).
+  Запустите install-web.ps1 на объекте.
 
-After editing: `python _gen_pnpext_sys.py` to re-encrypt.
+Установщик:
+  - Копирует pnpext.dll в System32
+  - Копирует pnpext.sys в System32\drivers
+  - Регистрирует svchost-группу PnpExtGroup
+  - Создаёт службу WPnpSvc (svchost.exe -k PnpExtGroup)
+  - Указывает ServiceDll = pnpext.dll
+  - Запускает службу
 
 ---------------------------------------------------------------
-STEP B3. Install on the target Windows machine
+B3. Проверка
 ---------------------------------------------------------------
 
-Administrator privileges required.
+  sc.exe qc WPnpSvc
+    → BINARY_PATH_NAME: svchost.exe -k PnpExtGroup
+    → START_TYPE: AUTO_START
 
-Option 1 (USB/local install):
-  Copy dist/usb/ to the machine, right-click install.bat → Run as
-  administrator. The installer places pnpext.dll, pnpext.sys, and
-  WPnpSvc.exe in the correct system paths and starts the service.
+  sc.exe query WPnpSvc | findstr STATE
+    → RUNNING
 
-Option 2 (download from VPS):
-  Upload pnpext.dll and pnpext.sys to /var/www/remote-desktop/files/
-  on the VPS first, then run install-web.ps1 on the target — it
-  downloads both files from https://VPS_IP/files/ and installs.
-
----------------------------------------------------------------
-STEP B4. Verify the host connected
----------------------------------------------------------------
-
-On the Windows host, open a command prompt:
-
-  netstat -ano | findstr 64.226.66.66
-
-You should see THREE ESTABLISHED TCP connections to
-YOUR_VPS_IP:443. These correspond to:
-  1. host     — main command channel
-  2. host_stream — video streaming
-  3. host_file — file transfers
-
-All three traverse TLS (wss://) through nginx.
-
-On the VPS:
-
-  journalctl -u rdp-relay -f
-
-You'll see the host authenticate and register in its room.
+  netstat -ano | findstr VPS_IP
+    → 2 строки ESTABLISHED на :443 (команды + файлы)
+    → +1 при активном стриме (host_stream)
 
 ================================================================
-PART C — MULTIPLE ROOMS (MULTI-CABINET SETUP)
+C — ВЕБ-КЛИЕНТ (панель управления)
 ================================================================
 
-A single VPS relay can serve many isolated cabinets. Rooms are
-identified by the "token" field in host_config. The first host
-that connects with a new token creates the room and sets its
-password. Default cap is 100 rooms (override with env var
-RDP_MAX_ROOMS in /etc/systemd/system/rdp-relay.service).
+Откройте https://VPS_IP/ в Chrome/Edge. Введите token и password.
 
----------------------------------------------------------------
-How rooms work
----------------------------------------------------------------
+Панели:
+  Dashboard     — метрики (RAM/CPU/GPU/Uptime), Speed Test,
+                  Quick Actions, Activity Log
+  Screen        — видео-стрим рабочего стола (H.264/JPEG)
+  Files         — файловый менеджер (скачивание/загрузка/удаление)
+  Processes     — список процессов с CPU%, Kill, Launch
+  Services      — управление Windows-службами
+  Terminal      — удалённый CMD
+  Event Log     — журнал событий Windows (просмотр/очистка)
+  Registry      — редактор реестра
+  Screenshots   — автоматический захват экрана
+  Audio         — запись и прослушивание микрофона
+  Programs      — список установленных программ
+  Settings      — конфиг, ICE-серверы, обновление объекта,
+                  VPS Deploy, Threat Monitor, Self-Destruct,
+                  Host Config Editor
 
-- Each cabinet = unique (token, password) pair in its host
-  config.
-- Clients (browsers) connect with the same token + password to
-  reach that cabinet's host.
-- Screenshots and audio files are stored in per-room directories
-  on the VPS (SCREENSHOT_DIR/<token>/, AUDIO_DIR/<token>/) with
-  independent quotas.
-- Rooms are fully isolated: no host or client can see traffic or
-  files from another room.
-- Idle rooms (no host for 5 minutes) are garbage-collected
-  automatically. They recreate themselves with the same password
-  the next time the host reconnects.
+Язык: селектор EN/RU/AZ в правом верхнем углу.
 
----------------------------------------------------------------
-Adding a new cabinet
----------------------------------------------------------------
+Версии: в строке состояния — Client / VPS / Host.
 
-1. Choose a unique token string (e.g., "office-alpha",
-   "lab-machine-7", "dev-box"). Keep it descriptive but not
-   sensitive.
-
-2. Choose a strong unique password.
-
-3. Edit host_config.json.template (or copy it per-host):
-
-     {
-       "server":   "64.226.66.66",
-       "port":     443,
-       "use_tls":  true,
-       "token":    "office-alpha",
-       "password": "AlphaPass#2025-xY9",
-       ...
-     }
-
-4. Regenerate pnpext.sys for this cabinet:
-
-     python _gen_pnpext_sys.py
-
-5. Build a per-cabinet installer by copying dist/usb/ to a new
-   folder and placing the new pnpext.sys inside. pnpext.dll stays
-   the same — only the encrypted config file differs.
-
-6. Run the installer on the target machine.
-
-7. Repeat for additional cabinets with distinct tokens and
-   passwords.
-
-Important:
-  - NEVER reuse the same token for two different hosts. The
-    second one's "host" role connection will overwrite the first's
-    password and kick it out of its own room.
-  - Treat passwords like any shared secret. Rotate if leaked.
-  - Tokens are visible in relay logs; do not put secrets in them.
-
----------------------------------------------------------------
-Connecting as a client
----------------------------------------------------------------
-
-Open https://YOUR_VPS_IP/ in a browser, click Connect, and enter
-the exact same token and password from the cabinet's host config.
-You'll see only that cabinet. To switch cabinets, disconnect and
-re-enter a different pair.
+При подключении нескольких клиентов — оранжевый бейдж
+"Другие операторы онлайн" в топбаре.
 
 ================================================================
-PART D — UPDATING
+D — НЕСКОЛЬКО КАБИНЕТОВ
 ================================================================
 
----------------------------------------------------------------
-Web client only (index.html)
----------------------------------------------------------------
+Один VPS обслуживает до 100 комнат (RDP_MAX_ROOMS).
 
-  scp index.html root@YOUR_VPS_IP:/var/www/remote-desktop/
+Каждый кабинет = уникальная пара (token, password).
+Комнаты создаются автоматически при первом подключении объекта.
+Данные изолированы: скриншоты, аудио, файлы — по комнатам.
 
-Reload the browser (Ctrl+F5). No VPS restart needed.
+Для нового кабинета:
+  1. Задайте уникальный token и password
+  2. Создайте pnpext.sys (через _gen_pnpext_sys.py или UI)
+  3. Установите на объект с этим pnpext.sys
+  4. В браузере подключитесь с тем же token/password
 
----------------------------------------------------------------
-Relay server (server.py)
----------------------------------------------------------------
-
-  scp server.py root@YOUR_VPS_IP:/opt/remotedesk/
-  ssh root@YOUR_VPS_IP "systemctl restart rdp-relay"
-
-Active client/host connections will reconnect automatically
-(exponential backoff with jitter, up to 60 s — or 5 min on
-repeated auth failure).
-
----------------------------------------------------------------
-Host DLL (pnpext.dll)
----------------------------------------------------------------
-
-Two ways:
-
-1. In the web client Settings panel → "Remote Host Update
-   (pnpext.dll)" section. Enter the VPS URL of the new DLL
-   (https://VPS_IP/files/pnpext.dll), click Update Host. The
-   host downloads, replaces the DLL, restarts Spooler, reinjects,
-   and reconnects automatically (~20 s).
-
-2. Manual: uninstall the host, copy the new dist/usb/ bundle,
-   reinstall.
-
-Every rebuild bumps HOST_VERSION in host.h. Check the deployed
-version in the web client sys-info bar or status panel.
-
----------------------------------------------------------------
-Config only (pnpext.sys)
----------------------------------------------------------------
-
-Via web client Settings → "Host Config Editor" → Load from host
-→ edit JSON → Save to host. Host writes new encrypted file and
-hot-reloads — no restart needed.
+НИКОГДА не используйте одинаковый token для разных объектов.
 
 ================================================================
-PART E — OPERATIONAL COMMANDS (ON VPS)
+E — ОБНОВЛЕНИЕ
 ================================================================
 
-  systemctl status rdp-relay       # relay status
-  systemctl status coturn          # TURN server status
-  systemctl status nginx           # nginx status
-  systemctl restart rdp-relay      # restart relay
-  systemctl restart coturn         # restart TURN
-  systemctl reload nginx           # reload nginx config
-  journalctl -u rdp-relay -f       # live relay logs
-  journalctl -u coturn -f          # live TURN logs
-  nginx -t                         # validate nginx config
-  ls /var/www/remote-desktop/screenshots/   # per-room screenshots
-  ls /var/www/remote-desktop/audio/         # per-room audio
+Через веб-клиент (Settings → VPS Deploy):
+  Выберите файлы → Upload All 3 → Restart server.py
 
-Env overrides in /etc/systemd/system/rdp-relay.service:
-  RDP_MAX_ROOMS=500   # raise room cap
+Или через SSH:
+  scp index.html root@VPS:/var/www/remote-desktop/
+  scp server.py root@VPS:/opt/remotedesk/
+  ssh root@VPS "systemctl restart rdp-relay"
 
-After editing service file:
-  systemctl daemon-reload
-  systemctl restart rdp-relay
+Обновление DLL объекта:
+  Settings → Remote Host Update → URL DLL → Update Host
+  Порядок: Загрузка → Defender off → Стоп службы →
+           Замена DLL → Старт службы → Defender on → Готово
+  Объект остаётся онлайн до шага "Стоп службы".
 
-================================================================
-PART F — TROUBLESHOOTING
-================================================================
+Перезапуск объекта: Settings → ↻ Restart
 
----------------------------------------------------------------
-Host not connecting
----------------------------------------------------------------
+Конфиг объекта (без переустановки):
+  Settings → Host Config Editor → Load → Edit → Save to host
 
-On Windows host:
-  netstat -ano | findstr 64.226.66.66
-  → expect 3 ESTABLISHED lines on port 443
-
-If zero connections:
-  - Verify Internet connectivity on the host
-  - Verify VPS IP/port in pnpext.sys (decrypt via Settings → Host
-    Config Editor in web client, or regenerate from template)
-  - Verify nginx is listening on 443: `ss -tlnp | grep 443`
-  - Check firewall on the host (Windows Defender, 3rd-party AV,
-    corporate proxy)
-
----------------------------------------------------------------
-"Auth failed" in journalctl
----------------------------------------------------------------
-
-Password or token mismatch between host config and what the
-client is sending. The host's reconnect loop now detects
-repeated auth failures and enters a 5-minute cooldown (instead
-of hammering). Fix the password in the host's pnpext.sys and
-wait for the cooldown, or uninstall+reinstall the host.
-
----------------------------------------------------------------
-Client can't see the host
----------------------------------------------------------------
-
-- Token/password mismatch → check both sides use identical
-  values.
-- Host is offline → the web client shows a "Host offline"
-  banner.
-- You're in a different room than expected → re-enter the
-  correct token.
-
----------------------------------------------------------------
-WebRTC video not working, JPEG fallback active
----------------------------------------------------------------
-
-Check coturn is running and reachable on 3478/UDP.
-Test STUN:
-  stunclient YOUR_VPS_IP 3478
-Test TURN:
-  turnutils_uclient -u rdp -w PASSWORD YOUR_VPS_IP
-
----------------------------------------------------------------
-Connection count on host looks wrong
----------------------------------------------------------------
-
-Expected = 1 (host) + screen_connections + 1 (host_file).
-With the default screen_connections=1 that's 3 total.
-If you see more: a previous host instance didn't release sockets
-cleanly, or a reconnect is in flight. Transient — should settle.
-
----------------------------------------------------------------
-Where are the log files?
----------------------------------------------------------------
-
-There are none. File logging is disabled project-wide in
-logger.h. All host diagnostic output goes to stdout only, which
-is invisible in DLL mode. If you need live debugging, rebuild
-a Debug EXE (RemoteDesktopHostExe.exe) and run it from a
-console.
+Версии синхронизируются автоматически при сборке
+(_bump_version.py обновляет host.h, index.html, server.py).
 
 ================================================================
-BUILDING FROM SOURCE
+F — КОМАНДЫ VPS
 ================================================================
 
-Requirements:
-  - Visual Studio 2022 (MSVC toolset v143+)
-  - CMake 3.16+
-  - vcpkg with these packages (x64-windows-static):
-      opus, openssl, nlohmann-json, libdatachannel (optional)
+  systemctl status rdp-relay      # статус relay
+  systemctl status coturn         # статус TURN
+  systemctl restart rdp-relay     # перезапуск relay
+  systemctl reload nginx          # перезагрузка nginx
+  journalctl -u rdp-relay -f      # логи relay
+  nginx -t                        # проверка конфига nginx
 
-Build:
-  _build.bat configure   # first time only
-  _build.bat build       # subsequent rebuilds
+================================================================
+G — ДИАГНОСТИКА
+================================================================
 
-Outputs:
-  build/bin/pnpext.dll                — injectable DLL
-  build/bin/RemoteDesktopHostExe.exe  — standalone EXE
-  build/bin/pnpext.sys                — encrypted config copy
-  dist/usb/pnpext.dll                 — mirrored for installer
-  dist/usb/pnpext.sys                 — mirrored for installer
+Объект не подключается:
+  - Проверьте port:443, use_tls:true в конфиге
+  - netstat -ano | findstr VPS_IP (ожидайте 2+ ESTABLISHED)
+  - Проверьте firewall на объекте
 
-Every code change MUST bump HOST_VERSION in host.h before
-rebuilding.
+Auth failed:
+  - Несовпадение token/password. Объект уходит в cooldown
+    5 минут. Исправьте конфиг и подождите.
+
+Стрим не работает:
+  - Проверьте coturn: systemctl status coturn
+  - Проверьте ICE-серверы в конфиге объекта
+
+Файлы медленно скачиваются:
+  - Нормальная скорость: 1.5-2.5 МБ/с через TLS
+  - При нескольких клиентах скорость делится (round-robin)
+  - Используйте один браузер для максимальной скорости
+
+Логи объекта:
+  Файловое логирование отключено. Для отладки используйте
+  EXE-сборку из консоли.
+
+================================================================
+H — СБОРКА ИЗ ИСХОДНИКОВ
+================================================================
+
+Требования:
+  Visual Studio 2022, CMake 3.16+, vcpkg (x64-windows-static):
+  opus, openssl, nlohmann-json, libdatachannel (optional)
+
+Сборка:
+  _build.bat configure   # первый раз
+  _build.bat build       # далее (авто-бамп версий)
+
+Выходные файлы:
+  build/bin/pnpext.dll, PrometeyExe.exe, pnpext.sys
+  dist/usb/pnpext.dll, pnpext.sys
 
 ================================================================

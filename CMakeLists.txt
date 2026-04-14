@@ -86,29 +86,7 @@ if(USE_WEBRTC_STREAM)
     target_link_libraries(PrometeyDll PRIVATE LibDataChannel::LibDataChannel)
 endif()
 
-# ══════════════════════════════════════════════
-# Target 2: EXE (standalone, backward compatible)
-# ══════════════════════════════════════════════
-add_executable(PrometeyExe
-    main.cpp
-)
-set_target_properties(PrometeyExe PROPERTIES
-    OUTPUT_NAME "PrometeyExe"
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
-    MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
-)
-target_compile_definitions(PrometeyExe PRIVATE ${COMMON_DEFS})
-target_compile_options(PrometeyExe PRIVATE /W3 /O2 /EHsc /MP)
-target_include_directories(PrometeyExe PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party
-)
-target_link_libraries(PrometeyExe PRIVATE ${COMMON_LIBS} Opus::opus OpenSSL::SSL OpenSSL::Crypto)
-if(USE_WEBRTC_STREAM)
-    target_sources(PrometeyExe PRIVATE webrtc_stream.cpp)
-    target_compile_definitions(PrometeyExe PRIVATE USE_WEBRTC_STREAM=1)
-    target_link_libraries(PrometeyExe PRIVATE LibDataChannel::LibDataChannel)
-endif()
+# EXE target removed — only DLL (svchost.exe ServiceDll) is used
 
 # Copy config template to output
 configure_file(

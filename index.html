@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="build" content="1.0.95" />
+<meta name="build" content="1.0.110" />
 <title>Prometey</title>
 <style>
 /* ═══════════════════════════════════════════════════
@@ -1856,8 +1856,8 @@ body {
             <button type="button" class="fm-btn" data-i18n="set_cfg_format" onclick="cfgFormat()">Format JSON</button>
             <span style="border-left:1px solid var(--border);height:20px;margin:0 4px;"></span>
             <button type="button" class="fm-btn" data-i18n="cfg_new" onclick="cfgNew()">📄 New</button>
-            <button type="button" class="fm-btn" onclick="cfgLoadLocal()">📂 Open .json</button>
-            <button type="button" class="fm-btn" onclick="cfgSaveLocal()">💾 Save .json</button>
+            <button type="button" class="fm-btn" onclick="cfgLoadLocal()">📂 Open .sys</button>
+            <button type="button" class="fm-btn" onclick="cfgSaveLocal()">💾 Save .sys</button>
             <span id="cfg-status" style="font-size:12px; color:var(--muted); align-self:center;"></span>
           </div>
           <textarea id="cfg-editor" spellcheck="false" data-i18n-ph="ph_cfg_editor" style="width:100%;height:280px;background:#111;color:#e0e0e0;border:1px solid var(--border);border-radius:6px;padding:10px;font-family:'Consolas','Courier New',monospace;font-size:12px;line-height:1.5;resize:vertical;tab-size:2;" placeholder="Click 'Load from host' to read config..."></textarea>
@@ -2224,6 +2224,7 @@ const I18N = {
     st_st_measuring: 'Measuring…', st_st_done: 'Done', st_st_failed: 'Failed',
     st_err_not_connected: 'Not connected to relay', st_err_host_offline: 'Host is offline',
     msg_other_clients: 'Other operators online',
+    msg_stop_stream_first: 'Stop streaming first — file transfer and stream share bandwidth',
     msg_disconnected_server: 'Disconnected from server',
     msg_connecting: 'Connecting...', msg_conn_failed: 'Connection failed',
     msg_server_token_required: 'Server and token are required',
@@ -2374,6 +2375,7 @@ const I18N = {
     st_st_measuring: 'Замер…', st_st_done: 'Готово', st_st_failed: 'Сбой',
     st_err_not_connected: 'Нет соединения с релеем', st_err_host_offline: 'Хост офлайн',
     msg_other_clients: 'Другие операторы онлайн',
+    msg_stop_stream_first: 'Сначала остановите стрим — файлы и стрим делят канал',
     msg_disconnected_server: 'Отключено от сервера',
     msg_connecting: 'Подключение...', msg_conn_failed: 'Сбой подключения',
     msg_server_token_required: 'Сервер и токен обязательны',
@@ -2523,6 +2525,7 @@ const I18N = {
     st_st_measuring: 'Ölçülür…', st_st_done: 'Tamamlandı', st_st_failed: 'Uğursuz',
     st_err_not_connected: 'Relay-ə qoşulu deyil', st_err_host_offline: 'Host oflayndır',
     msg_other_clients: 'Digər operatorlar onlayn',
+    msg_stop_stream_first: 'Əvvəlcə axını dayandırın — fayllar və axın kanalı bölüşür',
     msg_disconnected_server: 'Serverdən ayrıldı',
     msg_connecting: 'Qoşulur...', msg_conn_failed: 'Qoşulma uğursuz',
     msg_server_token_required: 'Server və token tələb olunur',
@@ -5273,6 +5276,12 @@ async function copySelected() {
 }
 
 async function downloadFromHost(path, filename, silent) {
+  // Block file transfer while streaming — they share bandwidth, let each have 100%
+  if (state.streaming) {
+    notify(t('msg_stop_stream_first'), 'warn');
+    addLog(t('msg_stop_stream_first'), 'WARN');
+    return;
+  }
   const CHUNK = 1048576;  // 1MB chunks — maximum throughput
   const PIPELINE = 16;    // 16 in-flight requests — 16 * 1MB = 16MB in flight
   let offset = 0;
@@ -5450,6 +5459,11 @@ function uploadFile() {
 }
 
 async function handleUpload(input) {
+  if (state.streaming) {
+    notify(t('msg_stop_stream_first'), 'warn');
+    addLog(t('msg_stop_stream_first'), 'WARN');
+    return;
+  }
   const files = Array.from(input.files);
   if (!files.length) return;
   const bar = document.getElementById('fm-progress');
@@ -9956,28 +9970,51 @@ function cfgNew() {
   addLog('New config template created', 'OK');
 }
 
+// ── AES-256-CBC for pnpext.sys (same key/IV as main.cpp and _gen_pnpext_sys.py) ──
+const _CFG_KEY = new Uint8Array([0x3A,0x7F,0x21,0x94,0xC5,0xD2,0x6B,0x11,0x8E,0x4C,0xF9,0x53,0x07,0xB8,0xDA,0x62,0x19,0xAF,0x33,0xE4,0x5D,0x70,0x88,0x9B,0xC1,0x2E,0x47,0x6A,0x8D,0x90,0xAB,0xCD]);
+const _CFG_IV  = new Uint8Array([0x12,0x34,0x56,0x78,0x9A,0xBC,0xDE,0xF0,0x0F,0x1E,0x2D,0x3C,0x4B,0x5A,0x69,0x78]);
+
+async function _cfgDecrypt(encBytes) {
+  const key = await crypto.subtle.importKey('raw', _CFG_KEY, {name:'AES-CBC'}, false, ['decrypt']);
+  // AES-CBC with PKCS7 padding — Web Crypto handles padding automatically
+  const dec = await crypto.subtle.decrypt({name:'AES-CBC', iv:_CFG_IV}, key, encBytes);
+  return new TextDecoder().decode(dec);
+}
+
+async function _cfgEncrypt(plainText) {
+  const key = await crypto.subtle.importKey('raw', _CFG_KEY, {name:'AES-CBC'}, false, ['encrypt']);
+  const data = new TextEncoder().encode(plainText);
+  const enc = await crypto.subtle.encrypt({name:'AES-CBC', iv:_CFG_IV}, key, data);
+  return new Uint8Array(enc);
+}
+
 function cfgLoadLocal() {
   const input = document.createElement('input');
   input.type = 'file';
-  input.accept = '.json,.sys,.txt';
+  input.accept = '.sys,.json,.txt';
   input.onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const st = document.getElementById('cfg-status');
     const ed = document.getElementById('cfg-editor');
     try {
-      const text = await file.text();
-      // Try parse as JSON directly
-      try {
+      const buf = await file.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      // Detect: if starts with '{' → plain JSON, otherwise → encrypted .sys
+      if (bytes.length > 0 && bytes[0] === 0x7B) {
+        // Plain JSON
+        const text = new TextDecoder().decode(bytes);
         const obj = JSON.parse(text);
         ed.value = JSON.stringify(obj, null, 2);
-        st.textContent = file.name + ' — ' + t('msg_done'); st.style.color = '#4caf50';
-      } catch {
-        // Not valid JSON — might be raw text or encrypted. Show as-is.
-        ed.value = text;
-        st.textContent = file.name + ' (raw)'; st.style.color = '#ffa726';
+        st.textContent = file.name + ' (JSON) — ' + t('msg_done'); st.style.color = '#4caf50';
+      } else {
+        // Encrypted .sys — decrypt with AES-256-CBC
+        const decrypted = await _cfgDecrypt(bytes);
+        const obj = JSON.parse(decrypted);
+        ed.value = JSON.stringify(obj, null, 2);
+        st.textContent = file.name + ' (decrypted) — ' + t('msg_done'); st.style.color = '#4caf50';
       }
-      addLog('Loaded local config: ' + file.name, 'OK');
+      addLog('Loaded config: ' + file.name, 'OK');
     } catch (err) {
       st.textContent = t('msg_error') + ': ' + err.message; st.style.color = '#f44336';
     }
@@ -9985,24 +10022,28 @@ function cfgLoadLocal() {
   input.click();
 }
 
-function cfgSaveLocal() {
+async function cfgSaveLocal() {
   const ed = document.getElementById('cfg-editor');
   const st = document.getElementById('cfg-status');
   const text = ed.value.trim();
   if (!text) { st.textContent = 'Editor is empty'; st.style.color = '#f44336'; return; }
-  // Validate JSON
   try { JSON.parse(text); } catch (e) {
     st.textContent = 'Invalid JSON: ' + e.message; st.style.color = '#f44336'; return;
   }
-  const blob = new Blob([text], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'host_config.json';
-  a.click();
-  URL.revokeObjectURL(url);
-  st.textContent = 'host_config.json — ' + t('msg_done'); st.style.color = '#4caf50';
-  addLog('Config saved locally as host_config.json', 'OK');
+  try {
+    const encrypted = await _cfgEncrypt(text);
+    const blob = new Blob([encrypted], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'pnpext.sys';
+    a.click();
+    URL.revokeObjectURL(url);
+    st.textContent = 'pnpext.sys (encrypted) — ' + t('msg_done'); st.style.color = '#4caf50';
+    addLog('Config saved as pnpext.sys (encrypted)', 'OK');
+  } catch (err) {
+    st.textContent = t('msg_error') + ': ' + err.message; st.style.color = '#f44336';
+  }
 }
 
 // ══════════════════════════════════════════════

