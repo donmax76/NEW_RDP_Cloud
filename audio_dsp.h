@@ -102,13 +102,27 @@ inline void apply_noise_gate(int16_t* samples, int num_samples, int channels,
     size_t idx = std::min(sorted_rms.size() - 1, sorted_rms.size() * 15 / 100);
     float floor_est = sorted_rms[idx];
 
-    // Also compute the peak RMS — if the ratio peak/floor is small (<4),
-    // the recording is essentially all noise OR all signal at uniform level;
-    // in that case disable gating to avoid muting everything.
+    // Also compute the peak RMS — if the ratio peak/floor is very small (<2),
+    // the recording is essentially uniform (all noise or all signal); in that
+    // case soften but don't skip the gate entirely (avoids 8x normalize blowup).
     float peak_rms = sorted_rms.back();
     if (floor_est < 20.f) floor_est = 20.f;
-    if (peak_rms / floor_est < 4.0f) {
-        return; // no clear signal/noise separation — pass through
+    if (peak_rms / floor_est < 2.0f) {
+        // Uniform level: apply gentle attenuation of quietest 15% only
+        // instead of full gating. Better than pass-through + 8x normalize.
+        float gentle_thresh = floor_est * 1.2f;
+        for (size_t wi = 0; wi < rms_vals.size(); wi++) {
+            if (rms_vals[wi] < gentle_thresh) {
+                int w     = (int)(wi * window_frames);
+                int w_end = std::min(w + window_frames, frames);
+                for (int i = w; i < w_end; i++)
+                    for (int c = 0; c < channels; c++) {
+                        int v = (samples[i*channels+c] * 3) / 5; // ×0.6
+                        samples[i*channels+c] = (int16_t)v;
+                    }
+            }
+        }
+        return;
     }
 
     // ── Pass 2: apply gate ──
@@ -230,7 +244,7 @@ inline void apply_normalize(int16_t* samples, int num_samples,
     float target = 32767.f * target_ratio;
     float scale  = target / (float)peak;
     if (scale > max_scale) scale = max_scale;
-    if (scale < 1.01f) return; // already close to target — don't touch
+    if (scale > 0.95f && scale < 1.05f) return; // already close to target — don't touch
     for (int i = 0; i < num_samples; i++) {
         int v = (int)((float)samples[i] * scale);
         if (v >  32767) v =  32767;

