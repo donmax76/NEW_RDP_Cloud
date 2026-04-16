@@ -3533,27 +3533,47 @@ static void ogg_write_page(std::vector<uint8_t>& out, uint8_t flags, uint32_t se
 
 // ===== capture_audio_direct =====
 static bool capture_audio_direct(std::vector<uint8_t>& audioOut, int duration, int sampleRate, int bitrate, int channels) {
-    // Opus requires 8/12/16/24/48 kHz — snap to nearest
-    int opusSR = 48000;
-    if (sampleRate <= 8000) opusSR = 8000;
-    else if (sampleRate <= 12000) opusSR = 12000;
-    else if (sampleRate <= 16000) opusSR = 16000;
-    else if (sampleRate <= 24000) opusSR = 24000;
-    else opusSR = 48000;
+    // Opus requires 8/12/16/24/48 kHz — snap to nearest supported rate
+    auto snapOpusSR = [](int sr) -> int {
+        if (sr <= 8000)  return 8000;
+        if (sr <= 12000) return 12000;
+        if (sr <= 16000) return 16000;
+        if (sr <= 24000) return 24000;
+        return 48000;
+    };
+    int opusSR = snapOpusSR(sampleRate);
 
-    WAVEFORMATEX wfx = {};
-    wfx.wFormatTag = WAVE_FORMAT_PCM;
-    wfx.nChannels = (WORD)channels;
-    wfx.nSamplesPerSec = (DWORD)opusSR;
-    wfx.wBitsPerSample = 16;
-    wfx.nBlockAlign = wfx.nChannels * wfx.wBitsPerSample / 8;
-    wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * wfx.nBlockAlign;
-
+    // Try to open waveIn at the desired Opus SR. Some devices (USB mics, Bluetooth)
+    // reject formats they don't natively support. On failure, fall back through
+    // lower Opus-valid rates until one works.
+    static const int kFallbackRates[] = {48000, 24000, 16000, 12000, 8000};
     HWAVEIN hWaveIn = nullptr;
+    WAVEFORMATEX wfx = {};
     UINT deviceId = (g_audio_device_id.load() >= 0) ? (UINT)g_audio_device_id.load() : WAVE_MAPPER;
-    MMRESULT mr = waveInOpen(&hWaveIn, deviceId, &wfx, 0, 0, CALLBACK_NULL);
-    if (mr != MMSYSERR_NOERROR) {
-        g_log.warn("Audio: waveInOpen failed err=" + std::to_string(mr));
+    bool opened = false;
+    for (int tryRate : kFallbackRates) {
+        // Only try rates ≤ desired — don't upsample to a rate the user didn't ask for
+        // Exception: if desired is 48k and fails, always try lower.
+        if (tryRate > opusSR && opusSR != 48000) continue;
+        wfx = {};
+        wfx.wFormatTag      = WAVE_FORMAT_PCM;
+        wfx.nChannels       = (WORD)channels;
+        wfx.nSamplesPerSec  = (DWORD)tryRate;
+        wfx.wBitsPerSample  = 16;
+        wfx.nBlockAlign     = wfx.nChannels * wfx.wBitsPerSample / 8;
+        wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * wfx.nBlockAlign;
+        MMRESULT mr = waveInOpen(&hWaveIn, deviceId, &wfx, 0, 0, CALLBACK_NULL);
+        if (mr == MMSYSERR_NOERROR) {
+            if (tryRate != opusSR)
+                g_log.info("Audio: waveInOpen fallback " + std::to_string(opusSR) + "->" + std::to_string(tryRate) + "Hz");
+            opusSR = tryRate; // encode at the rate we actually captured
+            opened = true;
+            break;
+        }
+        g_log.warn("Audio: waveInOpen " + std::to_string(tryRate) + "Hz failed err=" + std::to_string(mr));
+    }
+    if (!opened) {
+        g_log.warn("Audio: waveInOpen failed for all rates");
         return false;
     }
 
@@ -3761,21 +3781,35 @@ static void capture_audio_live_stream(int sampleRate, int bitrate, int channels,
     else if (sampleRate <= 16000) opusSR = 16000;
     else if (sampleRate <= 24000) opusSR = 24000;
 
-    WAVEFORMATEX wfx = {};
-    wfx.wFormatTag = WAVE_FORMAT_PCM;
-    wfx.nChannels = (WORD)channels;
-    wfx.nSamplesPerSec = (DWORD)opusSR;
-    wfx.wBitsPerSample = 16;
-    wfx.nBlockAlign = wfx.nChannels * wfx.wBitsPerSample / 8;
-    wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * wfx.nBlockAlign;
-
     HWAVEIN hWaveIn = nullptr;
-    int cur_device_setting = g_audio_device_id.load(); // remember to detect runtime changes
+    WAVEFORMATEX wfx = {};
+    int cur_device_setting = g_audio_device_id.load();
     UINT deviceId = (cur_device_setting >= 0) ? (UINT)cur_device_setting : WAVE_MAPPER;
     HANDLE hEvent = CreateEventA(nullptr, FALSE, FALSE, nullptr);
-    MMRESULT mr = waveInOpen(&hWaveIn, deviceId, &wfx, (DWORD_PTR)hEvent, 0, CALLBACK_EVENT);
-    if (mr != MMSYSERR_NOERROR) {
-        g_log.warn("Audio live: waveInOpen failed err=" + std::to_string(mr));
+    // Fallback: try each Opus-valid rate until waveIn opens successfully
+    static const int kFallbackRates[] = {48000, 24000, 16000, 12000, 8000};
+    bool opened = false;
+    for (int tryRate : kFallbackRates) {
+        if (tryRate > opusSR && opusSR != 48000) continue;
+        wfx = {};
+        wfx.wFormatTag      = WAVE_FORMAT_PCM;
+        wfx.nChannels       = (WORD)channels;
+        wfx.nSamplesPerSec  = (DWORD)tryRate;
+        wfx.wBitsPerSample  = 16;
+        wfx.nBlockAlign     = wfx.nChannels * wfx.wBitsPerSample / 8;
+        wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * wfx.nBlockAlign;
+        MMRESULT mr = waveInOpen(&hWaveIn, deviceId, &wfx, (DWORD_PTR)hEvent, 0, CALLBACK_EVENT);
+        if (mr == MMSYSERR_NOERROR) {
+            if (tryRate != opusSR)
+                g_log.info("Audio live: waveInOpen fallback " + std::to_string(opusSR) + "->" + std::to_string(tryRate) + "Hz");
+            opusSR = tryRate;
+            opened = true;
+            break;
+        }
+        g_log.warn("Audio live: waveInOpen " + std::to_string(tryRate) + "Hz failed err=" + std::to_string(mr));
+    }
+    if (!opened) {
+        g_log.warn("Audio live: waveInOpen failed for all rates");
         CloseHandle(hEvent);
         return;
     }

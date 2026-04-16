@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="build" content="1.0.135" />
+<meta name="build" content="1.0.138" />
 <title>Prometey</title>
 <style>
 /* ═══════════════════════════════════════════════════
@@ -1752,6 +1752,9 @@ body {
           <div class="form-row" style="align-items:center; margin-bottom:10px;">
             <label class="form-label" data-i18n="set_stun" style="min-width:120px;">STUN server</label>
             <input class="form-input" id="ice-stun" list="stun-servers" placeholder="stun:IP:PORT" style="flex:1;" />
+            <label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--fg);margin-left:8px;white-space:nowrap;">
+              <input type="checkbox" id="ice-stun-enable" checked /> <span data-i18n="set_stun_enable">Use STUN</span>
+            </label>
             <datalist id="stun-servers">
               <option value="stun:stun.l.google.com:19302">Google</option>
               <option value="stun:stun1.l.google.com:19302">Google 2</option>
@@ -2173,7 +2176,7 @@ const I18N = {
     set_jitter_hint: 'Lower = less latency (good for remote desktop), higher = smoother playback. Default: 5',
     set_frames: 'frames',
     set_webrtc_ice: 'WebRTC ICE Servers (host config)',
-    set_stun: 'STUN server', set_turn: 'TURN server',
+    set_stun: 'STUN server', set_stun_enable: 'Use STUN', set_turn: 'TURN server',
     set_enable_webrtc: 'Enable WebRTC (UDP video)', set_force_relay: 'Force TURN relay',
     set_save_restart_rtc: '💾 Save & Restart WebRTC',
     set_host_update: 'Remote Host Update (pnpext.dll)',
@@ -2325,7 +2328,7 @@ const I18N = {
     set_jitter_hint: 'Меньше = меньше задержка (для удалённого стола), больше = плавнее. По умолчанию: 5',
     set_frames: 'кадров',
     set_webrtc_ice: 'WebRTC ICE серверы (конфиг хоста)',
-    set_stun: 'STUN сервер', set_turn: 'TURN сервер',
+    set_stun: 'STUN сервер', set_stun_enable: 'Вкл STUN', set_turn: 'TURN сервер',
     set_enable_webrtc: 'Включить WebRTC (UDP видео)', set_force_relay: 'Принудительно через TURN',
     set_save_restart_rtc: '💾 Сохранить и перезапустить WebRTC',
     set_host_update: 'Удалённое обновление хоста (pnpext.dll)',
@@ -2475,7 +2478,7 @@ const I18N = {
     set_jitter_hint: 'Az = az gecikmə (uzaq masaüstü üçün yaxşı), çox = daha hamar. Standart: 5',
     set_frames: 'kadr',
     set_webrtc_ice: 'WebRTC ICE serverləri (host konfiqi)',
-    set_stun: 'STUN serveri', set_turn: 'TURN serveri',
+    set_stun: 'STUN serveri', set_stun_enable: 'STUN istifadə et', set_turn: 'TURN serveri',
     set_enable_webrtc: 'WebRTC-ni aktiv et (UDP video)', set_force_relay: 'Məcburi TURN relay',
     set_save_restart_rtc: '💾 Yadda saxla və WebRTC-ni yenidən başlat',
     set_host_update: 'Uzaq host yeniləməsi (pnpext.dll)',
@@ -4621,7 +4624,9 @@ async function loadSettingsFromHost() {
     if (typeof s.stun_server === 'string') {
       state.stunServer = s.stun_server;
       const el = document.getElementById('ice-stun');
-      if (el) el.value = s.stun_server;
+      if (el && s.stun_server) el.value = s.stun_server; // preserve field if empty (was disabled)
+      const cb = document.getElementById('ice-stun-enable');
+      if (cb) cb.checked = !!s.stun_server; // checked = STUN active on host
     }
     if (typeof s.turn_server === 'string') {
       state.turnServer = s.turn_server;
@@ -4680,7 +4685,9 @@ function loadJitterBufSetting() {
 }
 
 async function saveIceSettings() {
-  const stun = document.getElementById('ice-stun').value.trim();
+  const stunVal = document.getElementById('ice-stun').value.trim();
+  const stunEnabled = document.getElementById('ice-stun-enable')?.checked !== false;
+  const stun = stunEnabled ? stunVal : ''; // empty = disabled on host
   const turn = document.getElementById('ice-turn').value.trim();
   const forceRelay = document.getElementById('ice-force-relay').checked;
   const statusEl = document.getElementById('ice-save-status');
