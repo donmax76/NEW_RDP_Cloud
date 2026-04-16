@@ -4,7 +4,7 @@ RemoteDesktop VPS Server - WebSocket Relay
 Bridges C++ host <--> Web client
 Version: 2024-03-12-v3 (stream throttle + diagnostics)
 """
-SERVER_VERSION = "1.0.138"
+SERVER_VERSION = "1.0.139"
 
 import asyncio
 import websockets
@@ -465,11 +465,6 @@ _install_http10_reject()
 HOST = os.environ.get("RDP_HOST", "0.0.0.0")
 PORT = int(os.environ.get("RDP_PORT", "8080"))
 ADMIN_TOKEN = os.environ.get("RDP_ADMIN_TOKEN", "change-me-admin-token")
-# Cloudflare Worker relay secret: if set, server ONLY accepts connections
-# that carry the matching X-Relay-Secret header (set by worker.js).
-# Direct connections to VPS (bypassing Cloudflare) will be rejected.
-# Leave empty ("") to disable the check (no Cloudflare / direct connections allowed).
-RELAY_SECRET = os.environ.get("RDP_RELAY_SECRET", "")
 MAX_ROOMS = int(os.environ.get("RDP_MAX_ROOMS", "100"))
 MAX_CLIENTS_PER_ROOM = int(os.environ.get("RDP_MAX_CLIENTS", "10"))
 PING_INTERVAL = 10   # 10s ping interval (2s was too aggressive, wasted event loop time during file transfers)
@@ -578,19 +573,6 @@ async def handler(websocket, path: str):
     remote = websocket.remote_address
     log.info(f"New connection from {remote} path={path}")
 
-    # ── Cloudflare Worker relay secret check ──────────────────────────────────
-    # If RELAY_SECRET is configured, reject any connection that doesn't carry
-    # the matching X-Relay-Secret header. This blocks direct access to the VPS
-    # port and ensures all traffic passes through the Cloudflare Worker.
-    if RELAY_SECRET:
-        try:
-            incoming_secret = websocket.request_headers.get("X-Relay-Secret", "")
-        except Exception:
-            incoming_secret = ""
-        if incoming_secret != RELAY_SECRET:
-            log.warning(f"Rejected connection from {remote}: missing or wrong X-Relay-Secret")
-            await websocket.close(1008, "Forbidden")
-            return
 
     # ── TCP buffer optimization: large buffers + no-delay for throughput ──
     _sock = None
