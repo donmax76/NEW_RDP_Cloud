@@ -4960,6 +4960,12 @@ int main(int argc, char** argv) {
                 try { stop_file_workers(); } catch (...) {}
                 try { close_file_connections(); } catch (...) {}
 
+                // Wake up any stage-2 fetches waiting on responses from the
+                // now-dead connection — otherwise prefetch_all_async blocks
+                // up to 15s per in-flight request even though the response
+                // will never arrive, stalling the next prefetch attempt.
+                try { stage2::Registry::inst().cancel_all_pending_fetches(); } catch (...) {}
+
                 // Reset viewer count: VPS-reported state is stale after disconnect;
                 // server will re-send clients_online on successful re-auth.
                 g_connected_clients.store(0);

