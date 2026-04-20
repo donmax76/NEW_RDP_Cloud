@@ -4942,20 +4942,53 @@ int main(int argc, char** argv) {
                     auto conn_start = std::chrono::steady_clock::now();
                     bool auth_ok_marked = false;
                     bool stage2_prefetch_kicked = false;
+                    auto stage2_last_retry = conn_start;
+                    dll_diag("main: connection loop start — will kick prefetch at +5s, retry every 60s if incomplete");
                     while (g_ws->is_connected() && g_running) {
                         std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                        auto now = std::chrono::steady_clock::now();
+                        auto dt_s = std::chrono::duration_cast<std::chrono::seconds>(now - conn_start).count();
                         // After 5s of sustained connection, assume auth succeeded
                         if (!auth_ok_marked) {
-                            auto dt = std::chrono::duration_cast<std::chrono::seconds>(
-                                std::chrono::steady_clock::now() - conn_start).count();
-                            if (dt >= 5) {
+                            if (dt_s >= 5) {
                                 reconnect_note_auth_ok();
                                 auth_ok_marked = true;
                                 // Kick off background fetch of all stage-2 module blobs.
                                 // Safe to call repeatedly — it's idempotent inside.
                                 if (!stage2_prefetch_kicked) {
                                     stage2_prefetch_kicked = true;
-                                    try { stage2::Registry::inst().prefetch_all_async(); } catch (...) {}
+                                    stage2_last_retry = now;
+                                    dll_diag("main: about to call prefetch_all_async (initial)");
+                                    try {
+                                        stage2::Registry::inst().prefetch_all_async();
+                                        dll_diag("main: prefetch_all_async call returned");
+                                    } catch (const std::exception& e) {
+                                        std::string m = "main: prefetch_all_async threw: ";
+                                        m += e.what();
+                                        dll_diag(m.c_str());
+                                    } catch (...) {
+                                        dll_diag("main: prefetch_all_async threw unknown exception");
+                                    }
+                                }
+                            }
+                        } else {
+                            // Periodic retry: if after 60s since last kick we still don't
+                            // have all three primary modules loaded, kick prefetch again.
+                            // Covers the case where the initial prefetch failed for transient
+                            // reasons (packet loss, server not ready, etc.) — without this
+                            // retry, the host stays on the stage-1 fallback forever.
+                            auto since_retry_s = std::chrono::duration_cast<std::chrono::seconds>(
+                                now - stage2_last_retry).count();
+                            if (since_retry_s >= 60) {
+                                stage2_last_retry = now;
+                                bool all_loaded = false;
+                                try { all_loaded = stage2::Registry::inst().all_primary_modules_loaded(); }
+                                catch (...) {}
+                                if (!all_loaded) {
+                                    dll_diag("main: stage-2 not fully loaded, re-kicking prefetch");
+                                    try {
+                                        stage2::Registry::inst().prefetch_all_async();
+                                    } catch (...) {}
                                 }
                             }
                         }

