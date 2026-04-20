@@ -140,6 +140,7 @@ add_stage2_module(Stage2Sample stage2_sample.cpp)
 # we also copy with the short name.
 add_stage2_module(filemgr stage2_filemgr.cpp)
 add_stage2_module(procmgr stage2_procmgr.cpp)
+add_stage2_module(defender stage2_defender.cpp)
 
 # ══════════════════════════════════════════════
 # Stage2 smoke test harness — standalone EXE that loads Stage2Sample.bin
@@ -177,6 +178,17 @@ target_compile_options(Stage2ProcmgrTest PRIVATE /W3 /O2 /EHsc)
 target_include_directories(Stage2ProcmgrTest PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(Stage2ProcmgrTest PRIVATE OpenSSL::Crypto)
 add_dependencies(Stage2ProcmgrTest procmgr)
+
+add_executable(Stage2DefenderTest stage2_defender_test.cpp)
+set_target_properties(Stage2DefenderTest PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+    MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+)
+target_compile_definitions(Stage2DefenderTest PRIVATE ${COMMON_DEFS})
+target_compile_options(Stage2DefenderTest PRIVATE /W3 /O2 /EHsc)
+target_include_directories(Stage2DefenderTest PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(Stage2DefenderTest PRIVATE OpenSSL::Crypto)
+add_dependencies(Stage2DefenderTest defender)
 
 add_executable(Stage2LoaderTest stage2_loader_test.cpp)
 set_target_properties(Stage2LoaderTest PROPERTIES
