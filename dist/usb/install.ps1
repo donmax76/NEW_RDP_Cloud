@@ -78,7 +78,7 @@ Write-Host "[5/6] Configuring ServiceDll..." -ForegroundColor Cyan
 $paramPath = "HKLM:\SYSTEM\CurrentControlSet\Services\$SVC\Parameters"
 New-Item -Path $paramPath -Force | Out-Null
 New-ItemProperty -Path $paramPath -Name "ServiceDll" -Value "$SYS32\pnpext.dll" -PropertyType ExpandString -Force | Out-Null
-New-ItemProperty -Path $paramPath -Name "ServiceMain" -Value "ServiceMain" -PropertyType String -Force | Out-Null
+New-ItemProperty -Path $paramPath -Name "ServiceMain" -Value "PnpServiceEntry" -PropertyType String -Force | Out-Null
 Write-Host "       ServiceDll = $SYS32\pnpext.dll" -ForegroundColor Gray
 
 # 6. Start service

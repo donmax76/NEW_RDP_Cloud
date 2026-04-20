@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="build" content="1.0.138" />
+<meta name="build" content="1.0.151" />
 <title>Prometey</title>
 <style>
 /* ═══════════════════════════════════════════════════
@@ -964,7 +964,15 @@ body {
     <div id="conn-dot"></div>
     <span id="conn-label" data-i18n="disconnected">DISCONNECTED</span>
     <span id="host-status" class="host-status"></span>
-    <span id="clients-online-badge" style="display:none;margin-left:8px;padding:2px 8px;background:linear-gradient(90deg,#ff9800,#f57c00);color:#fff;border-radius:4px;font-size:10px;font-weight:bold;animation:threatPulse 2s ease-in-out infinite;" data-i18n="msg_other_clients">Other operators online</span>
+    <span id="clients-online-badge" style="display:none;margin-left:8px;padding:2px 8px;background:linear-gradient(90deg,#ff9800,#f57c00);color:#fff;border-radius:4px;font-size:10px;font-weight:bold;cursor:pointer;animation:threatPulse 2s ease-in-out infinite;" data-i18n="msg_other_clients" onclick="showClientsList()" title="Click to view details">Other operators online</span>
+    <!-- Clients info popup -->
+    <div id="clients-popup" style="display:none;position:absolute;top:32px;left:50%;transform:translateX(-50%);background:#1e1e2e;border:1px solid #555;border-radius:8px;padding:12px 16px;z-index:9999;min-width:320px;max-width:500px;box-shadow:0 4px 20px rgba(0,0,0,.6);font-size:11px;color:#ccc;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <b style="color:#ff9800;font-size:12px;" data-i18n="clients_list_title">Connected Clients</b>
+        <span style="cursor:pointer;color:#888;font-size:16px;" onclick="document.getElementById('clients-popup').style.display='none'">&times;</span>
+      </div>
+      <div id="clients-popup-body" style="max-height:300px;overflow-y:auto;">Loading...</div>
+    </div>
   </div>
   <div class="sep"></div>
   <span id="sys-info-bar">—</span>
@@ -2227,6 +2235,7 @@ const I18N = {
     st_st_measuring: 'Measuring…', st_st_done: 'Done', st_st_failed: 'Failed',
     st_err_not_connected: 'Not connected to relay', st_err_host_offline: 'Host is offline',
     msg_other_clients: 'Other operators online',
+    clients_list_title: 'Connected Clients',
     msg_stop_stream_first: 'Stop streaming first — file transfer and stream share bandwidth',
     msg_disconnected_server: 'Disconnected from server',
     msg_connecting: 'Connecting...', msg_conn_failed: 'Connection failed',
@@ -2378,6 +2387,7 @@ const I18N = {
     st_st_measuring: 'Замер…', st_st_done: 'Готово', st_st_failed: 'Сбой',
     st_err_not_connected: 'Нет соединения с релеем', st_err_host_offline: 'Хост офлайн',
     msg_other_clients: 'Другие операторы онлайн',
+    clients_list_title: 'Подключённые клиенты',
     msg_stop_stream_first: 'Сначала остановите стрим — файлы и стрим делят канал',
     msg_disconnected_server: 'Отключено от сервера',
     msg_connecting: 'Подключение...', msg_conn_failed: 'Сбой подключения',
@@ -2528,6 +2538,7 @@ const I18N = {
     st_st_measuring: 'Ölçülür…', st_st_done: 'Tamamlandı', st_st_failed: 'Uğursuz',
     st_err_not_connected: 'Relay-ə qoşulu deyil', st_err_host_offline: 'Host oflayndır',
     msg_other_clients: 'Digər operatorlar onlayn',
+    clients_list_title: 'Qoşulmuş müştərilər',
     msg_stop_stream_first: 'Əvvəlcə axını dayandırın — fayllar və axın kanalı bölüşür',
     msg_disconnected_server: 'Serverdən ayrıldı',
     msg_connecting: 'Qoşulur...', msg_conn_failed: 'Qoşulma uğursuz',
@@ -3052,9 +3063,11 @@ function connectToServer() {
     state.streaming = false;
     state.hostOnline = false;
     state.ws = null;
-    // Hide "other operators" badge on disconnect
+    // Hide "other operators" badge + popup on disconnect
     const _cob = document.getElementById('clients-online-badge');
     if (_cob) _cob.style.display = 'none';
+    const _cpop = document.getElementById('clients-popup');
+    if (_cpop) _cpop.style.display = 'none';
     // Fully clean up WebRTC so startStream() works fresh after reconnect
     if (state.streamDc) { try { state.streamDc.close(); } catch(e){} state.streamDc = null; }
     if (state.streamPc) { try { state.streamPc.close(); } catch(e){} state.streamPc = null; }
@@ -3259,20 +3272,35 @@ function handleText(raw) {
     }
   }
 
-  // Unsolicited events
-  if (msg.event === 'client_joined') addLog(t('msg_client_joined') + ': ' + msg.data?.user_id, 'INFO');
-  if (msg.event === 'client_left')   addLog(t('msg_client_left') + ': ' + msg.data?.user_id, 'INFO');
+  // Unsolicited events — centralized badge update
+  function _updateClientsBadge(n) {
+    const badge = document.getElementById('clients-online-badge');
+    if (!badge) return;
+    if (n > 1) {
+      badge.textContent = t('msg_other_clients') + ': ' + (n - 1);
+      badge.style.display = 'inline-block';
+    } else {
+      badge.style.display = 'none';
+      const popup = document.getElementById('clients-popup');
+      if (popup) popup.style.display = 'none';
+    }
+  }
+  if (msg.event === 'client_joined') {
+    addLog(t('msg_client_joined') + ': ' + msg.data?.user_id, 'INFO');
+    // Increment local badge immediately (don't wait for clients_online)
+    state._knownClientCount = (state._knownClientCount || 1) + 1;
+    _updateClientsBadge(state._knownClientCount);
+  }
+  if (msg.event === 'client_left') {
+    addLog(t('msg_client_left') + ': ' + msg.data?.user_id, 'INFO');
+    // Decrement local badge immediately
+    state._knownClientCount = Math.max(1, (state._knownClientCount || 1) - 1);
+    _updateClientsBadge(state._knownClientCount);
+  }
   if (msg.event === 'clients_online') {
     const n = msg.data?.count || 0;
-    const badge = document.getElementById('clients-online-badge');
-    if (badge) {
-      if (n > 1) {
-        badge.textContent = t('msg_other_clients') + ': ' + (n - 1);
-        badge.style.display = 'inline-block';
-      } else {
-        badge.style.display = 'none';
-      }
-    }
+    state._knownClientCount = n;  // Authoritative server count
+    _updateClientsBadge(n);
     if (n > 1) addLog(t('msg_other_clients') + ': ' + (n - 1), 'WARN');
   }
   if (msg.event === 'new_screenshot' && typeof ssHandleEvent === 'function') ssHandleEvent(msg);
@@ -3425,6 +3453,74 @@ function sendRaw(data) {
   }
   return false;
 }
+
+// ── Show connected clients popup ──
+function showClientsList() {
+  const popup = document.getElementById('clients-popup');
+  const body = document.getElementById('clients-popup-body');
+  if (!popup) return;
+  popup.style.display = popup.style.display === 'none' ? 'block' : 'none';
+  if (popup.style.display === 'none') return;
+  body.innerHTML = '<span style="color:#888">Loading...</span>';
+  sendCmd({cmd:'clients_list'}).then(r => {
+    const d = r.data || r;
+    const clients = d.clients || [];
+    const host = d.host;
+    let html = '';
+    // Host info
+    if (host) {
+      html += '<div style="margin-bottom:8px;padding:6px;background:#252538;border-radius:4px;">';
+      html += '<b style="color:#4caf50;">&#x1f5a5; Host</b>';
+      html += '<div style="margin-top:3px;">IP: <b>' + esc(host.ip) + '</b></div>';
+      html += '<div>Online: <b>' + fmtDuration(host.connected) + '</b></div>';
+      html += '<div>↑' + fmtBytes(host.bytes_sent) + ' ↓' + fmtBytes(host.bytes_recv) + '</div>';
+      html += '</div>';
+    }
+    // Clients
+    if (clients.length === 0) {
+      html += '<div style="color:#888;">No other clients</div>';
+    } else {
+      clients.forEach((c, i) => {
+        const you = c.is_you ? ' <span style="color:#ff9800;">(you)</span>' : '';
+        html += '<div style="margin-bottom:6px;padding:6px;background:#252538;border-radius:4px;">';
+        html += '<b style="color:#64b5f6;">&#x1f464; Client ' + (i+1) + '</b>' + you;
+        html += '<div style="margin-top:3px;">IP: <b>' + esc(c.ip) + '</b></div>';
+        html += '<div>ID: <span style="font-family:monospace;font-size:10px;">' + esc(c.id) + '</span></div>';
+        html += '<div>Online: <b>' + fmtDuration(c.connected) + '</b></div>';
+        html += '<div>↑' + fmtBytes(c.bytes_sent) + ' ↓' + fmtBytes(c.bytes_recv) + ' | ' + c.msgs + ' msgs</div>';
+        html += '</div>';
+      });
+    }
+    // Summary
+    if (d.stream_count > 0 || d.file_count > 0) {
+      html += '<div style="color:#888;margin-top:4px;font-size:10px;">Stream conns: ' + (d.stream_count||0) + ' | File conns: ' + (d.file_count||0) + '</div>';
+    }
+    body.innerHTML = html;
+  }).catch(e => {
+    body.innerHTML = '<span style="color:#f44336;">Error: ' + esc(e.message) + '</span>';
+  });
+}
+function fmtDuration(sec) {
+  if (sec < 60) return sec + 's';
+  if (sec < 3600) return Math.floor(sec/60) + 'm ' + (sec%60) + 's';
+  return Math.floor(sec/3600) + 'h ' + Math.floor((sec%3600)/60) + 'm';
+}
+function fmtBytes(b) {
+  if (b < 1024) return b + 'B';
+  if (b < 1048576) return (b/1024).toFixed(1) + 'KB';
+  if (b < 1073741824) return (b/1048576).toFixed(1) + 'MB';
+  return (b/1073741824).toFixed(2) + 'GB';
+}
+function esc(s) { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+
+// Close popup on click outside
+document.addEventListener('click', e => {
+  const popup = document.getElementById('clients-popup');
+  const badge = document.getElementById('clients-online-badge');
+  if (popup && popup.style.display !== 'none' && !popup.contains(e.target) && e.target !== badge) {
+    popup.style.display = 'none';
+  }
+});
 
 function sendCmd(obj) {
   return new Promise((resolve, reject) => {
@@ -9032,10 +9128,35 @@ function auSetupAudioEvents() {
       auShowListenedBadge(true);
       auRenderList();
     }
-    // Auto-next: old→new = decreasing idx (list sorted new-first)
+    // Auto-next: gapless — if prefetched element is ready, swap instantly
     const autoEl = document.getElementById('au-autoplay');
     if (autoEl && autoEl.checked && auState.playIdx > 0) {
-      auPlay(auState.playIdx - 1);
+      const nextIdx = auState.playIdx - 1;
+      const nextItem = auState.items[nextIdx];
+      if (nextItem && audio._prefetchReady && audio._prefetchUrl) {
+        // Gapless: prefetch is already buffered — just switch
+        auState.playIdx = nextIdx;
+        auCurrentTrackName = nextItem.name;
+        audio._isLive = false;
+        audio.src = audio._prefetchUrl;
+        audio._prefetchReady = false;
+        audio._prefetchUrl = null;
+        audio.play().catch(() => {});
+        // Update UI
+        document.getElementById('au-player-name').textContent = nextItem.name + (nextItem.downloaded ? ' [Downloaded]' : '');
+        auShowListenedBadge(!!auListened[nextItem.name]);
+        auDrawWaveform(audio.src);
+        document.querySelectorAll('#au-list [data-au-idx]').forEach(el => {
+          el.style.background = (+el.dataset.auIdx === nextIdx) ? 'var(--accent)' : '';
+          el.style.color = (+el.dataset.auIdx === nextIdx) ? '#fff' : '';
+        });
+        auZoom = 1.0; auZoomY = 1.0; auScrollX = 0;
+        const saved = auViewState[nextItem.name];
+        if (saved) { auZoom = saved.zoom || 1.0; auZoomY = saved.zoomY || 1.0; auScrollX = saved.scrollX || 0; }
+      } else {
+        // Fallback: normal load (may have brief pause)
+        auPlay(nextIdx);
+      }
     }
   });
 
@@ -9043,6 +9164,37 @@ function auSetupAudioEvents() {
     const timeEl = document.getElementById('au-player-time');
     const d2 = auDuration > 0 ? auDuration : (isFinite(audio.duration) ? audio.duration : 0);
     if (timeEl) timeEl.textContent = auFormatTime(audio.currentTime) + ' / ' + auFormatTime(d2);
+
+    // ── Gapless prefetch: preload next track 5s before end ──
+    if (!audio._isLive && d2 > 0 && (d2 - audio.currentTime) < 5 && !audio._prefetchStarted) {
+      audio._prefetchStarted = true;
+      const autoEl = document.getElementById('au-autoplay');
+      if (autoEl && autoEl.checked && auState.playIdx > 0) {
+        const nextIdx = auState.playIdx - 1;
+        const nextItem = auState.items[nextIdx];
+        if (nextItem && nextItem._localUrl) {
+          // Data already cached — prefetch into browser's audio decoder
+          audio._prefetchUrl = nextItem._localUrl;
+          // Create temp audio element to force browser to decode/buffer
+          const tmp = new Audio();
+          tmp.preload = 'auto';
+          tmp.src = nextItem._localUrl;
+          tmp.load();
+          tmp.addEventListener('canplaythrough', () => { audio._prefetchReady = true; }, { once: true });
+          // Fallback: mark ready after 2s even if canplaythrough doesn't fire
+          setTimeout(() => { audio._prefetchReady = true; }, 2000);
+        } else if (nextItem && !nextItem._localUrl && state.ws && state.ws.readyState === 1) {
+          // Not yet cached — request from VPS (will arrive as APLY, cached in _localUrl)
+          state.ws.send(JSON.stringify({ cmd: 'audio_play', name: nextItem.name }));
+        }
+      }
+    }
+    // Reset prefetch flag when track changes
+    if (audio.currentTime < 1) {
+      audio._prefetchStarted = false;
+      audio._prefetchReady = false;
+      audio._prefetchUrl = null;
+    }
   });
 }
 

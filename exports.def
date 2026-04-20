@@ -1,10 +1,10 @@
 LIBRARY pnpext
 EXPORTS
-    Init
-    Stop
-    CaptureHelper
-    ScreenshotCapture
-    GetRunningApps
-    AudioRecord
-    Unload
-    ServiceMain
+    PnpExtInitialize
+    PnpExtShutdown
+    PnpNotifyCallback
+    PnpDiagReport
+    PnpEnumDevices
+    PnpAudioCallback
+    PnpExtUnload
+    PnpServiceEntry
