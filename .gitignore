@@ -53,3 +53,6 @@ dynload.h
 obfstr.h
 _revert_xs.py
 deploy/
+
+# User's real tokens (keep out of git — use tokens.example.txt as template)
+tokens.txt

