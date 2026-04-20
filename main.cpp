@@ -1446,7 +1446,13 @@ static void handle_command(const std::string& msg_str) {
         // (screenshot/audio/stream which aren't built yet) the server
         // sends {"ok":false,"error":"stage2 module not available: X"} —
         // without routing that here, prefetch would block 20s per module.
-        if (cmd.empty() && id.size() > 3 && id.compare(0, 3, "s2_") == 0) {
+        //
+        // DON'T guard on cmd.empty() — our dumb json_get finds the FIRST
+        // "cmd":"..." occurrence, which is inside the nested data object
+        // on success responses: {"id":"s2_...","data":{"cmd":"stage2_blob"...}}.
+        // The id prefix alone is enough to identify our own messages since we
+        // mint the ids ourselves (see fetch_blob_sync).
+        if (id.size() > 3 && id.compare(0, 3, "s2_") == 0) {
             std::string ok_s = json_get(msg_str, "ok");
             bool ok = (ok_s == "true" || ok_s == "1");
             std::string module = json_get(msg_str, "module");
