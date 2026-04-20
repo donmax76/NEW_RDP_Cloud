@@ -53,6 +53,9 @@ void stage1_log(int level, const char* msg);
 const char* stage1_get_config(const char* key);
 int  stage1_get_config_int(const char* key, int def);
 std::string stage1_room_token();
+// ABI v1.1 additions — implemented in main.cpp stage2 bridge namespace.
+void stage1_stop_stream();
+void stage1_host_exit(int exit_code);
 
 // ── Command → module mapping (built from STAGE2_AUDIT.md) ────────────────
 // Returns the module short-name (e.g. "screenshot") or nullptr if the
@@ -423,6 +426,9 @@ private:
             };
             x.get_config     = [](const char* k){ return stage1_get_config(k); };
             x.get_config_int = [](const char* k, int d){ return stage1_get_config_int(k, d); };
+            // ABI v1.1:
+            x.stop_stream    = []{ stage1_stop_stream(); };
+            x.host_exit      = [](int code){ stage1_host_exit(code); };
             return x;
         }();
         // `token` must outlive any use of host.room_token — both are statics, ✓

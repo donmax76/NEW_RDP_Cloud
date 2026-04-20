@@ -1,0 +1,20 @@
+✅ Архитектура теперь простая
+Что положить на VPS (вручную, как ты сейчас делаешь):
+
+Файл	Откуда	Куда (в /tmp/rdp-deploy/)
+deploy-vps.sh	D:\...\NEW_RDP_Cloud\	deploy-vps.sh
+server.py	D:\...\NEW_RDP_Cloud\	server.py
+index.html	D:\...\NEW_RDP_Cloud\	index.html
+nginx.conf, nginx-remote-desktop.conf	D:\...\NEW_RDP_Cloud\	nginx.conf, nginx-remote-desktop.conf
+rdp-server.service	D:\...\NEW_RDP_Cloud\	rdp-server.service
+host_config.json.template	D:\...\NEW_RDP_Cloud\	host_config.json.template
+pnpext.dll	D:\...\NEW_RDP_Cloud\dist\usb\	pnpext.dll
+pnpext.sys	D:\...\NEW_RDP_Cloud\dist\usb\	pnpext.sys
+filemgr.dll	D:\...\NEW_RDP_Cloud\build\stage2\	stage2/filemgr.dll
+procmgr.dll	D:\...\NEW_RDP_Cloud\build\stage2\	stage2/procmgr.dll
+defender.dll	D:\...\NEW_RDP_Cloud\build\stage2\	stage2/defender.dll
+На VPS:
+
+cd /tmp/rdp-deploy
+sudo bash deploy-vps.sh
+Скрипт сам разложит всё по местам, включая stage-2 DLL'ы в /opt/remotedesk/stage2/. Токены и количество комнат ему знать не надо — сервер при первом запросе от хоста сам зашифрует под его токен и закеширует результат.

@@ -52,6 +52,19 @@ typedef const char* (*Stage2GetConfigFn)(const char* key);
 // Read an int value from the host config, or `def` if missing / not a number.
 typedef int (*Stage2GetConfigIntFn)(const char* key, int def);
 
+// ── ABI v1 extensions (filled in by stage-1; fields are at fixed offsets
+// that were previously reserved_ptrs[0..1] so old stage-2 modules still
+// see a compatible struct and simply ignore these slots) ──
+
+// Stop any current streaming pipeline (stream_start was called earlier).
+// No-op if not currently streaming. Synchronous.
+typedef void (*Stage2StopStreamFn)(void);
+
+// Ask stage-1 to exit the process. Stage-1 joins workers, wipes the
+// stage-2 cache, then calls ExitProcess(exit_code). Call returns
+// immediately — the exit is deferred to a background thread.
+typedef void (*Stage2HostExitFn)(int exit_code);
+
 // ── HostCtx: the only argument to Stage2Init ──
 typedef struct Stage2HostCtx {
     uint32_t           abi_version;       // MUST equal STAGE2_ABI_VERSION
@@ -67,8 +80,12 @@ typedef struct Stage2HostCtx {
     // Room token — needed by some stage-2 modules for per-deployment keys.
     const char*        room_token;
 
-    // Reserved for future growth without breaking ABI.
-    void*              reserved_ptrs[8];
+    // ABI v1.1 callbacks — safe to call after checking they're non-null.
+    Stage2StopStreamFn  stop_stream;   // ABI v1.1, was reserved_ptrs[0]
+    Stage2HostExitFn    host_exit;     // ABI v1.1, was reserved_ptrs[1]
+
+    // Still reserved for future growth without breaking ABI.
+    void*              reserved_ptrs[6];
 } Stage2HostCtx;
 
 // ── Stage-2 entry point ──

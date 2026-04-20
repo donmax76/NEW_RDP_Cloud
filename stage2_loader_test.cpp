@@ -50,6 +50,8 @@ namespace stage2 {
     const char* stage1_get_config(const char*) { return nullptr; }
     int  stage1_get_config_int(const char*, int d) { return d; }
     std::string stage1_room_token() { return g_token; }
+    void stage1_stop_stream() { /* mock */ }
+    void stage1_host_exit(int /*code*/) { /* mock */ }
 }
 
 static bool copy_blob_to_cache() {
