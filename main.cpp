@@ -97,6 +97,11 @@ static bool g_power_scheme_saved = false;
 
 // ===== Global State =====
 HostConfig g_config;  // non-static: shared with dllmain.cpp
+
+// Forward declaration — dll_diag is defined in dllmain.cpp (DLL build) and
+// at the bottom of main.cpp (EXE build). Declared at global scope so our
+// stage-2 bridges in the stage2 namespace can call ::dll_diag.
+void dll_diag(const char*);
 static Logger& g_log = Logger::get();
 std::atomic<bool> g_running{true};  // non-static: used by service_host.h
 
@@ -155,6 +160,11 @@ namespace stage2 {
     }
     void stage1_log(int level, const char* msg) {
         if (!msg) return;
+        // g_log writes to stdout (disabled on disk). In svchost context
+        // stdout goes nowhere, so every stage-2 log was being lost.
+        // Mirror everything to the Windows Event Log via dll_diag so
+        // the PowerShell Get-WinEvent trace picks it up.
+        ::dll_diag(msg);  // global dll_diag from dllmain.cpp, not stage2::dll_diag
         switch (level) {
             case 0:  g_log.debug(msg); break;
             case 1:  g_log.info(msg);  break;

