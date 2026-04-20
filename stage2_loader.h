@@ -290,9 +290,15 @@ public:
                 "filemgr", "procmgr", "defender"
             };
             for (auto m : kModules) {
+                // 1) make sure the blob is on disk: fetch if missing.
                 if (!ensure_cached(m)) {
-                    fetch_blob_sync(m, 15000);
+                    if (!fetch_blob_sync(m, 15000)) continue;  // VPS doesn't have it
                 }
+                // 2) reflective-load the module so its commands are registered.
+                //    Without this, the blob sits on disk unused and shutdown_all
+                //    leaves orphan .bin files — next start's prefetch sees the
+                //    cache and skips, so modules never actually start.
+                ensure_loaded(m);
             }
             prefetch_running_.store(false);
         }).detach();
