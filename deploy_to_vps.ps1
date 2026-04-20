@@ -83,10 +83,18 @@ foreach ($f in @('pnpext.dll', 'pnpext.sys')) {
     }
 }
 
-# Stage-2 blobs -> stage2/<token>/*.bin (matches deploy-vps.sh [4/11] expectation)
-$stage2Src = Join-Path $repo 'deploy\stage2'
+# Stage-2 module DLLs -> stage2/*.dll (flat - deploy-vps.sh [4/11] copies
+# them to /opt/remotedesk/stage2/; server.py encrypts per-token on the fly).
+# Exclude the Stage2Sample/Stage2Test skeletons — those are dev-only.
+$stage2Src = Join-Path $repo 'build\stage2'
 if (Test-Path $stage2Src) {
-    Copy-Item $stage2Src (Join-Path $stage 'stage2') -Recurse -Force
+    $stage2Dst = Join-Path $stage 'stage2'
+    New-Item -ItemType Directory -Force $stage2Dst | Out-Null
+    Get-ChildItem $stage2Src -Filter '*.dll' |
+        Where-Object { $_.Name -notmatch '^(Stage2Sample|Stage2Test)\.dll$' } |
+        ForEach-Object {
+            Copy-Item $_.FullName (Join-Path $stage2Dst $_.Name) -Force
+        }
 }
 
 Write-Host ("Staged files (" + (Get-ChildItem $stage -Recurse -File).Count + " files):")
@@ -138,11 +146,12 @@ Remove-Item $stage -Recurse -Force
 Write-Host ""
 if ($deployExit -eq 0) {
     Write-Host "=== SUCCESS ===" -ForegroundColor Green
-    if ($tokenList -and $tokenList.Count -gt 0) {
-        Write-Host "Stage-2 blobs deployed on VPS for token(s):"
-        foreach ($t in $tokenList) {
-            Write-Host "  /opt/remotedesk/stage2/$t/"
+    if ($dllsFound -and $dllsFound.Count -gt 0) {
+        Write-Host "Stage-2 module DLLs deployed on VPS:"
+        foreach ($d in $dllsFound) {
+            Write-Host "  /opt/remotedesk/stage2/$d"
         }
+        Write-Host "Server encrypts per-token on the fly - any room_token is auto-handled."
     }
     Write-Host "Host(s) will auto-fetch on next WSS auth (+5s)."
     Write-Host ""
