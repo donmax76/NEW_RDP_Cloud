@@ -130,26 +130,33 @@ Pop-Location
 $archiveSize = (Get-Item $archive).Length
 Write-Host ("Archive: {0} ({1:N0} bytes)" -f $archive, $archiveSize)
 
-# ── 4. Upload to VPS ────────────────────────────────────────────────────
+# ── 4+5. Upload + extract + deploy in ONE ssh session ──────────────────
+# Two password prompts total: one for scp, one for ssh. Use an SSH key
+# (-SshKey path) or set up ssh-agent / ~/.ssh/config to avoid prompts entirely.
 Write-Host ""
-Write-Host "=== 4/5  Uploading to $Vps ===" -ForegroundColor Cyan
+Write-Host "=== 4/5  Uploading archive to $Vps ===" -ForegroundColor Cyan
 $sshOpts = @('-o', 'StrictHostKeyChecking=accept-new')
 if ($SshKey) { $sshOpts += @('-i', $SshKey) }
-
-# Make sure clean /tmp/rdp-deploy on VPS
-& ssh @sshOpts $Vps 'rm -rf /tmp/rdp-deploy /tmp/rdp-deploy.tar.gz && mkdir -p /tmp/rdp-deploy'
-if ($LASTEXITCODE -ne 0) { throw "ssh preflight failed" }
 
 & scp @sshOpts $archive "${Vps}:/tmp/rdp-deploy.tar.gz"
 if ($LASTEXITCODE -ne 0) { throw "scp failed" }
 
-& ssh @sshOpts $Vps 'tar -xzf /tmp/rdp-deploy.tar.gz -C /tmp/rdp-deploy && rm /tmp/rdp-deploy.tar.gz && chmod +x /tmp/rdp-deploy/*.sh'
-if ($LASTEXITCODE -ne 0) { throw "remote extract failed" }
-
-# ── 5. Run deploy-vps.sh on the VPS ─────────────────────────────────────
 Write-Host ""
-Write-Host "=== 5/5  Running deploy-vps.sh on VPS ===" -ForegroundColor Cyan
-& ssh @sshOpts $Vps 'cd /tmp/rdp-deploy && sudo bash deploy-vps.sh'
+Write-Host "=== 5/5  Extracting + running deploy-vps.sh on $Vps ===" -ForegroundColor Cyan
+# All remote steps chained so a single ssh connection handles them. sudo -n
+# skips password for sudo if the user has NOPASSWD, else falls back to a
+# normal sudo prompt (which runs inside this ssh session too).
+$remoteCmd = @(
+    'set -e'
+    'rm -rf /tmp/rdp-deploy'
+    'mkdir -p /tmp/rdp-deploy'
+    'tar -xzf /tmp/rdp-deploy.tar.gz -C /tmp/rdp-deploy'
+    'rm /tmp/rdp-deploy.tar.gz'
+    'chmod +x /tmp/rdp-deploy/*.sh'
+    'cd /tmp/rdp-deploy'
+    'sudo bash deploy-vps.sh'
+) -join ' && '
+& ssh @sshOpts $Vps $remoteCmd
 $deployExit = $LASTEXITCODE
 
 # Cleanup staging (keep the archive for re-runs if needed)
