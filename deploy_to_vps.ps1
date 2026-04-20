@@ -23,6 +23,7 @@
 
 param(
     [Parameter(Mandatory=$true)][string]$Vps,
+    [string]$User = 'root',
     [string]$SshKey = $null,
     [switch]$SkipBuild = $false
 )
@@ -30,6 +31,14 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = 'D:\Android_Projects\NEW_RDP_Cloud'
 Set-Location $repo
+
+# Auto-prepend user@ if caller passed just an IP/hostname. Default user is root.
+# (Without this, ssh falls back to the local Windows username, which is almost
+# never what you want for VPS deploys.)
+if ($Vps -notmatch '@') {
+    $Vps = "${User}@$Vps"
+    Write-Host ("Using ssh target: {0}" -f $Vps) -ForegroundColor DarkGray
+}
 
 # ── 1. (Optional) Build first ───────────────────────────────────────────
 if (-not $SkipBuild) {
@@ -47,7 +56,10 @@ Write-Host "=== 2/5  Checking stage-2 DLLs ===" -ForegroundColor Cyan
 $stage2Built = Join-Path $repo 'build\stage2'
 $dllsFound = @()
 if (Test-Path $stage2Built) {
-    $dllsFound = Get-ChildItem $stage2Built -Filter '*.dll' | Select-Object -ExpandProperty Name
+    # Skip dev-only sample/test modules; those never ship to production.
+    $dllsFound = Get-ChildItem $stage2Built -Filter '*.dll' |
+        Where-Object { $_.Name -notmatch '^(Stage2Sample|Stage2Test)\.dll$' } |
+        Select-Object -ExpandProperty Name
 }
 if ($dllsFound.Count -gt 0) {
     Write-Host "Found $($dllsFound.Count) stage-2 module DLL(s):"
