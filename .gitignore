@@ -52,3 +52,4 @@ _backup_snapshot/
 dynload.h
 obfstr.h
 _revert_xs.py
+deploy/
