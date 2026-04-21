@@ -211,6 +211,15 @@ public:
         return load_locked(module_name);
     }
 
+    // Quick check: is the named module loaded (Stage2Init returned 0)?
+    // Used by the command dispatcher to decide whether a direct dispatch
+    // will succeed or whether we need to offload to a worker that waits
+    // for on-demand fetch+load.
+    bool is_module_loaded(const std::string& module_name) {
+        std::lock_guard<std::recursive_mutex> lk(mu_);
+        return modules_.count(module_name) > 0;
+    }
+
     // Synchronously ensure a module is loaded, waiting for the blob fetch
     // if it isn't cached yet. Returns true on success, false on timeout.
     //
@@ -378,7 +387,11 @@ public:
                 // shutdown_all() and at install/uninstall time by the .bat
                 // scripts, which is the correct moment to clear stale data.
 
-                static const char* kModules[] = { "filemgr", "procmgr", "defender", "sysinfo" };
+                // Order: sysinfo + defender first (touched most frequently by
+                // the viewer for status display), then procmgr, then filemgr.
+                // Previously filemgr was first and consistently lost the race
+                // to the initial auth-settle window, so it never prefetched.
+                static const char* kModules[] = { "sysinfo", "defender", "procmgr", "filemgr" };
                 for (auto m : kModules) {
                     std::string name = m;
                     // Skip modules already loaded — no point re-fetching a blob

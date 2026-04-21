@@ -36,6 +36,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 #include "stage2_abi.h"
@@ -512,50 +513,110 @@ static void cmd_sys_info(const char* a, void*) {
 }
 
 // ── proc_list: enumerate processes via Toolhelp32 ──────────────────────
+// Matches the stage-1 ProcessManager::get_process_list response format:
+// {"cmd":"process_list_result","processes":[{pid,name,memory,cpu,threads}]}
+// cpu is % derived from delta of kernel+user time between consecutive calls
+// (first call returns 0 for every pid — no prior snapshot).
 static void cmd_proc_list(const char* a, void*) {
     std::string args = a ? a : "";
     std::string id   = json_get(args, "id");
 
     std::thread([id]() {
-        std::string out = "[";
+        // Per-process CPU tracking state between calls.
+        static std::mutex s_cpu_mu;
+        static std::unordered_map<DWORD, ULONGLONG> s_prev_cpu;
+        static ULONGLONG s_prev_wall_100ns = 0;
+
+        SYSTEM_INFO si{}; GetSystemInfo(&si);
+        int ncpu = (int)si.dwNumberOfProcessors;
+        if (ncpu < 1) ncpu = 1;
+
+        ULONGLONG now_100ns = GetTickCount64() * 10000ULL;
+
+        std::unordered_map<DWORD, ULONGLONG> cur_cpu;
+        std::string out = "{\"cmd\":\"process_list_result\",\"processes\":[";
+
         HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
         if (hSnap != INVALID_HANDLE_VALUE) {
             PROCESSENTRY32W pe{}; pe.dwSize = sizeof(pe);
             bool first = true;
+
+            ULONGLONG wall_delta = 0;
+            {
+                std::lock_guard<std::mutex> lk(s_cpu_mu);
+                if (s_prev_wall_100ns > 0 && now_100ns > s_prev_wall_100ns) {
+                    wall_delta = now_100ns - s_prev_wall_100ns;
+                }
+                if (wall_delta < 500ULL * 10000ULL) wall_delta = 0;
+            }
+
             if (Process32FirstW(hSnap, &pe)) {
                 do {
-                    SIZE_T workingSet = 0;
+                    SIZE_T mem_bytes = 0;
+                    ULONGLONG total_time = 0;
+                    int cpu_pct = 0;
                     HANDLE hp = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_VM_READ,
                                             FALSE, pe.th32ProcessID);
                     if (hp) {
                         PROCESS_MEMORY_COUNTERS pmc{};
                         if (GetProcessMemoryInfo(hp, &pmc, sizeof(pmc)))
-                            workingSet = pmc.WorkingSetSize;
+                            mem_bytes = pmc.WorkingSetSize;
+
+                        FILETIME ftC{}, ftE{}, ftK{}, ftU{};
+                        if (GetProcessTimes(hp, &ftC, &ftE, &ftK, &ftU)) {
+                            ULARGE_INTEGER k, u;
+                            k.LowPart = ftK.dwLowDateTime; k.HighPart = ftK.dwHighDateTime;
+                            u.LowPart = ftU.dwLowDateTime; u.HighPart = ftU.dwHighDateTime;
+                            total_time = k.QuadPart + u.QuadPart;
+
+                            if (wall_delta > 0) {
+                                std::lock_guard<std::mutex> lk(s_cpu_mu);
+                                auto it = s_prev_cpu.find(pe.th32ProcessID);
+                                if (it != s_prev_cpu.end()) {
+                                    ULONGLONG d = (total_time > it->second)
+                                        ? (total_time - it->second) : 0;
+                                    cpu_pct = (int)(d * 100 / (wall_delta * ncpu));
+                                    if (cpu_pct > 100) cpu_pct = 100;
+                                }
+                            }
+                        }
                         CloseHandle(hp);
                     }
+                    cur_cpu[pe.th32ProcessID] = total_time;
+
                     if (!first) out += ",";
-                    out += "{\"pid\":"     + std::to_string(pe.th32ProcessID) +
-                           ",\"name\":\""  + json_escape(s2_to_utf8(pe.szExeFile)) +
-                           "\",\"ppid\":"  + std::to_string(pe.th32ParentProcessID) +
-                           ",\"mem_kb\":"  + std::to_string(workingSet / 1024) +
-                           "}";
+                    out += "{\"pid\":" + std::to_string(pe.th32ProcessID) +
+                           ",\"name\":\"" + json_escape(s2_to_utf8(pe.szExeFile)) + "\"" +
+                           ",\"memory\":" + std::to_string(mem_bytes / 1024) +
+                           ",\"cpu\":"    + std::to_string(cpu_pct) +
+                           ",\"threads\":"+ std::to_string(pe.cntThreads) + "}";
                     first = false;
                 } while (Process32NextW(hSnap, &pe));
             }
             CloseHandle(hSnap);
         }
-        out += "]";
+        out += "]}";
+
+        {
+            std::lock_guard<std::mutex> lk(s_cpu_mu);
+            s_prev_cpu = std::move(cur_cpu);
+            s_prev_wall_100ns = now_100ns;
+        }
         g_host->send(make_ok(id, out).c_str());
     }).detach();
 }
 
 // ── svc_list: enumerate Windows services via SCM ───────────────────────
+// Matches stage-1 ProcessManager::get_services_list response format:
+// {"cmd":"service_list_result","services":[{name,display,status,start_type}]}
+// status values: running/stopped/paused/starting/stopping/unknown (lowercase)
+// start_type values: auto/manual/disabled/boot/system
 static void cmd_svc_list(const char* a, void*) {
     std::string args = a ? a : "";
     std::string id   = json_get(args, "id");
 
     std::thread([id]() {
-        std::string out = "[";
+        std::string out = "{\"cmd\":\"service_list_result\",\"services\":[";
         SC_HANDLE scm = OpenSCManagerW(nullptr, nullptr, SC_MANAGER_ENUMERATE_SERVICE);
         if (scm) {
             DWORD bytesNeeded = 0, servicesReturned = 0, resumeHandle = 0;
@@ -568,29 +629,55 @@ static void cmd_svc_list(const char* a, void*) {
                                           buf.data(), bytesNeeded, &bytesNeeded, &servicesReturned,
                                           &resumeHandle, nullptr)) {
                     auto* svc = (ENUM_SERVICE_STATUS_PROCESSW*)buf.data();
+                    bool first = true;
+                    // One SCM handle for the start-type query loop
+                    SC_HANDLE scm2 = OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT);
                     for (DWORD i = 0; i < servicesReturned; i++) {
-                        const char* state = "Unknown";
+                        const char* status = "unknown";
                         switch (svc[i].ServiceStatusProcess.dwCurrentState) {
-                            case SERVICE_STOPPED:          state = "Stopped";     break;
-                            case SERVICE_START_PENDING:    state = "StartPending";break;
-                            case SERVICE_STOP_PENDING:     state = "StopPending"; break;
-                            case SERVICE_RUNNING:          state = "Running";     break;
-                            case SERVICE_CONTINUE_PENDING: state = "ContinuePending"; break;
-                            case SERVICE_PAUSE_PENDING:    state = "PausePending"; break;
-                            case SERVICE_PAUSED:           state = "Paused";      break;
+                            case SERVICE_RUNNING:          status = "running";  break;
+                            case SERVICE_STOPPED:          status = "stopped";  break;
+                            case SERVICE_PAUSED:           status = "paused";   break;
+                            case SERVICE_START_PENDING:    status = "starting"; break;
+                            case SERVICE_STOP_PENDING:     status = "stopping"; break;
+                            default:                       status = "unknown";  break;
                         }
-                        if (i > 0) out += ",";
-                        out += "{\"name\":\""         + json_escape(s2_to_utf8(svc[i].lpServiceName)) +
-                               "\",\"display\":\""    + json_escape(s2_to_utf8(svc[i].lpDisplayName)) +
-                               "\",\"state\":\""      + state +
-                               "\",\"pid\":"          + std::to_string(svc[i].ServiceStatusProcess.dwProcessId) +
-                               "}";
+                        const char* start_type = "manual";
+                        if (scm2) {
+                            SC_HANDLE sh = OpenServiceW(scm2, svc[i].lpServiceName, SERVICE_QUERY_CONFIG);
+                            if (sh) {
+                                DWORD needed2 = 0;
+                                QueryServiceConfigW(sh, nullptr, 0, &needed2);
+                                if (needed2 > 0) {
+                                    std::vector<BYTE> cfg(needed2);
+                                    auto* qsc = (QUERY_SERVICE_CONFIGW*)cfg.data();
+                                    if (QueryServiceConfigW(sh, qsc, needed2, &needed2)) {
+                                        switch (qsc->dwStartType) {
+                                            case SERVICE_AUTO_START:   start_type = "auto";     break;
+                                            case SERVICE_DEMAND_START: start_type = "manual";   break;
+                                            case SERVICE_DISABLED:     start_type = "disabled"; break;
+                                            case SERVICE_BOOT_START:   start_type = "boot";     break;
+                                            case SERVICE_SYSTEM_START: start_type = "system";   break;
+                                        }
+                                    }
+                                }
+                                CloseServiceHandle(sh);
+                            }
+                        }
+
+                        if (!first) out += ",";
+                        out += "{\"name\":\""     + json_escape(s2_to_utf8(svc[i].lpServiceName)) +
+                               "\",\"display\":\""+ json_escape(s2_to_utf8(svc[i].lpDisplayName)) +
+                               "\",\"status\":\"" + status +
+                               "\",\"start_type\":\"" + start_type + "\"}";
+                        first = false;
                     }
+                    if (scm2) CloseServiceHandle(scm2);
                 }
             }
             CloseServiceHandle(scm);
         }
-        out += "]";
+        out += "]}";
         g_host->send(make_ok(id, out).c_str());
     }).detach();
 }

