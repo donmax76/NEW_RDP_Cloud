@@ -32,20 +32,27 @@ $buildExit = $LASTEXITCODE
 Write-Host "BUILD_EXIT=$buildExit"
 if ($buildExit -ne 0) { exit $buildExit }
 
-# Post-build: Authenticode-sign pnpext.dll (self-signed cert auto-generated).
+# Post-build: scrub OpenSSL asm fingerprints, then Authenticode-sign.
+# Scrub MUST run before signing so the signature covers the patched bytes.
 Set-Location "D:\Android_Projects\NEW_RDP_Cloud"
+
+Write-Host ""
+Write-Host "[3/4] Scrubbing OpenSSL fingerprint strings..."
+& powershell -NoProfile -ExecutionPolicy Bypass -File _scrub_dll_strings.ps1 2>&1 |
+    Select-Object -Last 8
+
 $pfx = "build\signing\pnpext_signing.pfx"
 if (-not (Test-Path $pfx)) {
     Write-Host ""
-    Write-Host "[3/3] PFX missing, generating self-signed cert..."
+    Write-Host "[4/4] PFX missing, generating self-signed cert..."
     & powershell -NoProfile -ExecutionPolicy Bypass -File _gen_sign_cert.ps1
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "[3/3] cert generation failed; skipping signing" -ForegroundColor Yellow
+        Write-Host "[4/4] cert generation failed; skipping signing" -ForegroundColor Yellow
         exit 0
     }
 }
 Write-Host ""
-Write-Host "[3/3] Signing build\bin\pnpext.dll..."
+Write-Host "[4/4] Signing build\bin\pnpext.dll..."
 & powershell -NoProfile -ExecutionPolicy Bypass -File _sign_dll.ps1 2>&1 |
     Select-Object -Last 10
 exit 0
