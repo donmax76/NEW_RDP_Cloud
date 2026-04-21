@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="build" content="1.0.190" />
+<meta name="build" content="1.0.191" />
 <title>Prometey</title>
 <style>
 /* ═══════════════════════════════════════════════════
@@ -3113,6 +3113,46 @@ function connectToServer() {
 function handleText(raw) {
   let msg;
   try { msg = JSON.parse(raw); } catch { return; }
+
+  // Host lifecycle event: startup / shutdown / sleep / wake / lock / unlock.
+  // Server broadcasts these from the host to all viewers in the room so we
+  // can surface a richer status than plain online/offline. See server.py
+  // "host_event" handler + the JSONL log at /opt/remotedesk/host_events.log.
+  if (msg.cmd === 'host_event') {
+    const ev = String(msg.event || '').toLowerCase();
+    const when = new Date((msg.ts || (Date.now()/1000)) * 1000);
+    const hv = msg.host_version ? ` v${msg.host_version}` : '';
+    const label = {
+      startup:  `Host ONLINE (startup${hv})`,
+      shutdown: 'Host SHUTDOWN',
+      sleep:    'Host SLEEPING',
+      wake:     `Host AWAKE (resumed${hv})`,
+      lock:     'Host session LOCKED',
+      unlock:   'Host session UNLOCKED',
+    }[ev] || `Host event: ${ev}`;
+    addLog(label + ' @ ' + when.toLocaleTimeString(),
+           ev === 'shutdown' || ev === 'sleep' ? 'WARN' : 'OK');
+    state.hostPowerState = ev;
+    // Enrich the connection-status pill based on the new state.
+    const hostEl = document.getElementById('host-status');
+    if (hostEl) {
+      if (ev === 'shutdown' || ev === 'sleep') {
+        state.hostOnline = false;
+        hostEl.textContent = ev === 'sleep' ? 'Host: SLEEPING' : 'Host: SHUTDOWN';
+        hostEl.className = 'host-status offline';
+      } else if (ev === 'startup' || ev === 'wake') {
+        state.hostOnline = true;
+        hostEl.textContent = ev === 'wake' ? 'Host: AWAKE' : 'Host: ONLINE';
+        hostEl.className = 'host-status online';
+      } else if (ev === 'lock') {
+        hostEl.textContent = 'Host: LOCKED';
+      } else if (ev === 'unlock') {
+        hostEl.textContent = 'Host: UNLOCKED';
+      }
+      hostEl.style.display = '';
+    }
+    return;
+  }
 
   // Auth ok
   if (msg.event === 'auth_ok') {

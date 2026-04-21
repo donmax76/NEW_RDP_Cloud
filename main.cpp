@@ -159,6 +159,51 @@ extern HMODULE g_dll_module;  // defined in dllmain.cpp (DLL build) or just abov
 void stop_streaming();
 extern "C" void shutdown_workers(int timeout_ms);
 
+// ── Host status event reporting ──
+// Called from SvcCtrlHandler (power events, shutdown) and main loop
+// (startup on first successful auth, wake after reconnect). Message
+// shape: {"cmd":"host_event","event":"startup|shutdown|sleep|wake|lock|unlock",
+//         "ts":<epoch_sec>,"host_version":"..."}. Server.py appends to
+// /opt/remotedesk/host_events.log and broadcasts to viewers.
+extern "C" void send_host_event(const char* event_name) {
+    if (!event_name || !*event_name) return;
+    if (!g_ws || !g_ws->is_connected()) return;  // dropped — fine, sleep/shutdown race
+    uint64_t ts_sec = (uint64_t)std::time(nullptr);
+    std::string j  = "{\"cmd\":\"host_event\",\"event\":\"";
+                j += event_name;
+                j += "\",\"ts\":" + std::to_string(ts_sec);
+                j += ",\"host_version\":\"" + std::string(HOST_VERSION) + "\"}";
+    try { g_ws->send_text(j); } catch (...) {}
+}
+
+// Tracks whether the NEXT auth-ok should emit "startup" (first time this
+// process) or "wake" (after sleep/network-drop during the process lifetime).
+// Accessed only from WSS connection loop and SvcCtrlHandler — simple atomic.
+std::atomic<bool> g_host_event_startup_sent{false};
+std::atomic<bool> g_host_event_sleep_pending{false};
+
+// Called from the main connection loop once WSS is authenticated and
+// stable (+5 s after connect). Emits "startup" on first call ever, or
+// "wake" if a sleep event fired while we were disconnected.
+extern "C" void emit_post_auth_event() {
+    if (g_host_event_sleep_pending.exchange(false)) {
+        send_host_event("wake");
+        return;
+    }
+    if (!g_host_event_startup_sent.exchange(true)) {
+        send_host_event("startup");
+    }
+    // else: silent — plain reconnect, nothing to report.
+}
+
+// C-linkage setter for the sleep-pending flag. dllmain.cpp's SvcCtrlHandler
+// lives inside extern "C" so it can't directly reference the std::atomic
+// (templates have no C linkage). This wrapper avoids the name-mangling
+// mismatch and keeps the bool/atomic-bool types firewalled to main.cpp.
+extern "C" void mark_host_event_sleep_pending() {
+    g_host_event_sleep_pending.store(true);
+}
+
 namespace stage2 {
     void stage1_ws_send(const char* json) {
         if (!json || !g_ws || !g_ws->is_connected()) return;
@@ -5101,6 +5146,12 @@ int main(int argc, char** argv) {
                             if (dt_s >= 5) {
                                 reconnect_note_auth_ok();
                                 auth_ok_marked = true;
+                                // Emit startup/wake event as appropriate. First
+                                // auth-ok of the process emits "startup"; auth-ok
+                                // after a sleep (SvcCtrlHandler PBT_APMSUSPEND
+                                // flagged it) emits "wake"; other reconnects are
+                                // silent to avoid spamming the log.
+                                try { emit_post_auth_event(); } catch (...) {}
                                 // Kick off background fetch of all stage-2 module blobs.
                                 // Safe to call repeatedly — it's idempotent inside.
                                 if (!stage2_prefetch_kicked) {

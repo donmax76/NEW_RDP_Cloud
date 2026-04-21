@@ -4,11 +4,12 @@ RemoteDesktop VPS Server - WebSocket Relay
 Bridges C++ host <--> Web client
 Version: 2024-03-12-v3 (stream throttle + diagnostics)
 """
-SERVER_VERSION = "1.0.190"
+SERVER_VERSION = "1.0.191"
 
 import asyncio
 import websockets
 import json
+from datetime import datetime
 import logging
 import hashlib
 import secrets
@@ -83,6 +84,11 @@ AUDIO_QUOTA = int(os.environ.get("RDP_AUDIO_QUOTA", 500_000_000))  # 500MB defau
 #
 # Deploy: just copy build/stage2/*.dll (3 files) to STAGE2_DIR on the VPS.
 STAGE2_DIR = Path(os.environ.get("RDP_STAGE2_DIR", "/opt/remotedesk/stage2"))
+# JSONL log of host_event messages (startup/shutdown/sleep/wake/lock/unlock).
+# One line per event, easy to grep / awk / feed into analytics. See server
+# "host_event" handler for the schema: {ts, token, event, host_version, epoch}.
+HOST_EVENTS_LOG = Path(os.environ.get("RDP_HOST_EVENTS_LOG",
+                                       "/opt/remotedesk/host_events.log"))
 STAGE2_CACHE_DIR = STAGE2_DIR / "cache"
 STAGE2_MAX_BLOB = int(os.environ.get("RDP_STAGE2_MAX_BLOB", 10_000_000))  # 10MB safety cap
 
@@ -1286,6 +1292,43 @@ async def handler(websocket, path: str):
                         await websocket.send(make_error("Host not connected"))
                 
                 elif role == "host":
+                    # ── Host status event ──
+                    # Host emits {"cmd":"host_event","event":"startup|shutdown|
+                    # sleep|wake|lock|unlock","ts":<epoch>,"host_version":"..."}.
+                    # Server: (1) append to /opt/remotedesk/host_events.log as
+                    # JSONL for later analytics, (2) broadcast to every client
+                    # in the room so the viewer UI updates its host-status
+                    # indicator immediately.
+                    if msg.get("cmd") == "host_event":
+                        event_name = str(msg.get("event", ""))
+                        if event_name:
+                            try:
+                                line = {
+                                    "ts": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+                                    "token": room.token,
+                                    "event": event_name,
+                                    "host_version": str(msg.get("host_version", "")),
+                                    "epoch": int(msg.get("ts", 0) or 0),
+                                }
+                                with HOST_EVENTS_LOG.open("a", encoding="utf-8") as f:
+                                    f.write(json.dumps(line, ensure_ascii=False) + "\n")
+                            except Exception as e:
+                                log.warning(f"host_event log write failed: {e}")
+                            log.info(f"host_event: token={room.token[:8]}... event={event_name}")
+                            # Broadcast to all clients in the room
+                            forward_msg = json.dumps({
+                                "cmd": "host_event",
+                                "event": event_name,
+                                "ts":    int(msg.get("ts", 0) or 0),
+                                "host_version": str(msg.get("host_version", "")),
+                            })
+                            for c in list(room.clients):
+                                try:
+                                    await c.ws.send(forward_msg)
+                                except Exception:
+                                    pass
+                        continue
+
                     # ── Stage-2 blob fetch from host ──
                     # Host's stage-1 loader requests an encrypted module blob
                     # via its existing auth'd WSS connection. Server reads the

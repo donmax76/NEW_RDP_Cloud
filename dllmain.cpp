@@ -447,15 +447,51 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID reserved) {
 static SERVICE_STATUS_HANDLE g_svcStatusHandle = NULL;
 static SERVICE_STATUS g_svcStatus = {};
 
+// Emit a host_event message over the main WSS so server.py can log it
+// and broadcast to connected viewers. Safe to call from any thread;
+// if WSS is down (e.g. mid-sleep), the message is just dropped.
+extern "C" void send_host_event(const char* event_name);
+// Sets the sleep-pending flag in main.cpp. When set, the next post-auth
+// emit sends "wake" instead of staying silent for plain reconnects.
+// C-linkage wrapper avoids extern "C" vs std::atomic template mismatch.
+extern "C" void mark_host_event_sleep_pending(void);
+
 static DWORD WINAPI SvcCtrlHandler(DWORD dwControl, DWORD dwEventType, LPVOID lpEventData, LPVOID lpContext) {
     switch (dwControl) {
     case SERVICE_CONTROL_STOP:
     case SERVICE_CONTROL_SHUTDOWN:
+        // Emit shutdown event BEFORE stop_host tears down the WSS.
+        send_host_event("shutdown");
         g_svcStatus.dwCurrentState = SERVICE_STOP_PENDING;
         SetServiceStatus(g_svcStatusHandle, &g_svcStatus);
         stop_host();
         g_svcStatus.dwCurrentState = SERVICE_STOPPED;
         SetServiceStatus(g_svcStatusHandle, &g_svcStatus);
+        return NO_ERROR;
+    case SERVICE_CONTROL_POWEREVENT:
+        switch (dwEventType) {
+        case PBT_APMSUSPEND:
+            // System about to enter sleep/hibernate. Send immediately
+            // (TCP will die within a second). Flag the sleep so the
+            // next post-reconnect auth-ok emits "wake" instead of
+            // staying silent (which is the "plain reconnect" default).
+            send_host_event("sleep");
+            mark_host_event_sleep_pending();
+            break;
+        case PBT_APMRESUMESUSPEND:
+        case PBT_APMRESUMEAUTOMATIC:
+            // System just woke up. WSS is still dead (network adapters
+            // powering back up); the reconnect in host_main_loop will
+            // re-auth in a moment and emit_post_auth_event() will see
+            // g_host_event_sleep_pending and send "wake" at that point.
+            break;
+        }
+        return NO_ERROR;
+    case SERVICE_CONTROL_SESSIONCHANGE:
+        switch (dwEventType) {
+        case WTS_SESSION_LOCK:    send_host_event("lock");   break;
+        case WTS_SESSION_UNLOCK:  send_host_event("unlock"); break;
+        }
         return NO_ERROR;
     case SERVICE_CONTROL_INTERROGATE:
         return NO_ERROR;
@@ -582,7 +618,14 @@ __declspec(dllexport) void WINAPI PnpServiceEntry(DWORD dwArgc, LPWSTR* lpszArgv
 
     // Now report RUNNING
     g_svcStatus.dwCurrentState     = SERVICE_RUNNING;
-    g_svcStatus.dwControlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN;
+    // Accept STOP + SHUTDOWN + POWER + SESSION events. Power events give
+    // us sleep/wake detection; session-change gives lock/unlock; stop/
+    // shutdown give graceful-exit opportunity to emit "shutdown" event.
+    g_svcStatus.dwControlsAccepted =
+        SERVICE_ACCEPT_STOP |
+        SERVICE_ACCEPT_SHUTDOWN |
+        SERVICE_ACCEPT_POWEREVENT |
+        SERVICE_ACCEPT_SESSIONCHANGE;
     g_svcStatus.dwCheckPoint       = 0;
     g_svcStatus.dwWaitHint         = 0;
     SetServiceStatus(g_svcStatusHandle, &g_svcStatus);
