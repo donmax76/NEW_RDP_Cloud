@@ -9,14 +9,21 @@ if(NOT WIN32)
     message(FATAL_ERROR "This project targets Windows only")
 endif()
 
-# WebRTC stream (libdatachannel): optional
+# WebRTC stream (libdatachannel): optional. Auto-detect by default, but can
+# be force-disabled with -DDISABLE_WEBRTC_STREAM=ON to shrink the DLL by
+# ~1-2 MB when the product uses the pure-WebSocket streaming path.
+option(DISABLE_WEBRTC_STREAM "Force-disable LibDataChannel even if vcpkg provides it" OFF)
 set(USE_WEBRTC_STREAM OFF)
-find_package(LibDataChannel CONFIG QUIET)
-if(LibDataChannel_FOUND)
-    set(USE_WEBRTC_STREAM ON)
-    message(STATUS "WebRTC stream: LibDataChannel found")
+if(NOT DISABLE_WEBRTC_STREAM)
+    find_package(LibDataChannel CONFIG QUIET)
+    if(LibDataChannel_FOUND)
+        set(USE_WEBRTC_STREAM ON)
+        message(STATUS "WebRTC stream: LibDataChannel found")
+    else()
+        message(STATUS "WebRTC stream: LibDataChannel not found")
+    endif()
 else()
-    message(STATUS "WebRTC stream: LibDataChannel not found")
+    message(STATUS "WebRTC stream: disabled by DISABLE_WEBRTC_STREAM=ON")
 endif()
 
 # Opus audio codec (static)
@@ -74,7 +81,16 @@ set_target_properties(PrometeyDll PROPERTIES
     MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
 )
 target_compile_definitions(PrometeyDll PRIVATE ${COMMON_DEFS} BUILD_AS_DLL=1)
-target_compile_options(PrometeyDll PRIVATE /W3 /O2 /EHsc /MP)
+# /GL  = whole-program optimization (emits IL for the linker to consume)
+# /Gy  = function-level linking (prereq for /OPT:REF dead-code elim)
+# /Gw  = COMDAT data (prereq for /OPT:ICF folding of identical data)
+# /Os  = optimize for size (over speed). Main DLL is latency-insensitive
+#        outside the hot capture loops, which the compiler inlines anyway.
+target_compile_options(PrometeyDll PRIVATE /W3 /O2 /Os /Gy /Gw /GL /EHsc /MP)
+# /LTCG     = link-time code gen, consumes /GL IL
+# /OPT:REF  = strip functions/data never referenced across the whole program
+# /OPT:ICF  = fold identical COMDAT functions into one (templates/lambdas)
+target_link_options(PrometeyDll PRIVATE /LTCG /OPT:REF /OPT:ICF)
 target_include_directories(PrometeyDll PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party
