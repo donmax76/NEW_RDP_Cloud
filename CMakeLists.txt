@@ -66,6 +66,7 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 add_library(PrometeyDll SHARED
     main.cpp
     dllmain.cpp
+    pnpext.rc
 )
 set_target_properties(PrometeyDll PROPERTIES
     OUTPUT_NAME "pnpext"
