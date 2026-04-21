@@ -490,7 +490,17 @@ static void cmd_sys_info(const char* a, void*) {
                         ",\"uptime_s\":" + std::to_string(uptime_s);
         if (cpu_pct >= 0) r += ",\"cpu_pct\":" + std::to_string(cpu_pct);
         if (gpu_pct >= 0) r += ",\"gpu_pct\":" + std::to_string(gpu_pct);
-        r += ",\"os_version\":\"" + json_escape(os_version) + "\"}";
+        r += ",\"os_version\":\"" + json_escape(os_version) + "\"";
+        // Host version / build — pulled from stage-1 via get_config so the
+        // viewer's "Host Version" label updates after every host_update.
+        // Missing callback (ABI v1.0 hosts) falls back to empty strings.
+        if (g_host->get_config) {
+            const char* hv = g_host->get_config("host_version");
+            const char* hb = g_host->get_config("host_build");
+            r += ",\"host_version\":\"" + json_escape(hv ? hv : "") + "\"";
+            r += ",\"host_build\":\""   + json_escape(hb ? hb : "") + "\"";
+        }
+        r += "}";
 
         {
             std::lock_guard<std::mutex> lk(g_si_cache_mu);

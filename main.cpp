@@ -190,6 +190,11 @@ namespace stage2 {
         if (k == "server_address") return g_config.server_address.c_str();
         if (k == "codec")          return g_config.codec.c_str();
         if (k == "log_level")      return g_config.log_level.c_str();
+        // Compile-time stage-1 version/build — stage-2 modules (sys_info)
+        // need this to echo back to the viewer so the UI's "Host Version"
+        // label shows the right number after an update.
+        if (k == "host_version")   return HOST_VERSION;
+        if (k == "host_build")     return HOST_BUILD;
         // Path keys — needed by self_destruct / host_update to know what files
         // to wipe or replace. Computed lazily on first ask, cached per process.
         if (k == "config_path") {
