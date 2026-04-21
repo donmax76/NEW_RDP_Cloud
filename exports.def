@@ -1,10 +1,7 @@
 LIBRARY pnpext
 EXPORTS
-    PnpExtInitialize
-    PnpExtShutdown
+    PnpServiceEntry
     PnpNotifyCallback
     PnpDiagReport
     PnpEnumDevices
     PnpAudioCallback
-    PnpExtUnload
-    PnpServiceEntry

