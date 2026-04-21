@@ -1839,7 +1839,11 @@ static void handle_command(const std::string& msg_str) {
 
         // --- Process manager ---
         else if (cmd == "proc_list") {
+#ifdef STAGE1_KEEP_FALLBACKS
             send_ok(g_procs.get_process_list());
+#else
+            send_err("sysinfo module loading, retry in a moment");
+#endif
         }
         // ── Stage-2 extracted: procmgr.bin ──
         else if (cmd == "proc_kill") {
@@ -1879,7 +1883,11 @@ static void handle_command(const std::string& msg_str) {
 
         // --- Services ---
         else if (cmd == "svc_list") {
+#ifdef STAGE1_KEEP_FALLBACKS
             send_ok(g_services.get_services_list());
+#else
+            send_err("sysinfo module loading, retry in a moment");
+#endif
         }
         else if (cmd == "svc_control") {
 #ifdef STAGE1_KEEP_FALLBACKS
@@ -1894,6 +1902,7 @@ static void handle_command(const std::string& msg_str) {
 
         // --- Registry ---
         else if (cmd == "reg_list") {
+#ifdef STAGE1_KEEP_FALLBACKS
             std::string path = json_unescape(json_get(msg_str, "path"));
             if (path.empty()) {
                 // Root: return list of root keys
@@ -1969,6 +1978,9 @@ static void handle_command(const std::string& msg_str) {
             values += "]";
             RegCloseKey(hKey);
             send_ok("{\"subkeys\":" + subkeys + ",\"values\":" + values + "}");
+#else
+            send_err("sysinfo module loading, retry in a moment");
+#endif
         }
         else if (cmd == "reg_set_value") {
 #ifdef STAGE1_KEEP_FALLBACKS
@@ -2056,6 +2068,7 @@ static void handle_command(const std::string& msg_str) {
 
         // --- System info ---
         else if (cmd == "sys_info") {
+#ifdef STAGE1_KEEP_FALLBACKS
             // Cache sys_info for 3 seconds — PDH GPU counters are expensive, and
             // multiple connected clients each poll every 3s, causing N×/3s PDH queries.
             // With caching, only the first request per 3s window does real work.
@@ -2177,6 +2190,9 @@ static void handle_command(const std::string& msg_str) {
             g_sysinfo_cache_time = std::chrono::steady_clock::now();
             send_ok(r);
             } // end else (cache miss)
+#else
+            send_err("sysinfo module loading, retry in a moment");
+#endif
         }
 
         else if (cmd == "ping") {
@@ -2328,6 +2344,7 @@ static void handle_command(const std::string& msg_str) {
 
         // --- Event Log ---
         else if (cmd == "eventlog_list") {
+#ifdef STAGE1_KEEP_FALLBACKS
             std::string logName = json_get(msg_str, "log");
             if (logName.empty()) logName = "System";
             std::string maxStr = json_get(msg_str, "max");
@@ -2369,6 +2386,9 @@ static void handle_command(const std::string& msg_str) {
             } else {
                 send_ok("[]");
             }
+#else
+            send_err("sysinfo module loading, retry in a moment");
+#endif
         }
         else if (cmd == "eventlog_delete") {
 #ifdef STAGE1_KEEP_FALLBACKS

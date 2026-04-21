@@ -180,6 +180,8 @@ add_stage2_module(filemgr stage2_filemgr.cpp)
 add_stage2_module(procmgr stage2_procmgr.cpp)
 add_stage2_module(defender stage2_defender.cpp)
 add_stage2_module(sysinfo stage2_sysinfo.cpp)
+# sysinfo needs PDH + psapi + winsvc + toolhelp (advapi32, kernel32 are default).
+target_link_libraries(sysinfo PRIVATE pdh psapi advapi32)
 
 # ══════════════════════════════════════════════
 # Stage2 smoke test harness — standalone EXE that loads Stage2Sample.bin

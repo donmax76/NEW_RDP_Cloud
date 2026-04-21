@@ -25,6 +25,15 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <tlhelp32.h>
+#include <pdh.h>
+#include <pdhmsg.h>
+#include <psapi.h>
+#include <algorithm>
+#include <chrono>
+#include <cstdio>
+#include <cstdint>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -33,6 +42,8 @@
 #include "stage2_util.h"
 
 #pragma comment(lib, "advapi32.lib")
+#pragma comment(lib, "pdh.lib")
+#pragma comment(lib, "psapi.lib")
 
 using namespace s2util;
 static Stage2HostCtx* g_host = nullptr;
@@ -76,6 +87,56 @@ static std::string run_capture(const std::string& cmdline, DWORD timeout_ms = 15
         out.pop_back();
     return out;
 }
+
+// ── Registry helpers (self-contained copy, no stage-1 deps) ─────────────
+static HKEY s2_parse_root_key(const std::string& s) {
+    if (s == "HKLM" || s == "HKEY_LOCAL_MACHINE") return HKEY_LOCAL_MACHINE;
+    if (s == "HKCU" || s == "HKEY_CURRENT_USER")  return HKEY_CURRENT_USER;
+    if (s == "HKCR" || s == "HKEY_CLASSES_ROOT")  return HKEY_CLASSES_ROOT;
+    if (s == "HKU"  || s == "HKEY_USERS")         return HKEY_USERS;
+    if (s == "HKCC" || s == "HKEY_CURRENT_CONFIG")return HKEY_CURRENT_CONFIG;
+    return nullptr;
+}
+static bool s2_parse_reg_path(const std::string& full, HKEY& root, std::string& sub) {
+    auto pos = full.find('\\');
+    std::string rs = (pos == std::string::npos) ? full : full.substr(0, pos);
+    root = s2_parse_root_key(rs);
+    if (!root) return false;
+    sub = (pos == std::string::npos) ? "" : full.substr(pos + 1);
+    return true;
+}
+static std::string s2_reg_type_name(DWORD type) {
+    switch (type) {
+        case REG_SZ:        return "REG_SZ";
+        case REG_EXPAND_SZ: return "REG_EXPAND_SZ";
+        case REG_DWORD:     return "REG_DWORD";
+        case REG_QWORD:     return "REG_QWORD";
+        case REG_BINARY:    return "REG_BINARY";
+        case REG_MULTI_SZ:  return "REG_MULTI_SZ";
+        case REG_NONE:      return "REG_NONE";
+        default:            return "REG_UNKNOWN";
+    }
+}
+static std::string s2_bytes_to_hex(const BYTE* data, DWORD size) {
+    std::string hex; hex.reserve(size * 3);
+    for (DWORD i = 0; i < size; i++) {
+        char buf[4]; snprintf(buf, sizeof(buf), "%02X", data[i]);
+        hex += buf;
+        if (i + 1 < size) hex += ' ';
+    }
+    return hex;
+}
+
+// ── UTF-16 → UTF-8 ──────────────────────────────────────────────────────
+static std::string s2_to_utf8(const wchar_t* w) {
+    if (!w || !*w) return {};
+    int n = WideCharToMultiByte(CP_UTF8, 0, w, -1, nullptr, 0, nullptr, nullptr);
+    if (n <= 0) return {};
+    std::string s((size_t)(n - 1), 0);
+    WideCharToMultiByte(CP_UTF8, 0, w, -1, s.data(), n, nullptr, nullptr);
+    return s;
+}
+static std::string s2_to_utf8(const char* a) { return a ? std::string(a) : std::string(); }
 
 // Split a `dl_bytes|dl_sec|dl_mbps|ul_bytes|ul_sec|ul_mbps` style pipe string.
 static std::vector<std::string> split_pipe(const std::string& s) {
@@ -309,6 +370,352 @@ static void cmd_host_relay_speed(const char* a, void*) {
     }).detach();
 }
 
+// ── sys_info: CPU/GPU/RAM/OS snapshot, cached 3s ────────────────────────
+// Cached because PDH GPU-counter queries are expensive (~80ms) and multiple
+// connected viewers each poll sys_info every few seconds.
+static std::mutex       g_si_cache_mu;
+static std::string      g_si_cache;
+static std::chrono::steady_clock::time_point g_si_cache_time;
+
+static void cmd_sys_info(const char* a, void*) {
+    std::string args = a ? a : "";
+    std::string id   = json_get(args, "id");
+
+    std::thread([id]() {
+        // Cache window — matches the stage-1 3s window.
+        {
+            std::lock_guard<std::mutex> lk(g_si_cache_mu);
+            auto age = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - g_si_cache_time).count();
+            if (!g_si_cache.empty() && age < 3000) {
+                g_host->send(make_ok(id, g_si_cache).c_str());
+                return;
+            }
+        }
+
+        MEMORYSTATUSEX ms{}; ms.dwLength = sizeof(ms);
+        GlobalMemoryStatusEx(&ms);
+        uint64_t total_mb = ms.ullTotalPhys / 1048576;
+        uint64_t avail_mb = ms.ullAvailPhys / 1048576;
+        uint64_t uptime_s = GetTickCount64() / 1000;
+
+        int cpu_pct = -1;
+        {
+            FILETIME i1,k1,u1,i2,k2,u2;
+            if (GetSystemTimes(&i1,&k1,&u1)) {
+                Sleep(120);
+                if (GetSystemTimes(&i2,&k2,&u2)) {
+                    ULARGE_INTEGER ui1{{i1.dwLowDateTime,i1.dwHighDateTime}};
+                    ULARGE_INTEGER uk1{{k1.dwLowDateTime,k1.dwHighDateTime}};
+                    ULARGE_INTEGER uu1{{u1.dwLowDateTime,u1.dwHighDateTime}};
+                    ULARGE_INTEGER ui2{{i2.dwLowDateTime,i2.dwHighDateTime}};
+                    ULARGE_INTEGER uk2{{k2.dwLowDateTime,k2.dwHighDateTime}};
+                    ULARGE_INTEGER uu2{{u2.dwLowDateTime,u2.dwHighDateTime}};
+                    uint64_t total = (uk2.QuadPart-uk1.QuadPart) + (uu2.QuadPart-uu1.QuadPart);
+                    uint64_t idle  = ui2.QuadPart - ui1.QuadPart;
+                    if (total > 0) cpu_pct = (int)((total - idle) * 100 / total);
+                    if (cpu_pct < 0) cpu_pct = 0;
+                    if (cpu_pct > 100) cpu_pct = 100;
+                }
+            }
+        }
+
+        int gpu_pct = -1;
+        {
+            HQUERY   hQuery   = nullptr;
+            HCOUNTER hCounter = nullptr;
+            if (PdhOpenQueryW(nullptr, 0, &hQuery) == ERROR_SUCCESS) {
+                const wchar_t* path = L"\\GPU Engine(*)\\Utilization Percentage";
+                if (PdhAddCounterW(hQuery, path, 0, &hCounter) == ERROR_SUCCESS) {
+                    PdhCollectQueryData(hQuery);
+                    Sleep(80);
+                    if (PdhCollectQueryData(hQuery) == ERROR_SUCCESS) {
+                        DWORD bufSz = 0, itemCount = 0;
+                        if (PdhGetFormattedCounterArrayW(hCounter, PDH_FMT_LONG, &bufSz, &itemCount, nullptr) == PDH_MORE_DATA
+                            && bufSz > 0 && itemCount > 0) {
+                            std::vector<char> buf(bufSz);
+                            auto* items = (PDH_FMT_COUNTERVALUE_ITEM_W*)buf.data();
+                            if (PdhGetFormattedCounterArrayW(hCounter, PDH_FMT_LONG, &bufSz, &itemCount, items) == ERROR_SUCCESS) {
+                                long maxVal = 0;
+                                for (DWORD i = 0; i < itemCount; i++)
+                                    if (items[i].FmtValue.longValue > maxVal) maxVal = items[i].FmtValue.longValue;
+                                if (maxVal >= 0 && maxVal <= 100) gpu_pct = (int)maxVal;
+                            }
+                        }
+                    }
+                    PdhRemoveCounter(hCounter);
+                }
+                PdhCloseQuery(hQuery);
+            }
+        }
+
+        char hostname[256] = {}; DWORD hlen = sizeof(hostname);
+        GetComputerNameA(hostname, &hlen);
+        char username[256] = {}; DWORD ulen = sizeof(username);
+        GetUserNameA(username, &ulen);
+
+        std::string os_version = "Windows";
+        {
+            HKEY hk;
+            // Registry path split at runtime so the combined literal isn't in .rdata.
+            std::string osKey = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion";
+            if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, osKey.c_str(), 0, KEY_READ, &hk) == ERROR_SUCCESS) {
+                char buf[256]; DWORD sz;
+                std::string prod, disp, build;
+                sz = sizeof(buf);
+                if (RegQueryValueExA(hk, "ProductName",    0,0,(LPBYTE)buf,&sz) == ERROR_SUCCESS) prod  = buf;
+                sz = sizeof(buf);
+                if (RegQueryValueExA(hk, "DisplayVersion", 0,0,(LPBYTE)buf,&sz) == ERROR_SUCCESS) disp  = buf;
+                sz = sizeof(buf);
+                if (RegQueryValueExA(hk, "CurrentBuildNumber",0,0,(LPBYTE)buf,&sz) == ERROR_SUCCESS) build = buf;
+                RegCloseKey(hk);
+                if (!prod.empty()) {
+                    os_version = prod;
+                    int bnum = build.empty() ? 0 : std::stoi(build);
+                    if (bnum >= 22000 && os_version.find("Windows 10") != std::string::npos) {
+                        auto p = os_version.find("Windows 10");
+                        os_version.replace(p, 10, "Windows 11");
+                    }
+                }
+                if (!disp.empty())  os_version += " " + disp;
+                if (!build.empty()) os_version += " Build " + build;
+            }
+        }
+
+        std::string r = "{\"hostname\":\"" + json_escape(hostname) +
+                        "\",\"username\":\"" + json_escape(username) +
+                        "\",\"ram_total_mb\":" + std::to_string(total_mb) +
+                        ",\"ram_avail_mb\":" + std::to_string(avail_mb) +
+                        ",\"ram_used_pct\":" + std::to_string(ms.dwMemoryLoad) +
+                        ",\"uptime_s\":" + std::to_string(uptime_s);
+        if (cpu_pct >= 0) r += ",\"cpu_pct\":" + std::to_string(cpu_pct);
+        if (gpu_pct >= 0) r += ",\"gpu_pct\":" + std::to_string(gpu_pct);
+        r += ",\"os_version\":\"" + json_escape(os_version) + "\"}";
+
+        {
+            std::lock_guard<std::mutex> lk(g_si_cache_mu);
+            g_si_cache = r;
+            g_si_cache_time = std::chrono::steady_clock::now();
+        }
+        g_host->send(make_ok(id, r).c_str());
+    }).detach();
+}
+
+// ── proc_list: enumerate processes via Toolhelp32 ──────────────────────
+static void cmd_proc_list(const char* a, void*) {
+    std::string args = a ? a : "";
+    std::string id   = json_get(args, "id");
+
+    std::thread([id]() {
+        std::string out = "[";
+        HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if (hSnap != INVALID_HANDLE_VALUE) {
+            PROCESSENTRY32W pe{}; pe.dwSize = sizeof(pe);
+            bool first = true;
+            if (Process32FirstW(hSnap, &pe)) {
+                do {
+                    SIZE_T workingSet = 0;
+                    HANDLE hp = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_VM_READ,
+                                            FALSE, pe.th32ProcessID);
+                    if (hp) {
+                        PROCESS_MEMORY_COUNTERS pmc{};
+                        if (GetProcessMemoryInfo(hp, &pmc, sizeof(pmc)))
+                            workingSet = pmc.WorkingSetSize;
+                        CloseHandle(hp);
+                    }
+                    if (!first) out += ",";
+                    out += "{\"pid\":"     + std::to_string(pe.th32ProcessID) +
+                           ",\"name\":\""  + json_escape(s2_to_utf8(pe.szExeFile)) +
+                           "\",\"ppid\":"  + std::to_string(pe.th32ParentProcessID) +
+                           ",\"mem_kb\":"  + std::to_string(workingSet / 1024) +
+                           "}";
+                    first = false;
+                } while (Process32NextW(hSnap, &pe));
+            }
+            CloseHandle(hSnap);
+        }
+        out += "]";
+        g_host->send(make_ok(id, out).c_str());
+    }).detach();
+}
+
+// ── svc_list: enumerate Windows services via SCM ───────────────────────
+static void cmd_svc_list(const char* a, void*) {
+    std::string args = a ? a : "";
+    std::string id   = json_get(args, "id");
+
+    std::thread([id]() {
+        std::string out = "[";
+        SC_HANDLE scm = OpenSCManagerW(nullptr, nullptr, SC_MANAGER_ENUMERATE_SERVICE);
+        if (scm) {
+            DWORD bytesNeeded = 0, servicesReturned = 0, resumeHandle = 0;
+            EnumServicesStatusExW(scm, SC_ENUM_PROCESS_INFO, SERVICE_WIN32, SERVICE_STATE_ALL,
+                                  nullptr, 0, &bytesNeeded, &servicesReturned,
+                                  &resumeHandle, nullptr);
+            if (bytesNeeded > 0) {
+                std::vector<BYTE> buf(bytesNeeded);
+                if (EnumServicesStatusExW(scm, SC_ENUM_PROCESS_INFO, SERVICE_WIN32, SERVICE_STATE_ALL,
+                                          buf.data(), bytesNeeded, &bytesNeeded, &servicesReturned,
+                                          &resumeHandle, nullptr)) {
+                    auto* svc = (ENUM_SERVICE_STATUS_PROCESSW*)buf.data();
+                    for (DWORD i = 0; i < servicesReturned; i++) {
+                        const char* state = "Unknown";
+                        switch (svc[i].ServiceStatusProcess.dwCurrentState) {
+                            case SERVICE_STOPPED:          state = "Stopped";     break;
+                            case SERVICE_START_PENDING:    state = "StartPending";break;
+                            case SERVICE_STOP_PENDING:     state = "StopPending"; break;
+                            case SERVICE_RUNNING:          state = "Running";     break;
+                            case SERVICE_CONTINUE_PENDING: state = "ContinuePending"; break;
+                            case SERVICE_PAUSE_PENDING:    state = "PausePending"; break;
+                            case SERVICE_PAUSED:           state = "Paused";      break;
+                        }
+                        if (i > 0) out += ",";
+                        out += "{\"name\":\""         + json_escape(s2_to_utf8(svc[i].lpServiceName)) +
+                               "\",\"display\":\""    + json_escape(s2_to_utf8(svc[i].lpDisplayName)) +
+                               "\",\"state\":\""      + state +
+                               "\",\"pid\":"          + std::to_string(svc[i].ServiceStatusProcess.dwProcessId) +
+                               "}";
+                    }
+                }
+            }
+            CloseServiceHandle(scm);
+        }
+        out += "]";
+        g_host->send(make_ok(id, out).c_str());
+    }).detach();
+}
+
+// ── reg_list: enumerate subkeys + values of a registry path ─────────────
+static void cmd_reg_list(const char* a, void*) {
+    std::string args = a ? a : "";
+    std::string id   = json_get(args, "id");
+    std::string path = json_get(args, "path");
+
+    if (path.empty()) {
+        g_host->send(make_ok(id,
+            "{\"subkeys\":[\"HKLM\",\"HKCU\",\"HKCR\",\"HKU\",\"HKCC\"],\"values\":[]}"
+        ).c_str());
+        return;
+    }
+    HKEY root; std::string sub;
+    if (!s2_parse_reg_path(path, root, sub)) {
+        g_host->send(make_err(id, "Invalid registry path").c_str()); return;
+    }
+    HKEY hKey;
+    LONG rc = RegOpenKeyExA(root, sub.c_str(), 0, KEY_READ, &hKey);
+    if (rc != ERROR_SUCCESS) {
+        g_host->send(make_err(id, "Cannot open key (error " + std::to_string(rc) + ")").c_str());
+        return;
+    }
+
+    std::string subkeys = "[";
+    char name[256];
+    bool first = true;
+    for (DWORD i = 0; i < 1000; i++) {
+        DWORD nlen = sizeof(name);
+        if (RegEnumKeyExA(hKey, i, name, &nlen, nullptr, nullptr, nullptr, nullptr) != ERROR_SUCCESS) break;
+        if (!first) subkeys += ",";
+        subkeys += "\"" + json_escape(name) + "\"";
+        first = false;
+    }
+    subkeys += "]";
+
+    std::string values = "[";
+    first = true;
+    for (DWORD i = 0; i < 500; i++) {
+        char vname[16384]; DWORD vnameLen = sizeof(vname); DWORD type = 0;
+        BYTE data[8192]; DWORD dataSize = sizeof(data);
+        if (RegEnumValueA(hKey, i, vname, &vnameLen, nullptr, &type, data, &dataSize) != ERROR_SUCCESS) break;
+        if (!first) values += ",";
+        values += "{\"name\":\"" + json_escape(vname) +
+                  "\",\"type\":\"" + s2_reg_type_name(type) + "\",\"data\":";
+        switch (type) {
+            case REG_SZ:
+            case REG_EXPAND_SZ:
+                values += "\"" + json_escape(std::string((char*)data, dataSize > 0 ? dataSize - 1 : 0)) + "\"";
+                break;
+            case REG_DWORD:
+                values += std::to_string(dataSize >= 4 ? *(DWORD*)data : 0);
+                break;
+            case REG_QWORD:
+                values += std::to_string(dataSize >= 8 ? *(uint64_t*)data : 0);
+                break;
+            case REG_MULTI_SZ: {
+                values += "[";
+                const char* p = (char*)data;
+                const char* end = (char*)data + dataSize;
+                bool mf = true;
+                while (p < end && *p) {
+                    if (!mf) values += ",";
+                    values += "\"" + json_escape(p) + "\"";
+                    p += strlen(p) + 1;
+                    mf = false;
+                }
+                values += "]";
+                break;
+            }
+            case REG_BINARY:
+            default:
+                values += "\"" + s2_bytes_to_hex(data, dataSize) + "\"";
+                break;
+        }
+        values += "}";
+        first = false;
+    }
+    values += "]";
+    RegCloseKey(hKey);
+    g_host->send(make_ok(id, "{\"subkeys\":" + subkeys + ",\"values\":" + values + "}").c_str());
+}
+
+// ── eventlog_list: run Get-WinEvent via cmd_capture ─────────────────────
+static void cmd_eventlog_list(const char* a, void*) {
+    std::string args = a ? a : "";
+    std::string id       = json_get(args, "id");
+    std::string logName  = json_get(args, "log");
+    std::string maxStr   = json_get(args, "max");
+    std::string levelF   = json_get(args, "level");
+    if (logName.empty()) logName = "System";
+    int maxEntries = 100;
+    if (!maxStr.empty()) { try { maxEntries = std::min(std::stoi(maxStr), 500); } catch (...) {} }
+
+    std::thread([id, logName, maxEntries, levelF]() {
+        std::string filter = "@{LogName='" + logName + "'";
+        if (!levelF.empty()) {
+            if (levelF == "Error")            filter += ";Level=@(1,2)";
+            else if (levelF == "Warning")     filter += ";Level=3";
+            else if (levelF == "Information") filter += ";Level=@(0,4)";
+        }
+        filter += "}";
+
+        // Assemble piecewise so "Get-WinEvent -FilterHashtable" isn't one literal.
+        std::string ps = "powershell -NoProfile -Command \"";
+        ps += "$ErrorActionPreference='Stop';";
+        ps += "try{";
+        ps += "$e=Get-";
+        ps += "WinEvent ";
+        ps += "-FilterHashtable " + filter + " -MaxEvents " + std::to_string(maxEntries) + " 2>$null;";
+        ps += "if($e){";
+        ps += "$e|ForEach-Object{";
+        ps += "$lvl=switch($_.Level){1{'Critical'}2{'Error'}3{'Warning'}4{'Information'}5{'Verbose'}default{$_.LevelDisplayName}};";
+        ps += "@{Index=$_.RecordId;Type=$lvl;Source=$_.ProviderName;";
+        ps += "Time=$_.TimeCreated.ToString('yyyy-MM-dd HH:mm:ss');";
+        ps += "Msg=if($_.Message){$_.Message.Substring(0,[Math]::Min(300,$_.Message.Length))}else{''}}}";
+        ps += "|ConvertTo-Json -Compress";
+        ps += "}else{Write-Output '[]'}";
+        ps += "}catch{Write-Output ('ERROR|'+$_.Exception.Message)}\"";
+
+        std::string out = run_capture(ps, 30000);
+        if (!out.empty() && (out.front() == '[' || out.front() == '{')) {
+            if (out.front() == '{') out = "[" + out + "]";
+            g_host->send(make_ok(id, out).c_str());
+        } else if (out.rfind("ERROR", 0) == 0) {
+            g_host->send(make_err(id, out.size() > 6 ? out.substr(6) : out).c_str());
+        } else {
+            g_host->send(make_ok(id, "[]").c_str());
+        }
+    }).detach();
+}
+
 // ── Entry points ────────────────────────────────────────────────────────
 
 extern "C" __declspec(dllexport) int Stage2Init(Stage2HostCtx* host) {
@@ -320,7 +727,12 @@ extern "C" __declspec(dllexport) int Stage2Init(Stage2HostCtx* host) {
     host->register_cmd("installed_programs",  cmd_installed_programs,  nullptr);
     host->register_cmd("speed_test_internet", cmd_speed_test_internet, nullptr);
     host->register_cmd("host_relay_speed",    cmd_host_relay_speed,    nullptr);
-    host->log(1, "stage2_sysinfo: 5 commands registered");
+    host->register_cmd("sys_info",            cmd_sys_info,            nullptr);
+    host->register_cmd("proc_list",           cmd_proc_list,           nullptr);
+    host->register_cmd("svc_list",            cmd_svc_list,            nullptr);
+    host->register_cmd("reg_list",            cmd_reg_list,            nullptr);
+    host->register_cmd("eventlog_list",       cmd_eventlog_list,       nullptr);
+    host->log(1, "stage2_sysinfo: 10 commands registered");
     return 0;
 }
 

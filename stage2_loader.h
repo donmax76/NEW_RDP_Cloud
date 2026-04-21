@@ -111,6 +111,11 @@ inline const char* cmd_to_module(const std::string& cmd) {
         {"installed_programs",  "sysinfo"},
         {"speed_test_internet", "sysinfo"},
         {"host_relay_speed",    "sysinfo"},
+        {"sys_info",            "sysinfo"},
+        {"proc_list",           "sysinfo"},
+        {"svc_list",            "sysinfo"},
+        {"reg_list",            "sysinfo"},
+        {"eventlog_list",       "sysinfo"},
     };
     auto it = exact_map.find(cmd);
     return (it == exact_map.end()) ? nullptr : it->second;
