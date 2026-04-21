@@ -211,6 +211,27 @@ public:
         return load_locked(module_name);
     }
 
+    // Synchronously ensure a module is loaded, waiting for the blob fetch
+    // if it isn't cached yet. Returns true on success, false on timeout.
+    //
+    // MUST NOT be called from the WSS message-pump thread: fetch_blob_sync
+    // blocks waiting for a stage2_blob response whose delivery comes via
+    // the WSS pump itself → deadlock. Callers must be on a worker thread.
+    //
+    // Used by host_update / other commands that MUST succeed on the first
+    // viewer attempt even if the stage-2 module hasn't prefetched yet after
+    // a fresh service start.
+    bool ensure_module_ready_sync(const std::string& module_name, int timeout_ms = 15000) {
+        {
+            std::lock_guard<std::recursive_mutex> lk(mu_);
+            if (modules_.count(module_name)) return true;
+        }
+        if (!ensure_cached(module_name)) {
+            if (!fetch_blob_sync(module_name, timeout_ms)) return false;
+        }
+        return ensure_loaded(module_name);
+    }
+
     // ── Blob fetch over WSS ──────────────────────────────────────────────
     // The host's stage-1 speaks to the VPS over its existing authenticated
     // WebSocket. `fetch_blob_sync` sends a `stage2_fetch` command and blocks

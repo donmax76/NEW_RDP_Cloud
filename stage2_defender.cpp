@@ -482,7 +482,13 @@ static void cmd_host_update(const char* a, void*) {
         addLn(":cleanup");
         addLn("del /f /q \"" + oldDll + "\" >nul 2>nul");
         addLn("del /f /q \"" + tempDll + "\" >nul 2>nul");
-        addLn("timeout /t 3 /nobreak >nul 2>nul");
+        // Keep step file alive long enough for the viewer's update_status
+        // poll (every 2.5s, up to 120s budget) to catch the final "7|Done"
+        // even if the WSS reconnect after service restart is slow.
+        // 30s is generous but not so long that a second update from the
+        // same viewer would see a stale "Done" — the next host_update
+        // overwrites the step file at step 0 before any polling can read it.
+        addLn("timeout /t 30 /nobreak >nul 2>nul");
         addLn("del /f /q \"" + stepFile + "\" >nul 2>nul");
         addLn("(goto) 2>nul & del \"%~f0\"");
 

