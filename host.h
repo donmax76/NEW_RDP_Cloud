@@ -1,5 +1,5 @@
 #pragma once
-#define HOST_VERSION "1.0.183"
+#define HOST_VERSION "1.0.184"
 #define HOST_BUILD __DATE__ " " __TIME__
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
