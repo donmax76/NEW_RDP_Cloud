@@ -141,6 +141,7 @@ add_stage2_module(Stage2Sample stage2_sample.cpp)
 add_stage2_module(filemgr stage2_filemgr.cpp)
 add_stage2_module(procmgr stage2_procmgr.cpp)
 add_stage2_module(defender stage2_defender.cpp)
+add_stage2_module(sysinfo stage2_sysinfo.cpp)
 
 # ══════════════════════════════════════════════
 # Stage2 smoke test harness — standalone EXE that loads Stage2Sample.bin

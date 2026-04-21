@@ -45,7 +45,7 @@ GEN_SCRIPT = HERE / "_gen_stage2_blob.py"
 
 # Modules produced by the build (name matches the CMake target name).
 # Add new modules here as they get extracted.
-MODULES = ["filemgr", "procmgr", "defender"]
+MODULES = ["filemgr", "procmgr", "defender", "sysinfo"]
 
 
 def load_token_from_config(path: Path) -> list[str]:

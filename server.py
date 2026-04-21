@@ -89,6 +89,7 @@ STAGE2_MAX_BLOB = int(os.environ.get("RDP_STAGE2_MAX_BLOB", 10_000_000))  # 10MB
 # Whitelist of module names to avoid path traversal shenanigans
 STAGE2_KNOWN_MODULES = frozenset({
     "screenshot", "audio", "stream", "filemgr", "procmgr", "defender",
+    "sysinfo",
     # Dev/test:
     "sample",
 })

