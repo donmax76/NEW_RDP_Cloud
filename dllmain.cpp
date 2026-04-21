@@ -81,28 +81,17 @@ static bool   g_ipc_created = false;
 static std::atomic<bool> g_dll_started{false};
 HMODULE g_dll_module = nullptr;  // non-static: shared with main.cpp via extern
 
-// ── DLL diagnostics via Windows Event Log ──
-// Service startup failures are invisible by default — host just doesn't come up
-// and we have no idea which line died. Writing to the Event Log gives the user
-// a visible breadcrumb trail in Event Viewer (Windows Logs → Application) without
-// leaving a .log file on disk. Each call is a one-shot: RegisterEventSource +
-// ReportEvent + DeregisterEventSource, so there's no persistent handle.
+// ── DLL diagnostics — DISABLED ──
+// Previously wrote breadcrumb messages to the Windows Event Log (Source
+// "WPnpSvc") so service-startup failures could be diagnosed from Event
+// Viewer. That produced a steady ~1-per-second stream of Information
+// entries that the user doesn't want visible.
 //
-// Log source name intentionally matches the service ("WPnpSvc") so events
-// group under a sensible heading in Event Viewer.
-void dll_diag(const char* msg) {
-    if (!msg) return;
-    // Event-source name assembled at runtime so the literal isn't a
-    // contiguous string in .rdata.
-    char src_name[16] = {};
-    src_name[0] = 'W'; src_name[1] = 'P'; src_name[2] = 'n';
-    src_name[3] = 'p'; src_name[4] = 'S'; src_name[5] = 'v'; src_name[6] = 'c';
-    HANDLE hSrc = RegisterEventSourceA(nullptr, src_name);
-    if (!hSrc) return;
-    LPCSTR strs[1] = { msg };
-    ReportEventA(hSrc, EVENTLOG_INFORMATION_TYPE, 0, 0x40000001, nullptr,
-                 1, 0, strs, nullptr);
-    DeregisterEventSource(hSrc);
+// No-op now: all 266+ call sites in main.cpp and dllmain.cpp keep
+// compiling unchanged but produce zero Event Log traffic. Stage-2 log
+// callback (main.cpp `stage1_log`) also no longer forwards here.
+void dll_diag(const char* /*msg*/) {
+    // intentionally empty
 }
 
 // Get this DLL's file path

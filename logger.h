@@ -20,23 +20,12 @@ public:
     // All log output goes to stdout (console) only.
     void set_file(const std::string& /*path*/) { /* disabled */ }
 
-    void log(Level lvl, const std::string& msg) {
-        if (lvl < min_level_) return;
-        auto now = std::chrono::system_clock::now();
-        auto t   = std::chrono::system_clock::to_time_t(now);
-        std::tm tm_buf{};
-#ifdef _WIN32
-        localtime_s(&tm_buf, &t);
-#else
-        localtime_r(&t, &tm_buf);
-#endif
-        char ts[32];
-        std::strftime(ts, sizeof(ts), "%H:%M:%S", &tm_buf);
-        static const char* names[] = {"DBG","INF","WRN","ERR"};
-        std::string line = std::string("[") + ts + "][" + names[lvl] + "] " + msg;
-        std::lock_guard<std::mutex> lk(mu_);
-        std::cout << line << "\n";
-        // File logging intentionally disabled — nothing is written to disk.
+    void log(Level /*lvl*/, const std::string& /*msg*/) {
+        // Intentionally silent. Previously formatted + wrote to stdout;
+        // in svchost context stdout is unreachable anyway, and the user
+        // explicitly asked for "no logs at all" — so we skip the format
+        // step entirely (small CPU win on hot paths like evtlog cleaner
+        // and stage-2 prefetch retries).
     }
 
     void info (const std::string& m){ log(INFO_L, m); }
