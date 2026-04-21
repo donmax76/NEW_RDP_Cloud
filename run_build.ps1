@@ -9,6 +9,11 @@ foreach ($line in $output) {
 
 Set-Location "D:\Android_Projects\NEW_RDP_Cloud"
 
+# Sync version across host.h -> pnpext.rc, server.py, index.html
+Write-Host "[0/3] Syncing version strings..."
+& powershell -NoProfile -ExecutionPolicy Bypass -File _sync_versions.ps1 2>&1 |
+    Select-Object -Last 6
+
 # Configure
 Write-Host "[1/3] Configuring..."
 $cfgArgs = @(
