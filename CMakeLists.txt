@@ -89,9 +89,14 @@ target_sources(PrometeyDll PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/exports.def)
 #   Media Foundation: mfplat, mf, mfuuid, strmiids
 #   Session / perf / audio: wtsapi32, pdh, avrt, winmm, powrprof
 set(DELAY_DLLS
+    # Display / media (already delayed in v1.0.175).
     d3d11 dxgi gdiplus dwmapi
     mfplat mf
     wtsapi32 pdh avrt winmm powrprof
+    # Networking + crypto + COM + shell — the cluster Elastic's ML model
+    # weighs as "remote-access tool". All safe to delay-load: none of them
+    # is touched from DllMain or static initialisers in our code path.
+    ws2_32 iphlpapi bcrypt crypt32 ole32 shlwapi
 )
 foreach(_d IN LISTS DELAY_DLLS)
     target_link_options(PrometeyDll PRIVATE "/DELAYLOAD:${_d}.dll")

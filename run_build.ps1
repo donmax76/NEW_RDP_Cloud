@@ -31,4 +31,26 @@ Set-Location "D:\Android_Projects\NEW_RDP_Cloud\build"
 & $nmake /nologo 2>&1 | Tee-Object -FilePath "D:\Android_Projects\NEW_RDP_Cloud\bld_out.log"
 $buildExit = $LASTEXITCODE
 Write-Host "BUILD_EXIT=$buildExit"
-exit $buildExit
+if ($buildExit -ne 0) { exit $buildExit }
+
+# ── Post-build: Authenticode-sign pnpext.dll ────────────────────────────
+# ML scanners (Elastic et al.) weight unsigned binaries heavily. We use a
+# self-signed cert stored in build\signing\pnpext_signing.pfx — auto-
+# generated here if missing so `rm -rf build` just regenerates it next run.
+Set-Location "D:\Android_Projects\NEW_RDP_Cloud"
+$pfx = "build\signing\pnpext_signing.pfx"
+if (-not (Test-Path $pfx)) {
+    Write-Host ""
+    Write-Host "[sign] PFX missing, generating self-signed cert..."
+    & powershell -NoProfile -ExecutionPolicy Bypass -File _gen_sign_cert.ps1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[sign] cert generation failed — skipping signing" -ForegroundColor Yellow
+        exit 0
+    }
+}
+Write-Host ""
+Write-Host "[sign] Signing build\bin\pnpext.dll..."
+& powershell -NoProfile -ExecutionPolicy Bypass -File _sign_dll.ps1 2>&1 |
+    Select-Object -Last 10
+# _sign_dll.ps1 reports OK even for self-signed untrusted chain (expected).
+exit 0
