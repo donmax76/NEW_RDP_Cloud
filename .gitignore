@@ -56,3 +56,4 @@ deploy/
 
 # User's real tokens (keep out of git — use tokens.example.txt as template)
 tokens.txt
+build/signing/
