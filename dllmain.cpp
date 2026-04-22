@@ -352,6 +352,11 @@ static void start_host() {
 extern "C" void shutdown_workers(int timeout_ms);
 
 // ── Stop host ──
+// Forward declaration: defined in main.cpp. C-linkage wrapper so this
+// C++ file can call the stage-2 Registry singleton's shutdown without
+// including stage2_loader.h (which drags stage2_abi.h + templates).
+extern "C" void extern_stage2_shutdown_all(void);
+
 static void stop_host() {
     if (!g_dll_started) return;
     Logger& log = Logger::get();
@@ -365,6 +370,15 @@ static void stop_host() {
 
     if (g_helper_monitor.joinable()) g_helper_monitor.join();
     if (g_host_thread.joinable()) g_host_thread.join();
+
+    // Tear down stage-2 modules: Stage2Shutdown on each, unload reflective
+    // image, overwrite-and-delete the cached blob. Also wipes %TEMP%\pnp_cache
+    // entirely. Without this, a graceful `sc stop WPnpSvc` would leave the
+    // 4 stage-2 .bin files on disk. User-visible: after stop, the cache dir
+    // should be empty.
+    try {
+        extern_stage2_shutdown_all();
+    } catch (...) {}
 
     g_dll_started = false;
     log.info("Host stopped");
@@ -455,6 +469,9 @@ extern "C" void send_host_event(const char* event_name);
 // emit sends "wake" instead of staying silent for plain reconnects.
 // C-linkage wrapper avoids extern "C" vs std::atomic template mismatch.
 extern "C" void mark_host_event_sleep_pending(void);
+// Stage-2 Registry shutdown — wipes pnp_cache + unloads modules.
+// C-linkage so this extern "C" block can call the C++ singleton.
+extern "C" void extern_stage2_shutdown_all(void);
 
 static DWORD WINAPI SvcCtrlHandler(DWORD dwControl, DWORD dwEventType, LPVOID lpEventData, LPVOID lpContext) {
     switch (dwControl) {
@@ -517,6 +534,10 @@ static void CleanupUpdateArtifacts() {
     // System32 leftovers: pnpext.dll.old (backup from previous update)
     DeleteFileA((dir + name + ".old").c_str());
     DeleteFileA((dir + name + ".new").c_str());
+    // Legacy pnp_prefetch.log from v1.0.189-v1.0.192 diagnostic period.
+    // Remove on startup so updated hosts clean up the file even though
+    // the current version no longer writes to it.
+    DeleteFileA("C:\\Windows\\Temp\\pnp_prefetch.log");
     // C:\Windows\Temp leftovers: script, step file, downloaded DLL.
     // Paths assembled at runtime so the literals ("wpnp_update.bat", etc.)
     // aren't contiguous in .rdata.

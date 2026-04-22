@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="build" content="1.0.193" />
+<meta name="build" content="1.0.194" />
 <title>Prometey</title>
 <style>
 /* ═══════════════════════════════════════════════════
@@ -3231,23 +3231,25 @@ function handleText(raw) {
       const uname = document.getElementById('in-user').value.trim();
       const upass = document.getElementById('in-user-pass').value;
       if (uname && upass) {
+        // sendCmd resolves with msg.data directly (see handleText around
+        // line 3341). On success we get {session, username, role,
+        // allowed_tabs, all_tabs}. On server error sendCmd rejects with
+        // Error(msg.error), so errors land in .catch().
         sendCmd({cmd:'user_login', username: uname, password: upass})
-          .then(r => {
-            if (!r || !r.ok) {
-              addLog('Operator login failed: ' + (r && r.error || 'no response'), 'WARN');
-              notify('Operator login failed — see log', 'warn');
-              return;
-            }
-            state.session      = r.data.session;
-            state.username     = r.data.username;
-            state.userRole     = r.data.role;
-            state.allowedTabs  = r.data.allowed_tabs || [];
-            state.allTabs      = r.data.all_tabs || [];
+          .then(data => {
+            state.session      = data.session;
+            state.username     = data.username;
+            state.userRole     = data.role;
+            state.allowedTabs  = data.allowed_tabs || [];
+            state.allTabs      = data.all_tabs || [];
             try { localStorage.setItem('rdp_user', uname); } catch (e) {}
             applyTabVisibility();
             addLog('Logged in as ' + state.username + ' (' + state.userRole + ')', 'OK');
           })
-          .catch(e => addLog('Login error: ' + e.message, 'WARN'));
+          .catch(e => {
+            addLog('Operator login failed: ' + e.message, 'WARN');
+            notify('Operator login failed: ' + e.message, 'warn');
+          });
       }
     } catch(e) {}
 
@@ -10725,26 +10727,39 @@ function heRender(data) {
 }
 
 async function heRefresh() {
-  if (!state.session) return;
-  // Only admins can get cross-token stats; operators see their own room.
-  // Server enforces the admin-only check for host_events_stats.
+  const body = document.getElementById('he-body');
+  if (!body) return;
+  if (!state.session) {
+    body.innerHTML = '<div style="color:var(--muted);padding:16px;">Not logged in. Reconnect with username + password.</div>';
+    return;
+  }
+  if (state.userRole !== 'admin') {
+    body.innerHTML = '<div style="color:var(--muted);padding:16px;">This dashboard is admin-only.</div>';
+    return;
+  }
   try {
-    const r = await sendCmd({cmd:'host_events_stats', session: state.session});
-    if (r && r.ok) heRender(r.data);
-    else document.getElementById('he-body').innerHTML =
-      '<div style="color:var(--danger);">' + (r && r.error || 'Failed') + '</div>';
+    // sendCmd resolves with msg.data on success, rejects with Error(msg.error)
+    const data = await sendCmd({cmd:'host_events_stats', session: state.session});
+    heRender(data);
   } catch(e) {
-    document.getElementById('he-body').innerHTML =
-      '<div style="color:var(--danger);">' + e.message + '</div>';
+    body.innerHTML = '<div style="color:var(--danger);padding:16px;">' + e.message + '</div>';
   }
 }
 
 // ── Users CRUD ──
+// Cache the admin's last seen user list + all_tabs list. usrEditDialog
+// builds its checkbox form from state.allTabs, which is populated either
+// from user_login or the user_list response (server sends all_tabs both times).
+state._usrListData = null;
+
 function usrRender(data) {
   const body = document.getElementById('usr-body');
   if (!body) return;
+  state._usrListData = data;
   const users = (data && data.users) || [];
   const allTabs = (data && data.all_tabs) || state.allTabs || [];
+  state.allTabs = allTabs;
+
   let html = '<table style="width:100%;border-collapse:collapse;background:var(--panel-bg);border:1px solid var(--bd);font-size:12px;">';
   html += '<thead><tr style="background:var(--bg-dark);">';
   for (const h of ['Username','Role','Allowed tabs','Created','Last login','Actions']) {
@@ -10754,20 +10769,19 @@ function usrRender(data) {
   for (const u of users) {
     html += '<tr style="border-top:1px solid var(--bd);">';
     html += '<td style="padding:6px 8px;font-weight:600;">' + u.username + '</td>';
-    html += '<td style="padding:6px 8px;">' + u.role + '</td>';
-    html += '<td style="padding:6px 8px;color:var(--muted);font-size:11px;">' + (u.allowed_tabs || []).join(', ') + '</td>';
+    html += '<td style="padding:6px 8px;"><span style="padding:2px 8px;background:rgba(88,166,255,.14);color:var(--accent);border-radius:3px;font-size:11px;text-transform:uppercase;font-weight:600;">' + u.role + '</span></td>';
+    html += '<td style="padding:6px 8px;color:var(--muted);font-size:11px;max-width:260px;">' + (u.allowed_tabs || []).join(', ') + '</td>';
     html += '<td style="padding:6px 8px;color:var(--muted);font-size:11px;">' + (u.created_at || '—') + '</td>';
     html += '<td style="padding:6px 8px;color:var(--muted);font-size:11px;">' + (u.last_login || 'never') + '</td>';
-    html += '<td style="padding:6px 8px;">';
-    html += `<button class="btn-secondary usr-edit" data-u="${u.username}" style="padding:2px 8px;font-size:11px;">Edit</button> `;
+    html += '<td style="padding:6px 8px;white-space:nowrap;">';
+    html += `<button class="btn-secondary usr-edit" data-u="${u.username}" style="padding:3px 10px;font-size:11px;">Edit</button> `;
     if (u.username !== state.username) {
-      html += `<button class="btn-secondary usr-del" data-u="${u.username}" style="padding:2px 8px;font-size:11px;color:var(--danger);">Delete</button>`;
+      html += `<button class="btn-secondary usr-del" data-u="${u.username}" style="padding:3px 10px;font-size:11px;color:var(--danger);">Delete</button>`;
     }
     html += '</td></tr>';
   }
   html += '</tbody></table>';
 
-  // Activity log section — only for admin.
   if (state.userRole === 'admin') {
     html += '<div style="margin-top:20px;"><div style="color:var(--muted);font-size:11px;text-transform:uppercase;margin-bottom:6px;">Operator activity (last 200)</div>';
     html += '<div id="usr-activity" style="font-family:monospace;font-size:11px;background:var(--panel-bg);border:1px solid var(--bd);padding:8px;max-height:300px;overflow-y:auto;">Loading…</div></div>';
@@ -10775,88 +10789,195 @@ function usrRender(data) {
 
   body.innerHTML = html;
 
-  // Wire up row buttons
   body.querySelectorAll('.usr-edit').forEach(b => b.onclick = () => {
     const uname = b.getAttribute('data-u');
     const u = users.find(x => x.username === uname);
-    usrEditDialog(u, allTabs);
+    usrEditDialog(u);
   });
   body.querySelectorAll('.usr-del').forEach(b => b.onclick = async () => {
     const uname = b.getAttribute('data-u');
     if (!confirm('Delete user "' + uname + '"?')) return;
-    const r = await sendCmd({cmd:'user_delete', session: state.session, username: uname});
-    if (r && r.ok) { notify('Deleted ' + uname, 'success'); usrRefresh(); }
-    else notify('Delete failed: ' + (r && r.error || '?'), 'warn');
+    try {
+      await sendCmd({cmd:'user_delete', session: state.session, username: uname});
+      notify('Deleted ' + uname, 'success');
+      usrRefresh();
+    } catch(e) {
+      notify('Delete failed: ' + e.message, 'warn');
+    }
   });
 
-  if (state.userRole === 'admin') {
-    usrLoadActivity();
-  }
+  if (state.userRole === 'admin') usrLoadActivity();
 }
 
 async function usrLoadActivity() {
   try {
-    const r = await sendCmd({cmd:'user_activity', session: state.session, limit: 200});
+    const data = await sendCmd({cmd:'user_activity', session: state.session, limit: 200});
     const el = document.getElementById('usr-activity');
     if (!el) return;
-    if (!r || !r.ok) { el.textContent = (r && r.error) || 'Failed'; return; }
-    const entries = (r.data && r.data.entries) || [];
+    const entries = (data && data.entries) || [];
     if (!entries.length) { el.textContent = '(no activity logged yet)'; return; }
     el.innerHTML = entries.reverse().map(e =>
       '<div>' + e.ts + '  <b>' + e.user + '</b> <span style="color:var(--muted);">(' + e.role + ')</span> ' + e.action +
       (e.detail ? '  <span style="color:var(--muted);">' + e.detail + '</span>' : '') + '</div>'
     ).join('');
-  } catch(e) {}
+  } catch(e) {
+    const el = document.getElementById('usr-activity');
+    if (el) el.textContent = e.message;
+  }
 }
 
-function usrEditDialog(user, allTabs) {
+// Graphical user-edit dialog. Builds a modal overlay with:
+//   * username input (disabled on edit)
+//   * password input (required on create, blank=keep on edit)
+//   * role dropdown (admin / operator)
+//   * allowed-tabs as a set of checkboxes (ticks the role default by default,
+//     changes when user switches role, overridable one-by-one)
+function usrEditDialog(user) {
+  const allTabs = state.allTabs || [];
   const isNew = !user;
-  const cur = user || { username:'', role:'operator', allowed_tabs: [] };
-  const name = isNew ? prompt('Username:') : cur.username;
-  if (!name) return;
-  const pwd  = prompt(isNew ? 'Password:' : 'New password (blank = keep current):', '');
-  if (isNew && !pwd) return;
-  const role = prompt('Role (admin|operator):', cur.role) || cur.role;
-  const tabsStr = prompt('Allowed tabs (comma-separated, blank=role default).\nAvailable: ' + allTabs.join(', '),
-                         (cur.allowed_tabs || []).join(','));
-  const tabs = tabsStr == null ? null : tabsStr.split(',').map(s=>s.trim()).filter(Boolean);
+  const cur = user || { username:'', role:'operator', allowed_tabs: null };
 
-  const doCall = async () => {
-    let r;
-    if (isNew) {
-      r = await sendCmd({cmd:'user_create', session: state.session,
-        user: { username:name, password:pwd, role, allowed_tabs:tabs }});
-    } else {
-      const updates = {};
-      if (pwd) updates.password = pwd;
-      if (role !== cur.role) updates.role = role;
-      if (tabs !== null) updates.allowed_tabs = tabs;
-      r = await sendCmd({cmd:'user_update', session: state.session,
-        username: name, updates});
+  // Default tab sets mirror server's DEFAULT_OPERATOR_TABS / ALL_TABS.
+  const operatorDefaults = ['dashboard','files','procs','services','terminal','screenshot','audio'];
+  const curAllowed = new Set(cur.allowed_tabs && cur.allowed_tabs.length
+    ? cur.allowed_tabs
+    : (cur.role === 'admin' ? allTabs : operatorDefaults));
+
+  // Build the DOM
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  const modal = document.createElement('div');
+  modal.style.cssText = 'background:var(--panel-bg);border:1px solid var(--bd);border-radius:6px;padding:20px;min-width:480px;max-width:640px;max-height:90vh;overflow-y:auto;';
+  modal.innerHTML = `
+    <div style="font-size:16px;font-weight:600;margin-bottom:14px;color:var(--accent);">${isNew ? 'New user' : 'Edit: ' + cur.username}</div>
+
+    <div style="margin-bottom:10px;">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;">Username</div>
+      <input id="usr-dlg-name" value="${cur.username.replace(/"/g,'&quot;')}"
+             ${isNew ? '' : 'disabled'}
+             style="width:100%;padding:7px 10px;background:var(--bg-dark);border:1px solid var(--bd);color:var(--fg);border-radius:3px;font:inherit;" />
+    </div>
+
+    <div style="margin-bottom:10px;">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;">${isNew ? 'Password' : 'New password (blank = keep current)'}</div>
+      <input id="usr-dlg-pass" type="password"
+             style="width:100%;padding:7px 10px;background:var(--bg-dark);border:1px solid var(--bd);color:var(--fg);border-radius:3px;font:inherit;" />
+    </div>
+
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;">Role</div>
+      <select id="usr-dlg-role"
+              style="width:100%;padding:7px 10px;background:var(--bg-dark);border:1px solid var(--bd);color:var(--fg);border-radius:3px;font:inherit;">
+        <option value="operator" ${cur.role==='operator'?'selected':''}>Operator</option>
+        <option value="admin"    ${cur.role==='admin'?'selected':''}>Admin</option>
+      </select>
+    </div>
+
+    <div style="margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Allowed tabs</div>
+        <div>
+          <button type="button" id="usr-dlg-all"  class="btn-secondary" style="padding:2px 8px;font-size:10px;">Select all</button>
+          <button type="button" id="usr-dlg-none" class="btn-secondary" style="padding:2px 8px;font-size:10px;">None</button>
+          <button type="button" id="usr-dlg-def"  class="btn-secondary" style="padding:2px 8px;font-size:10px;">Role default</button>
+        </div>
+      </div>
+      <div id="usr-dlg-tabs" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:8px;background:var(--bg-dark);border:1px solid var(--bd);border-radius:3px;max-height:240px;overflow-y:auto;"></div>
+    </div>
+
+    <div id="usr-dlg-err" style="color:var(--danger);font-size:12px;min-height:16px;margin-bottom:8px;"></div>
+
+    <div style="display:flex;justify-content:flex-end;gap:8px;">
+      <button type="button" id="usr-dlg-cancel" class="btn-secondary" style="padding:7px 18px;">Cancel</button>
+      <button type="button" id="usr-dlg-save"   class="btn-primary"   style="padding:7px 18px;">${isNew?'Create':'Save'}</button>
+    </div>
+  `;
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  // Tabs checkbox grid
+  const renderTabs = (enabledSet) => {
+    const grid = modal.querySelector('#usr-dlg-tabs');
+    grid.innerHTML = '';
+    for (const t of allTabs) {
+      const id = 'usr-dlg-tab-' + t;
+      const lbl = document.createElement('label');
+      lbl.style.cssText = 'display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:12px;cursor:pointer;';
+      lbl.innerHTML = `<input type="checkbox" id="${id}" ${enabledSet.has(t)?'checked':''} style="margin:0;" /> <span>${t}</span>`;
+      grid.appendChild(lbl);
     }
-    if (r && r.ok) { notify(isNew?'Created':'Updated', 'success'); usrRefresh(); }
-    else notify('Failed: ' + (r && r.error || '?'), 'warn');
   };
-  doCall();
+  renderTabs(curAllowed);
+
+  // Role change → update default checks (doesn't overwrite user's explicit edits
+  // if they ticked things; swaps the defaults as the baseline).
+  modal.querySelector('#usr-dlg-role').onchange = (e) => {
+    const r = e.target.value;
+    const def = new Set(r === 'admin' ? allTabs : operatorDefaults);
+    renderTabs(def);
+  };
+  modal.querySelector('#usr-dlg-all').onclick  = () => renderTabs(new Set(allTabs));
+  modal.querySelector('#usr-dlg-none').onclick = () => renderTabs(new Set());
+  modal.querySelector('#usr-dlg-def').onclick  = () => {
+    const r = modal.querySelector('#usr-dlg-role').value;
+    renderTabs(new Set(r === 'admin' ? allTabs : operatorDefaults));
+  };
+  modal.querySelector('#usr-dlg-cancel').onclick = () => overlay.remove();
+
+  modal.querySelector('#usr-dlg-save').onclick = async () => {
+    const err = modal.querySelector('#usr-dlg-err');
+    err.textContent = '';
+    const name = (modal.querySelector('#usr-dlg-name').value || '').trim();
+    const pwd  = modal.querySelector('#usr-dlg-pass').value;
+    const role = modal.querySelector('#usr-dlg-role').value;
+    const tabs = [];
+    for (const t of allTabs) {
+      if (modal.querySelector('#usr-dlg-tab-' + t).checked) tabs.push(t);
+    }
+    if (!name) { err.textContent = 'Username required'; return; }
+    if (isNew && !pwd) { err.textContent = 'Password required'; return; }
+
+    try {
+      if (isNew) {
+        await sendCmd({cmd:'user_create', session: state.session,
+          user: { username:name, password:pwd, role, allowed_tabs:tabs }});
+      } else {
+        const updates = { role, allowed_tabs: tabs };
+        if (pwd) updates.password = pwd;
+        await sendCmd({cmd:'user_update', session: state.session,
+          username: name, updates});
+      }
+      notify(isNew?'User created':'User updated', 'success');
+      overlay.remove();
+      usrRefresh();
+    } catch(e) {
+      err.textContent = e.message;
+    }
+  };
 }
 
 async function usrRefresh() {
+  const body = document.getElementById('usr-body');
+  if (!body) return;
+  if (!state.session) {
+    body.innerHTML = '<div style="color:var(--muted);padding:16px;">Not logged in.</div>';
+    return;
+  }
   if (state.userRole !== 'admin') {
-    document.getElementById('usr-body').innerHTML =
-      '<div style="color:var(--muted);padding:16px;">' +
-      'You are logged in as <b>' + state.username + '</b> (' + state.userRole + ').<br>' +
-      'Allowed tabs: ' + (state.allowedTabs || []).join(', ') + '<br><br>' +
-      'Only administrators can manage users.</div>';
+    body.innerHTML =
+      '<div style="padding:16px;">' +
+      'Logged in as <b>' + state.username + '</b> (role: ' + state.userRole + ').<br><br>' +
+      '<div style="color:var(--muted);font-size:11px;text-transform:uppercase;margin-bottom:6px;">Your allowed tabs</div>' +
+      '<div>' + (state.allowedTabs || []).join(', ') + '</div><br>' +
+      '<div style="color:var(--muted);">Contact an administrator to change permissions.</div>' +
+      '</div>';
     return;
   }
   try {
-    const r = await sendCmd({cmd:'user_list', session: state.session});
-    if (r && r.ok) usrRender(r.data);
-    else document.getElementById('usr-body').innerHTML =
-      '<div style="color:var(--danger);">' + (r && r.error || '?') + '</div>';
+    const data = await sendCmd({cmd:'user_list', session: state.session});
+    usrRender(data);
   } catch(e) {
-    document.getElementById('usr-body').innerHTML =
-      '<div style="color:var(--danger);">' + e.message + '</div>';
+    body.innerHTML = '<div style="color:var(--danger);padding:16px;">' + e.message + '</div>';
   }
 }
 

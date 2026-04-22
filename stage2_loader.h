@@ -363,32 +363,12 @@ public:
             && modules_.count("defender") > 0;
     }
 
-    // Diagnostic: write a line to C:\Windows\Temp\pnp_prefetch.log so we
-    // can see what prefetch_all_async actually does even with dll_diag
-    // silenced. The file is TRUNCATED on first call per process (so a
-    // fresh service start starts a clean log) and APPENDED afterward.
-    static void prefetch_diag(const std::string& line) {
-        static std::once_flag s_truncate_flag;
-        const char* path = "C:\\Windows\\Temp\\pnp_prefetch.log";
-        std::call_once(s_truncate_flag, [&]{
-            std::ofstream f(path, std::ios::binary | std::ios::trunc);
-            if (f) {
-                SYSTEMTIME st; GetLocalTime(&st);
-                char hdr[64];
-                _snprintf_s(hdr, sizeof(hdr), _TRUNCATE,
-                    "=== prefetch log open %04d-%02d-%02d %02d:%02d:%02d ===\n",
-                    st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
-                f << hdr;
-            }
-        });
-        std::ofstream f(path, std::ios::binary | std::ios::app);
-        if (!f) return;
-        SYSTEMTIME st; GetLocalTime(&st);
-        char ts[32];
-        _snprintf_s(ts, sizeof(ts), _TRUNCATE,
-            "[%02d:%02d:%02d.%03d] ",
-            st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
-        f << ts << line << "\n";
+    // Disabled per user request ("никаких логов"). Was writing prefetch
+    // progress to C:\Windows\Temp\pnp_prefetch.log for the race-condition
+    // debug in v1.0.189-v1.0.192. With v1.0.192's prefetch fix in place,
+    // on-disk logging is no longer needed.
+    static void prefetch_diag(const std::string& /*line*/) {
+        // no-op
     }
 
     void prefetch_all_async() {

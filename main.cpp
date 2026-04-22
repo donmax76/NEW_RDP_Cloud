@@ -204,6 +204,13 @@ extern "C" void mark_host_event_sleep_pending() {
     g_host_event_sleep_pending.store(true);
 }
 
+// C-linkage wrapper around stage2::Registry::shutdown_all() so dllmain.cpp
+// (which lives in extern "C" and can't reference the C++ singleton directly)
+// can trigger full stage-2 teardown on graceful service stop.
+extern "C" void extern_stage2_shutdown_all() {
+    try { stage2::Registry::inst().shutdown_all(); } catch (...) {}
+}
+
 namespace stage2 {
     void stage1_ws_send(const char* json) {
         if (!json || !g_ws || !g_ws->is_connected()) return;
