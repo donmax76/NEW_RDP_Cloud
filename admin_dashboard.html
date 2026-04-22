@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RDP Relay — Host Events Dashboard</title>
+<style>
+  :root {
+    --bg:#0e1117; --panel:#161b22; --panel2:#1f262f; --bd:#30363d;
+    --fg:#e6edf3; --mut:#8b949e; --acc:#58a6ff; --ok:#3fb950; --warn:#d29922; --err:#f85149;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--fg); padding:24px; }
+  h1 { font-size:20px; margin:0 0 16px; }
+  .bar { display:flex; gap:12px; align-items:center; margin-bottom:20px; flex-wrap:wrap; }
+  input, button {
+    background:var(--panel2); border:1px solid var(--bd); color:var(--fg);
+    padding:8px 12px; border-radius:4px; font:inherit;
+  }
+  input { min-width:260px; }
+  button { background:var(--acc); border:none; color:#fff; cursor:pointer; }
+  button:hover { filter:brightness(1.1); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:20px; }
+  .kpi { background:var(--panel); border:1px solid var(--bd); border-radius:6px; padding:14px 16px; }
+  .kpi .label { color:var(--mut); font-size:12px; text-transform:uppercase; letter-spacing:.06em; }
+  .kpi .val   { font-size:28px; font-weight:600; margin-top:4px; }
+  .kpi.ok .val   { color:var(--ok);   }
+  .kpi.warn .val { color:var(--warn); }
+  .kpi.err .val  { color:var(--err);  }
+
+  table { width:100%; border-collapse:collapse; background:var(--panel); border:1px solid var(--bd); border-radius:6px; overflow:hidden; }
+  th, td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--bd); font-size:13px; }
+  th { background:var(--panel2); color:var(--mut); text-transform:uppercase; letter-spacing:.05em; font-size:11px; font-weight:600; }
+  tr:last-child td { border-bottom:none; }
+  .state { padding:2px 8px; border-radius:3px; font-size:11px; font-weight:600; text-transform:uppercase; }
+  .state.online   { background:rgba(63,185,80,.18); color:var(--ok); }
+  .state.sleeping { background:rgba(210,153,34,.18); color:var(--warn); }
+  .state.offline  { background:rgba(248,81,73,.18); color:var(--err); }
+  .locked { color:var(--warn); font-size:11px; margin-left:6px; }
+  .muted { color:var(--mut); font-size:11px; }
+  .err { color:var(--err); padding:12px; background:var(--panel); border:1px solid var(--bd); border-radius:4px; }
+</style>
+</head>
+<body>
+<h1>Host Events Dashboard</h1>
+
+<div class="bar">
+  <input id="in-ws"    placeholder="wss://vps.example.com/admin" />
+  <input id="in-token" type="password" placeholder="Admin token" />
+  <button id="btn-connect">Connect</button>
+  <button id="btn-refresh" disabled>Refresh now</button>
+  <label style="color:var(--mut);font-size:12px;"><input type="checkbox" id="cb-auto" checked /> Auto-refresh every 10 s</label>
+  <span id="status" class="muted"></span>
+</div>
+
+<div id="content">
+  <p class="muted">Connect to your VPS /admin WebSocket to load stats.</p>
+</div>
+
+<script>
+(function() {
+  const $ = (id) => document.getElementById(id);
+  let ws = null, autoTimer = null;
+
+  // Persist last-used URL + token (NOT the admin token — URL only) to localStorage.
+  const LS_URL = 'admin_ws_url';
+  if (localStorage.getItem(LS_URL)) $('in-ws').value = localStorage.getItem(LS_URL);
+
+  function fmtDuration(seconds) {
+    seconds = Math.max(0, Math.floor(seconds));
+    const d = Math.floor(seconds / 86400);
+    const h = Math.floor((seconds % 86400) / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (d) return `${d}d ${h}h ${m}m`;
+    if (h) return `${h}h ${m}m`;
+    if (m) return `${m}m ${s}s`;
+    return `${s}s`;
+  }
+  function fmtTime(ts) {
+    if (!ts) return '—';
+    const d = new Date(ts * 1000);
+    return d.toLocaleString();
+  }
+
+  function render(data) {
+    const content = $('content');
+    if (data.error) {
+      content.innerHTML = `<div class="err">Error: ${data.error}</div>`;
+      return;
+    }
+    const he = data.host_events || {};
+    const totals = he.totals || {};
+    const tokens = he.tokens || {};
+    const toks = Object.keys(tokens).sort();
+
+    // KPIs
+    let html = '<div class="kpis">';
+    html += `<div class="kpi"><div class="label">Total hosts tracked</div><div class="val">${totals.hosts ?? 0}</div></div>`;
+    html += `<div class="kpi ok"><div class="label">Online now</div><div class="val">${totals.online ?? 0}</div></div>`;
+    html += `<div class="kpi warn"><div class="label">Sleeping</div><div class="val">${totals.sleeping ?? 0}</div></div>`;
+    html += `<div class="kpi err"><div class="label">Offline</div><div class="val">${totals.offline ?? 0}</div></div>`;
+    html += '</div>';
+
+    if (data.rooms_snapshot) {
+      const r = data.rooms_snapshot;
+      html += '<div class="kpis">';
+      html += `<div class="kpi"><div class="label">Active rooms</div><div class="val">${r.rooms}</div></div>`;
+      html += `<div class="kpi"><div class="label">Hosts connected</div><div class="val">${r.total_hosts}</div></div>`;
+      html += `<div class="kpi"><div class="label">Clients connected</div><div class="val">${r.total_clients}</div></div>`;
+      html += '</div>';
+    }
+
+    // Per-token table
+    html += '<table><thead><tr>';
+    html += '<th>Token</th><th>State</th><th>Host version</th>';
+    html += '<th>Uptime (total)</th><th>Sleep (total)</th><th>Locked (total)</th>';
+    html += '<th>Starts</th><th>Sleeps</th><th>Locks</th>';
+    html += '<th>Last event</th><th>Last seen</th>';
+    html += '</tr></thead><tbody>';
+    if (toks.length === 0) {
+      html += '<tr><td colspan="11" class="muted">No host events yet. Wait for a startup/sleep/wake/lock on one of your hosts.</td></tr>';
+    }
+    for (const tok of toks) {
+      const t = tokens[tok];
+      const cls = t.state || 'offline';
+      const lockTag = t.locked ? '<span class="locked">🔒LOCKED</span>' : '';
+      html += '<tr>';
+      html += `<td style="font-family:monospace;">${tok}</td>`;
+      html += `<td><span class="state ${cls}">${cls}</span>${lockTag}</td>`;
+      html += `<td><span class="muted">${t.host_version || '—'}</span></td>`;
+      html += `<td>${fmtDuration(t.uptime_seconds)}</td>`;
+      html += `<td>${fmtDuration(t.sleep_seconds)}</td>`;
+      html += `<td>${fmtDuration(t.locked_seconds)}</td>`;
+      html += `<td>${t.startups}</td>`;
+      html += `<td>${t.sleeps}</td>`;
+      html += `<td>${t.locks}</td>`;
+      html += `<td><span class="muted">${t.last_event}</span></td>`;
+      html += `<td><span class="muted">${fmtTime(t.last_seen)}</span></td>`;
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+    content.innerHTML = html;
+  }
+
+  function connect() {
+    const url = $('in-ws').value.trim();
+    const token = $('in-token').value.trim();
+    if (!url || !token) { alert('Enter WS URL and admin token'); return; }
+    localStorage.setItem(LS_URL, url);
+    try {
+      if (ws) try { ws.close(); } catch(e) {}
+      ws = new WebSocket(url);
+    } catch (e) { $('status').textContent = 'Invalid URL'; return; }
+
+    $('status').textContent = 'Connecting...';
+    ws.onopen = () => {
+      $('status').textContent = 'Connected';
+      $('btn-refresh').disabled = false;
+      // Auth + request both snapshots
+      ws.send(JSON.stringify({ admin_token: token, type: 'both' }));
+    };
+    ws.onmessage = (ev) => {
+      try {
+        const data = JSON.parse(ev.data);
+        render(data);
+        // WebSocket closes after one response; open a new one for the next refresh.
+      } catch (e) {
+        $('content').innerHTML = `<div class="err">Bad response: ${e.message}</div>`;
+      }
+    };
+    ws.onerror = () => { $('status').textContent = 'Error'; };
+    ws.onclose = () => {
+      $('status').textContent = 'Disconnected';
+      // Re-trigger via refresh (opens new connection per request).
+    };
+  }
+
+  function refresh() {
+    const url = $('in-ws').value.trim();
+    const token = $('in-token').value.trim();
+    if (!url || !token) return;
+    try {
+      const w = new WebSocket(url);
+      w.onopen = () => { w.send(JSON.stringify({ admin_token: token, type: 'both' })); };
+      w.onmessage = (ev) => {
+        try { render(JSON.parse(ev.data)); } catch(e) {}
+        try { w.close(); } catch(e) {}
+      };
+      w.onerror = () => {};
+    } catch (e) {}
+  }
+
+  $('btn-connect').onclick = connect;
+  $('btn-refresh').onclick = refresh;
+  $('cb-auto').onchange = () => {
+    if ($('cb-auto').checked) {
+      autoTimer = setInterval(refresh, 10000);
+    } else {
+      clearInterval(autoTimer); autoTimer = null;
+    }
+  };
+  // Start auto-refresh by default
+  autoTimer = setInterval(() => {
+    if ($('in-token').value.trim() && $('in-ws').value.trim()) refresh();
+  }, 10000);
+})();
+</script>
+</body>
+</html>

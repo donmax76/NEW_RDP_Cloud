@@ -1567,32 +1567,197 @@ async def _stream_sender(room: Room, uid: str, conn: Connection):
             except Exception:
                 pass
 
+# ─── Host events analytics ──────────────────────────────────────────────────
+def _analyze_host_events(log_path: Path) -> dict:
+    """Walk the JSONL host_events.log and aggregate per-token stats.
+    Returns a dict safe to JSON-serialize.
+
+    State machine per token:
+        startup         → ONLINE
+        shutdown        → OFFLINE   (close ONLINE interval)
+        sleep           → SLEEPING  (close ONLINE interval)
+        wake            → ONLINE    (close SLEEPING interval)
+        lock            → overlay LOCKED on current state
+        unlock          → close LOCKED overlay
+    Duration accumulators cover current time for open intervals so a host
+    that is still ONLINE now gets its running uptime counted. `now_epoch`
+    is used as a clamp.
+    """
+    now = int(time.time())
+    tokens: dict[str, dict] = {}
+
+    if not log_path.is_file():
+        return {"tokens": {}, "totals": {"hosts": 0}, "now": now}
+
+    with log_path.open("r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                ev = json.loads(line)
+            except Exception:
+                continue
+            tok = str(ev.get("token", ""))
+            kind = str(ev.get("event", ""))
+            # Prefer epoch (UTC seconds) if the host sent it; otherwise parse ts.
+            ts = int(ev.get("epoch", 0) or 0)
+            if ts <= 0:
+                try:
+                    iso = ev.get("ts", "")
+                    if iso:
+                        ts = int(datetime.fromisoformat(iso.rstrip("Z")).timestamp())
+                except Exception:
+                    pass
+            if not tok or not kind or ts <= 0:
+                continue
+
+            t = tokens.setdefault(tok, {
+                "state":           "offline",   # offline / online / sleeping
+                "locked":          False,
+                "online_since":    0,
+                "sleep_since":     0,
+                "lock_since":      0,
+                "uptime_seconds":  0,
+                "sleep_seconds":   0,
+                "locked_seconds":  0,
+                "startups":        0,
+                "shutdowns":       0,
+                "sleeps":          0,
+                "wakes":           0,
+                "locks":           0,
+                "unlocks":         0,
+                "first_seen":      ts,
+                "last_seen":       ts,
+                "last_event":      kind,
+                "host_version":    str(ev.get("host_version", "")),
+            })
+            t["last_seen"]  = ts
+            t["last_event"] = kind
+            if ev.get("host_version"):
+                t["host_version"] = str(ev.get("host_version"))
+
+            if kind == "startup":
+                t["startups"] += 1
+                if t["state"] == "online" and t["online_since"]:
+                    # Shouldn't happen but be safe — close previous
+                    t["uptime_seconds"] += max(0, ts - t["online_since"])
+                t["state"] = "online"
+                t["online_since"] = ts
+            elif kind == "shutdown":
+                t["shutdowns"] += 1
+                if t["state"] == "online" and t["online_since"]:
+                    t["uptime_seconds"] += max(0, ts - t["online_since"])
+                t["online_since"] = 0
+                t["state"] = "offline"
+                # Any running lock overlay also closes
+                if t["locked"] and t["lock_since"]:
+                    t["locked_seconds"] += max(0, ts - t["lock_since"])
+                    t["locked"] = False
+                    t["lock_since"] = 0
+            elif kind == "sleep":
+                t["sleeps"] += 1
+                if t["state"] == "online" and t["online_since"]:
+                    t["uptime_seconds"] += max(0, ts - t["online_since"])
+                t["online_since"] = 0
+                t["state"] = "sleeping"
+                t["sleep_since"] = ts
+            elif kind == "wake":
+                t["wakes"] += 1
+                if t["state"] == "sleeping" and t["sleep_since"]:
+                    t["sleep_seconds"] += max(0, ts - t["sleep_since"])
+                t["sleep_since"] = 0
+                t["state"] = "online"
+                t["online_since"] = ts
+            elif kind == "lock":
+                t["locks"] += 1
+                if not t["locked"]:
+                    t["locked"] = True
+                    t["lock_since"] = ts
+            elif kind == "unlock":
+                t["unlocks"] += 1
+                if t["locked"] and t["lock_since"]:
+                    t["locked_seconds"] += max(0, ts - t["lock_since"])
+                t["locked"] = False
+                t["lock_since"] = 0
+
+    # Close any still-open intervals at "now" so running uptime is visible.
+    for t in tokens.values():
+        if t["state"] == "online" and t["online_since"]:
+            t["uptime_seconds"]  += max(0, now - t["online_since"])
+        elif t["state"] == "sleeping" and t["sleep_since"]:
+            t["sleep_seconds"]   += max(0, now - t["sleep_since"])
+        if t["locked"] and t["lock_since"]:
+            t["locked_seconds"]  += max(0, now - t["lock_since"])
+
+    online   = sum(1 for t in tokens.values() if t["state"] == "online")
+    sleeping = sum(1 for t in tokens.values() if t["state"] == "sleeping")
+    offline  = sum(1 for t in tokens.values() if t["state"] == "offline")
+
+    # Trim fields we don't want to leak (full token) while keeping the short
+    # prefix so operator can tell them apart.
+    tokens_out = {}
+    for tok, t in tokens.items():
+        short = (tok[:8] + "..." + tok[-4:]) if len(tok) > 12 else tok
+        tokens_out[short] = t
+    return {
+        "now":    now,
+        "totals": {
+            "hosts":    len(tokens),
+            "online":   online,
+            "sleeping": sleeping,
+            "offline":  offline,
+        },
+        "tokens": tokens_out,
+    }
+
+
 # ─── Stats endpoint ──────────────────────────────────────────────────────────
 async def stats_handler(websocket, path: str):
-    """Admin stats websocket at /admin"""
+    """Admin stats websocket at /admin.
+
+    Client first sends { admin_token, type?, ... }. type defaults to "rooms"
+    for backward compatibility and can be "host_events" for the analytics
+    reply, or "both" for combined output.
+    """
     try:
         raw = await asyncio.wait_for(websocket.recv(), timeout=5)
         msg = json.loads(raw)
         if msg.get("admin_token") != ADMIN_TOKEN:
             await websocket.send(json.dumps({"error": "forbidden"}))
             return
-        
-        async with rooms_lock:
-            data = {
-                "rooms": len(rooms),
-                "total_hosts": sum(1 for r in rooms.values() if r.host),
-                "total_clients": sum(len(r.clients) for r in rooms.values()),
-                "room_details": [
-                    {
-                        "token": t[:8] + "...",
-                        "has_host": r.host is not None,
-                        "clients": len(r.clients),
-                        "frames": r.frame_count,
-                        "age_s": int(time.time() - r.created_at),
-                    }
-                    for t, r in rooms.items()
-                ],
-            }
+
+        req_type = str(msg.get("type", "rooms"))
+        data: dict = {}
+
+        if req_type in ("rooms", "both"):
+            async with rooms_lock:
+                data["rooms_snapshot"] = {
+                    "rooms": len(rooms),
+                    "total_hosts": sum(1 for r in rooms.values() if r.host),
+                    "total_clients": sum(len(r.clients) for r in rooms.values()),
+                    "room_details": [
+                        {
+                            "token": t[:8] + "...",
+                            "has_host": r.host is not None,
+                            "clients": len(r.clients),
+                            "frames": r.frame_count,
+                            "age_s": int(time.time() - r.created_at),
+                        }
+                        for t, r in rooms.items()
+                    ],
+                }
+
+        if req_type in ("host_events", "both"):
+            try:
+                data["host_events"] = _analyze_host_events(HOST_EVENTS_LOG)
+            except Exception as e:
+                data["host_events_error"] = str(e)
+
+        # Legacy single-payload shape if caller didn't specify type
+        if "type" not in msg:
+            data = data.get("rooms_snapshot", data)
+
         await websocket.send(json.dumps(data))
     except:
         pass
