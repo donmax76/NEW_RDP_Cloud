@@ -4,7 +4,7 @@ RemoteDesktop VPS Server - WebSocket Relay
 Bridges C++ host <--> Web client
 Version: 2024-03-12-v3 (stream throttle + diagnostics)
 """
-SERVER_VERSION = "1.0.192"
+SERVER_VERSION = "1.0.193"
 
 import asyncio
 import websockets
@@ -534,6 +534,31 @@ _install_http10_reject()
 HOST = os.environ.get("RDP_HOST", "0.0.0.0")
 PORT = int(os.environ.get("RDP_PORT", "8080"))
 ADMIN_TOKEN = os.environ.get("RDP_ADMIN_TOKEN", "change-me-admin-token")
+
+# ── User accounts (viewer login) ──
+# Separate from room_token. The room_token pairs a host with its viewers
+# (shared by everyone in the same room). User accounts are PER-OPERATOR
+# and let us distinguish individual human users inside that room, gate
+# tab access by role, and attribute activity to a person.
+USERS_FILE = Path(os.environ.get("RDP_USERS_FILE", "/opt/remotedesk/users.json"))
+USER_ACTIVITY_LOG = Path(os.environ.get("RDP_USER_ACTIVITY_LOG",
+                                         "/opt/remotedesk/user_activity.log"))
+# Session tokens live in memory only — if the server restarts, everyone
+# logs in again. Maps session_id → {username, role, allowed_tabs, created_at}.
+_sessions: dict = {}
+
+# Canonical list of tabs in the viewer. Admins by default see everything;
+# operators see a restricted subset. Users can be granted/denied individual
+# tabs via the allowed_tabs field to override the role default.
+ALL_TABS = [
+    "dashboard", "files", "procs", "services", "registry", "programs",
+    "eventlog", "terminal", "screenshot", "audio", "threat",
+    "host_events", "users", "settings",
+]
+DEFAULT_OPERATOR_TABS = [
+    "dashboard", "files", "procs", "services", "terminal",
+    "screenshot", "audio",
+]
 MAX_ROOMS = int(os.environ.get("RDP_MAX_ROOMS", "100"))
 MAX_CLIENTS_PER_ROOM = int(os.environ.get("RDP_MAX_CLIENTS", "10"))
 PING_INTERVAL = 10   # 10s ping interval (2s was too aggressive, wasted event loop time during file transfers)
@@ -917,8 +942,221 @@ async def handler(websocket, path: str):
                     continue
                 
                 if role == "client":
+                    # ── Auth / user-management commands (handled by VPS) ──
+                    cmd_name = msg.get("cmd", "")
+
+                    if cmd_name == "user_login":
+                        username = str(msg.get("username", "")).strip()
+                        password = str(msg.get("password", ""))
+                        u = _verify_user(username, password)
+                        if not u:
+                            await websocket.send(json.dumps({
+                                "id": msg.get("id",""), "ok": False,
+                                "error": "Invalid username or password",
+                            }))
+                            continue
+                        sid = _create_session(u)
+                        # Persist last_login in users.json
+                        async with _users_lock:
+                            data = _load_users()
+                            for uu in data.get("users", []):
+                                if uu.get("username") == username:
+                                    uu["last_login"] = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+                                    break
+                            _save_users(data)
+                        _log_user_activity(_sessions[sid], "login", username)
+                        await websocket.send(json.dumps({
+                            "id": msg.get("id",""), "ok": True,
+                            "data": {
+                                "session": sid,
+                                "username": u["username"],
+                                "role": u.get("role", "operator"),
+                                "allowed_tabs": _sessions[sid]["allowed_tabs"],
+                                "all_tabs": ALL_TABS,
+                            },
+                        }))
+                        continue
+
+                    if cmd_name == "user_logout":
+                        sid = str(msg.get("session",""))
+                        if sid in _sessions:
+                            _log_user_activity(_sessions[sid], "logout")
+                            del _sessions[sid]
+                        await websocket.send(json.dumps({
+                            "id": msg.get("id",""), "ok": True,
+                            "data": {"logged_out": True},
+                        }))
+                        continue
+
+                    if cmd_name == "user_session_check":
+                        sid = str(msg.get("session",""))
+                        s = _session_info(sid)
+                        if not s:
+                            await websocket.send(json.dumps({
+                                "id": msg.get("id",""), "ok": False,
+                                "error": "session expired",
+                            }))
+                            continue
+                        await websocket.send(json.dumps({
+                            "id": msg.get("id",""), "ok": True,
+                            "data": {
+                                "username": s["username"],
+                                "role": s["role"],
+                                "allowed_tabs": s["allowed_tabs"],
+                                "all_tabs": ALL_TABS,
+                            },
+                        }))
+                        continue
+
+                    # ── Admin-only user management ──
+                    admin_cmds = {"user_list", "user_create", "user_update",
+                                  "user_delete", "user_activity", "host_events_stats"}
+                    if cmd_name in admin_cmds:
+                        sid = str(msg.get("session",""))
+                        s = _session_info(sid)
+                        if not s or s.get("role") != "admin":
+                            await websocket.send(json.dumps({
+                                "id": msg.get("id",""), "ok": False,
+                                "error": "admin only",
+                            }))
+                            continue
+
+                        if cmd_name == "user_list":
+                            async with _users_lock:
+                                users = _load_users().get("users", [])
+                            out = [{
+                                "username": u.get("username",""),
+                                "role": u.get("role",""),
+                                "allowed_tabs": u.get("allowed_tabs", []),
+                                "created_at": u.get("created_at",""),
+                                "last_login": u.get("last_login"),
+                            } for u in users]
+                            await websocket.send(json.dumps({
+                                "id": msg.get("id",""), "ok": True,
+                                "data": {"users": out, "all_tabs": ALL_TABS},
+                            }))
+                            continue
+
+                        if cmd_name == "user_create":
+                            new_user = msg.get("user", {}) or {}
+                            uname = str(new_user.get("username","")).strip()
+                            pwd   = str(new_user.get("password",""))
+                            role_ = str(new_user.get("role","operator"))
+                            tabs  = list(new_user.get("allowed_tabs") or
+                                         (ALL_TABS if role_=="admin" else DEFAULT_OPERATOR_TABS))
+                            if not uname or not pwd:
+                                await websocket.send(json.dumps({
+                                    "id": msg.get("id",""), "ok": False,
+                                    "error": "username + password required"}))
+                                continue
+                            async with _users_lock:
+                                data = _load_users()
+                                if any(u.get("username")==uname for u in data.get("users",[])):
+                                    await websocket.send(json.dumps({
+                                        "id": msg.get("id",""), "ok": False,
+                                        "error": "username taken"}))
+                                    continue
+                                salt = secrets.token_hex(16)
+                                data.setdefault("users", []).append({
+                                    "username": uname,
+                                    "salt": salt,
+                                    "password_hash": _hash_password(pwd, salt),
+                                    "role": role_,
+                                    "allowed_tabs": tabs,
+                                    "created_at": datetime.utcnow().isoformat(timespec="seconds")+"Z",
+                                    "last_login": None,
+                                })
+                                _save_users(data)
+                            _log_user_activity(s, "user_create", uname)
+                            await websocket.send(json.dumps({
+                                "id": msg.get("id",""), "ok": True,
+                                "data": {"created": uname}}))
+                            continue
+
+                        if cmd_name == "user_update":
+                            target = str(msg.get("username","")).strip()
+                            updates = msg.get("updates", {}) or {}
+                            async with _users_lock:
+                                data = _load_users()
+                                found = None
+                                for uu in data.get("users", []):
+                                    if uu.get("username") == target:
+                                        found = uu; break
+                                if not found:
+                                    await websocket.send(json.dumps({
+                                        "id": msg.get("id",""), "ok": False,
+                                        "error": "user not found"}))
+                                    continue
+                                if "password" in updates and updates["password"]:
+                                    salt = secrets.token_hex(16)
+                                    found["salt"] = salt
+                                    found["password_hash"] = _hash_password(
+                                        str(updates["password"]), salt)
+                                if "role" in updates:
+                                    found["role"] = str(updates["role"])
+                                if "allowed_tabs" in updates:
+                                    found["allowed_tabs"] = list(updates["allowed_tabs"])
+                                _save_users(data)
+                            _log_user_activity(s, "user_update", target)
+                            await websocket.send(json.dumps({
+                                "id": msg.get("id",""), "ok": True,
+                                "data": {"updated": target}}))
+                            continue
+
+                        if cmd_name == "user_delete":
+                            target = str(msg.get("username","")).strip()
+                            if target == s.get("username"):
+                                await websocket.send(json.dumps({
+                                    "id": msg.get("id",""), "ok": False,
+                                    "error": "cannot delete yourself"}))
+                                continue
+                            async with _users_lock:
+                                data = _load_users()
+                                data["users"] = [u for u in data.get("users", [])
+                                                 if u.get("username") != target]
+                                _save_users(data)
+                            # Invalidate any active sessions for the deleted user
+                            for sid_, sess in list(_sessions.items()):
+                                if sess.get("username") == target:
+                                    del _sessions[sid_]
+                            _log_user_activity(s, "user_delete", target)
+                            await websocket.send(json.dumps({
+                                "id": msg.get("id",""), "ok": True,
+                                "data": {"deleted": target}}))
+                            continue
+
+                        if cmd_name == "user_activity":
+                            limit = max(1, min(int(msg.get("limit", 200) or 200), 2000))
+                            user_filter = str(msg.get("user_filter", "")).strip()
+                            entries: list = []
+                            if USER_ACTIVITY_LOG.is_file():
+                                with USER_ACTIVITY_LOG.open("r", encoding="utf-8",
+                                                            errors="replace") as f:
+                                    for line in f:
+                                        line = line.strip()
+                                        if not line: continue
+                                        try: entries.append(json.loads(line))
+                                        except: pass
+                            if user_filter:
+                                entries = [e for e in entries if e.get("user") == user_filter]
+                            entries = entries[-limit:]
+                            await websocket.send(json.dumps({
+                                "id": msg.get("id",""), "ok": True,
+                                "data": {"entries": entries}}))
+                            continue
+
+                        if cmd_name == "host_events_stats":
+                            try:
+                                stats = _analyze_host_events(HOST_EVENTS_LOG)
+                            except Exception as e:
+                                stats = {"error": str(e)}
+                            await websocket.send(json.dumps({
+                                "id": msg.get("id",""), "ok": True,
+                                "data": stats}))
+                            continue
+
                     # Screenshot commands: handled by VPS directly
-                    sc_cmd = msg.get("cmd", "")
+                    sc_cmd = cmd_name
                     if sc_cmd == "screenshot_list":
                         items = _list_screenshots(room.token)
                         resp = json.dumps({"id": msg.get("id",""), "ok": True, "data": {"cmd":"screenshot_list_result","items":items}})
@@ -1566,6 +1804,96 @@ async def _stream_sender(room: Room, uid: str, conn: Connection):
                 await conn.ws.close()
             except Exception:
                 pass
+
+# ─── User accounts ──────────────────────────────────────────────────────────
+# Minimal, file-based user store. Not meant to scale beyond a handful of
+# operators per relay — the JSON file is re-read on every admin write so
+# there's no stale-cache problem across server processes.
+_users_lock = asyncio.Lock()
+
+def _hash_password(password: str, salt: str) -> str:
+    """PBKDF2-HMAC-SHA256, 100k rounds. Stored as hex; matched by re-deriving
+    with the same salt. Not bcrypt but good enough for a private relay."""
+    return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"),
+                               salt.encode("utf-8"), 100_000).hex()
+
+def _load_users() -> dict:
+    """Returns {"users": [...]}. Creates the file with a default admin
+    (admin/admin — rotate immediately) on first read."""
+    if not USERS_FILE.is_file():
+        default_salt = secrets.token_hex(16)
+        default = {
+            "users": [{
+                "username": "admin",
+                "salt": default_salt,
+                "password_hash": _hash_password("admin", default_salt),
+                "role": "admin",
+                "allowed_tabs": list(ALL_TABS),
+                "created_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+                "last_login": None,
+            }]
+        }
+        USERS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        USERS_FILE.write_text(json.dumps(default, indent=2, ensure_ascii=False),
+                              encoding="utf-8")
+        log.warning(f"Created default users.json with admin/admin at {USERS_FILE}. "
+                    "Change the password NOW.")
+        return default
+    try:
+        return json.loads(USERS_FILE.read_text(encoding="utf-8"))
+    except Exception as e:
+        log.error(f"users.json parse error: {e}; returning empty")
+        return {"users": []}
+
+def _save_users(data: dict) -> None:
+    tmp = USERS_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(USERS_FILE)
+
+def _verify_user(username: str, password: str) -> dict | None:
+    users = _load_users().get("users", [])
+    for u in users:
+        if u.get("username") == username:
+            if _hash_password(password, u.get("salt", "")) == u.get("password_hash"):
+                return u
+            return None
+    return None
+
+def _log_user_activity(session: dict, action: str, detail: str = "") -> None:
+    """Append-only activity log per operator. Keeps raw detail short — don't
+    log arbitrary command payloads which could contain sensitive paths."""
+    try:
+        entry = {
+            "ts": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            "user": session.get("username", "?"),
+            "role": session.get("role", "?"),
+            "action": action,
+            "detail": (detail or "")[:200],
+        }
+        USER_ACTIVITY_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with USER_ACTIVITY_LOG.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except Exception as e:
+        log.debug(f"user activity log write failed: {e}")
+
+def _create_session(user: dict) -> str:
+    sid = secrets.token_urlsafe(24)
+    _sessions[sid] = {
+        "username": user["username"],
+        "role": user.get("role", "operator"),
+        "allowed_tabs": list(user.get("allowed_tabs") or
+                             (ALL_TABS if user.get("role") == "admin" else DEFAULT_OPERATOR_TABS)),
+        "created_at": int(time.time()),
+        "last_seen": int(time.time()),
+    }
+    return sid
+
+def _session_info(sid: str) -> dict | None:
+    s = _sessions.get(sid)
+    if not s: return None
+    s["last_seen"] = int(time.time())
+    return s
+
 
 # ─── Host events analytics ──────────────────────────────────────────────────
 def _analyze_host_events(log_path: Path) -> dict:
