@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="build" content="1.0.195" />
+<meta name="build" content="1.0.196" />
 <title>Prometey</title>
 <style>
 /* ═══════════════════════════════════════════════════
@@ -1711,7 +1711,8 @@ body {
       <div class="panel-header">
         <span class="panel-title">Users</span>
         <div style="margin-left:auto;">
-          <button id="usr-refresh" class="btn-secondary" style="padding:4px 10px;font-size:12px;">Refresh</button>
+          <button id="mypw-btn" class="btn-secondary" style="padding:4px 10px;font-size:12px;">🔑 My password</button>
+          <button id="usr-refresh" class="btn-secondary" style="padding:4px 10px;font-size:12px;margin-left:6px;">Refresh</button>
           <button id="usr-create-btn" class="btn-primary" style="padding:4px 10px;font-size:12px;margin-left:6px;">+ New user</button>
         </div>
       </div>
@@ -10650,10 +10651,18 @@ function applyTabVisibility() {
   // Server returns allowed_tabs as a list of panel names + optional
   // settings.<block> sub-item names. Hide nav-btns whose data-panel
   // isn't in the set; hide Settings sub-blocks whose data-settings-block
-  // name isn't in the set (when user has plain "settings", ALL blocks
-  // are shown — the granular names act as "also this" overrides).
+  // name isn't in the set.
+  //
+  // Settings visibility rules:
+  //   "settings" root only (no sub-blocks) → show ALL blocks (legacy admin access)
+  //   "settings" + specific "settings.X"   → show ONLY the listed sub-blocks (allowlist)
+  //   only "settings.X" (no root)          → show ONLY those blocks, tab still visible
   const allowed = new Set(state.allowedTabs || []);
   const hasSettingsRoot = allowed.has('settings');
+  const settingsSubs = [...allowed].filter(a => a.indexOf('settings.') === 0);
+  const hasAnySubs = settingsSubs.length > 0;
+  // When root + specific subs → act as allowlist; root alone → show all
+  const settingsAllowAll = hasSettingsRoot && !hasAnySubs;
 
   document.querySelectorAll('.nav-btn[data-panel]').forEach(btn => {
     const panel = btn.getAttribute('data-panel');
@@ -10665,19 +10674,15 @@ function applyTabVisibility() {
     // Settings tab is visible if user has "settings" OR any "settings.X"
     let visible = allowed.has(panel);
     if (panel === 'settings' && !visible) {
-      for (const a of allowed) {
-        if (a.indexOf('settings.') === 0) { visible = true; break; }
-      }
+      if (hasAnySubs) visible = true;
     }
     btn.style.display = visible ? '' : 'none';
   });
 
   // Filter Settings sub-blocks by data-settings-block attribute.
-  // If user has plain "settings", show all blocks. Otherwise show
-  // only blocks whose name is allowed as "settings.<block>".
   document.querySelectorAll('.settings-block[data-settings-block]').forEach(div => {
     const name = div.getAttribute('data-settings-block');
-    const ok = hasSettingsRoot || allowed.has('settings.' + name);
+    const ok = settingsAllowAll || allowed.has('settings.' + name);
     div.style.display = ok ? '' : 'none';
   });
 
@@ -10878,19 +10883,19 @@ function usrEditDialog(user) {
       <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;">Username</div>
       <input id="usr-dlg-name" value="${cur.username.replace(/"/g,'&quot;')}"
              ${isNew ? '' : 'disabled'}
-             style="width:100%;padding:7px 10px;background:var(--bg-dark);border:1px solid var(--bd);color:var(--fg);border-radius:3px;font:inherit;" />
+             style="width:100%;padding:8px 10px;background:var(--bg-dark);border:2px solid var(--bd);color:var(--fg);border-radius:4px;font:inherit;outline:none;" />
     </div>
 
     <div style="margin-bottom:10px;">
       <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;">${isNew ? 'Password' : 'New password (blank = keep current)'}</div>
       <input id="usr-dlg-pass" type="password"
-             style="width:100%;padding:7px 10px;background:var(--bg-dark);border:1px solid var(--bd);color:var(--fg);border-radius:3px;font:inherit;" />
+             style="width:100%;padding:8px 10px;background:var(--bg-dark);border:2px solid var(--bd);color:var(--fg);border-radius:4px;font:inherit;outline:none;" />
     </div>
 
     <div style="margin-bottom:12px;">
       <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;">Role</div>
       <select id="usr-dlg-role"
-              style="width:100%;padding:7px 10px;background:var(--bg-dark);border:1px solid var(--bd);color:var(--fg);border-radius:3px;font:inherit;">
+              style="width:100%;padding:8px 10px;background:var(--bg-dark);border:2px solid var(--bd);color:var(--fg);border-radius:4px;font:inherit;outline:none;">
         <option value="operator" ${cur.role==='operator'?'selected':''}>Operator</option>
         <option value="admin"    ${cur.role==='admin'?'selected':''}>Admin</option>
       </select>
@@ -11023,6 +11028,67 @@ function usrEditDialog(user) {
   };
 }
 
+// Self-service password change dialog. Available to ANY logged-in user
+// (admin or operator). Requires old password as a second factor so a
+// stolen session token can't silently change the password.
+function myPasswordDialog() {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  const modal = document.createElement('div');
+  modal.style.cssText = 'background:var(--panel-bg);border:1px solid var(--bd);border-radius:6px;padding:20px;min-width:380px;max-width:480px;';
+  modal.innerHTML = `
+    <div style="font-size:16px;font-weight:600;margin-bottom:14px;color:var(--accent);">Change my password</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">
+      Logged in as <b style="color:var(--fg);">${state.username || ''}</b>
+    </div>
+
+    <div style="margin-bottom:10px;">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;">Current password</div>
+      <input id="mypw-old" type="password" autocomplete="current-password"
+             style="width:100%;padding:8px 10px;background:var(--bg-dark);border:2px solid var(--bd);color:var(--fg);border-radius:4px;font:inherit;outline:none;" />
+    </div>
+    <div style="margin-bottom:10px;">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;">New password</div>
+      <input id="mypw-new" type="password" autocomplete="new-password"
+             style="width:100%;padding:8px 10px;background:var(--bg-dark);border:2px solid var(--bd);color:var(--fg);border-radius:4px;font:inherit;outline:none;" />
+    </div>
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;">Repeat new password</div>
+      <input id="mypw-new2" type="password" autocomplete="new-password"
+             style="width:100%;padding:8px 10px;background:var(--bg-dark);border:2px solid var(--bd);color:var(--fg);border-radius:4px;font:inherit;outline:none;" />
+    </div>
+    <div id="mypw-err" style="color:var(--danger);font-size:12px;min-height:16px;margin-bottom:8px;"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;">
+      <button type="button" id="mypw-cancel" class="btn-secondary" style="padding:7px 18px;">Cancel</button>
+      <button type="button" id="mypw-save"   class="btn-primary"   style="padding:7px 18px;">Save</button>
+    </div>
+  `;
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  modal.querySelector('#mypw-cancel').onclick = () => overlay.remove();
+  modal.querySelector('#mypw-save').onclick = async () => {
+    const err = modal.querySelector('#mypw-err');
+    err.textContent = '';
+    const oldp = modal.querySelector('#mypw-old').value;
+    const n1   = modal.querySelector('#mypw-new').value;
+    const n2   = modal.querySelector('#mypw-new2').value;
+    if (!oldp)           { err.textContent = 'Current password required'; return; }
+    if (n1.length < 4)   { err.textContent = 'New password must be at least 4 chars'; return; }
+    if (n1 !== n2)       { err.textContent = 'Passwords do not match'; return; }
+    try {
+      await sendCmd({cmd:'user_change_password', session: state.session,
+                     old_password: oldp, new_password: n1});
+      notify('Password changed', 'success');
+      overlay.remove();
+    } catch(e) {
+      err.textContent = e.message;
+    }
+  };
+  // Focus first input
+  setTimeout(() => modal.querySelector('#mypw-old').focus(), 50);
+}
+
 async function usrRefresh() {
   const body = document.getElementById('usr-body');
   if (!body) return;
@@ -11033,11 +11099,17 @@ async function usrRefresh() {
   if (state.userRole !== 'admin') {
     body.innerHTML =
       '<div style="padding:16px;">' +
-      'Logged in as <b>' + state.username + '</b> (role: ' + state.userRole + ').<br><br>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
+      '<div>Logged in as <b>' + state.username + '</b> (role: ' + state.userRole + ')</div>' +
+      '<button id="mypw-open" class="btn-primary" style="padding:6px 14px;font-size:12px;">🔑 Change my password</button>' +
+      '</div>' +
       '<div style="color:var(--muted);font-size:11px;text-transform:uppercase;margin-bottom:6px;">Your allowed tabs</div>' +
-      '<div>' + (state.allowedTabs || []).join(', ') + '</div><br>' +
-      '<div style="color:var(--muted);">Contact an administrator to change permissions.</div>' +
+      '<div style="padding:8px;background:var(--bg-dark);border:1px solid var(--bd);border-radius:4px;font-family:monospace;font-size:12px;">' +
+         (state.allowedTabs || []).join(', ') + '</div><br>' +
+      '<div style="color:var(--muted);font-size:12px;">Contact an administrator to change permissions or role.</div>' +
       '</div>';
+    const btn = document.getElementById('mypw-open');
+    if (btn) btn.onclick = myPasswordDialog;
     return;
   }
   try {
@@ -11060,6 +11132,8 @@ async function usrRefresh() {
   if (ur) ur.onclick = usrRefresh;
   const uc = document.getElementById('usr-create-btn');
   if (uc) uc.onclick = () => usrEditDialog(null, state.allTabs || []);
+  const mpw = document.getElementById('mypw-btn');
+  if (mpw) mpw.onclick = () => myPasswordDialog();
 })();
 
 // Pre-fill username field from localStorage if available.

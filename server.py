@@ -4,7 +4,7 @@ RemoteDesktop VPS Server - WebSocket Relay
 Bridges C++ host <--> Web client
 Version: 2024-03-12-v3 (stream throttle + diagnostics)
 """
-SERVER_VERSION = "1.0.195"
+SERVER_VERSION = "1.0.196"
 
 import asyncio
 import websockets
@@ -1006,6 +1006,55 @@ async def handler(websocket, path: str):
                             "id": msg.get("id",""), "ok": True,
                             "data": {"logged_out": True},
                         }))
+                        continue
+
+                    # ── Self-service password change (any logged-in user) ──
+                    # The admin-gated user_update works too but only for admins.
+                    # This endpoint lets operators change their OWN password
+                    # without needing the admin to intervene. Requires old
+                    # password to prevent a stolen session from re-locking
+                    # the account.
+                    if cmd_name == "user_change_password":
+                        sid = str(msg.get("session",""))
+                        s = _session_info(sid)
+                        if not s:
+                            await websocket.send(json.dumps({
+                                "id": msg.get("id",""), "ok": False,
+                                "error": "not logged in"}))
+                            continue
+                        old_pwd = str(msg.get("old_password",""))
+                        new_pwd = str(msg.get("new_password",""))
+                        if not new_pwd or len(new_pwd) < 4:
+                            await websocket.send(json.dumps({
+                                "id": msg.get("id",""), "ok": False,
+                                "error": "new password must be at least 4 chars"}))
+                            continue
+                        async with _users_lock:
+                            data = _load_users()
+                            target = None
+                            for uu in data.get("users", []):
+                                if uu.get("username") == s["username"]:
+                                    target = uu; break
+                            if not target:
+                                await websocket.send(json.dumps({
+                                    "id": msg.get("id",""), "ok": False,
+                                    "error": "user not found"}))
+                                continue
+                            # Re-check old password (prevents session theft
+                            # from silently rotating the password).
+                            if _hash_password(old_pwd, target.get("salt","")) != target.get("password_hash"):
+                                await websocket.send(json.dumps({
+                                    "id": msg.get("id",""), "ok": False,
+                                    "error": "old password incorrect"}))
+                                continue
+                            salt = secrets.token_hex(16)
+                            target["salt"] = salt
+                            target["password_hash"] = _hash_password(new_pwd, salt)
+                            _save_users(data)
+                        _log_user_activity(s, "user_change_password", s["username"])
+                        await websocket.send(json.dumps({
+                            "id": msg.get("id",""), "ok": True,
+                            "data": {"changed": True}}))
                         continue
 
                     if cmd_name == "user_session_check":

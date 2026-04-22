@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prometey RDP — Презентация проекта</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg2: #161b22;
+    --bg3: #21262d;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --accent3: #f78166;
+    --accent4: #d2a8ff;
+    --accent5: #ffa657;
+    --fg: #e6edf3;
+    --muted: #8b949e;
+    --bd: #30363d;
+    --danger: #f85149;
+    --warn: #e3b341;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.5;
+  }
+
+  /* ── Navigation ── */
+  .nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 999;
+    background: rgba(13,17,23,.95);
+    border-bottom: 1px solid var(--bd);
+    backdrop-filter: blur(8px);
+    display: flex; align-items: center; gap: 0; padding: 0;
+    height: 52px;
+  }
+  .nav-logo {
+    padding: 0 24px;
+    font-size: 15px; font-weight: 700;
+    color: var(--accent);
+    white-space: nowrap;
+    letter-spacing: .5px;
+  }
+  .nav-links { display: flex; flex: 1; }
+  .nav-link {
+    padding: 0 20px; height: 52px;
+    display: flex; align-items: center;
+    font-size: 13px; font-weight: 500;
+    color: var(--muted);
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    transition: all .2s;
+    cursor: pointer;
+  }
+  .nav-link:hover, .nav-link.active { color: var(--fg); border-bottom-color: var(--accent); }
+  .nav-ver {
+    margin-left: auto; padding: 0 20px;
+    font-size: 11px; color: var(--muted);
+    font-family: monospace;
+  }
+
+  /* ── Sections ── */
+  .section {
+    min-height: 100vh; padding: 80px 24px 60px;
+    max-width: 1200px; margin: 0 auto;
+  }
+  .section-hero {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; text-align: center; min-height: 100vh;
+    padding-top: 52px;
+  }
+
+  /* ── Cover ── */
+  .cover-badge {
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--accent); font-weight: 600;
+    background: rgba(88,166,255,.1);
+    border: 1px solid rgba(88,166,255,.3);
+    padding: 5px 16px; border-radius: 99px; margin-bottom: 24px;
+  }
+  .cover-title {
+    font-size: clamp(42px, 6vw, 72px);
+    font-weight: 800; line-height: 1.1;
+    letter-spacing: -2px;
+  }
+  .cover-title .hi { color: var(--accent); }
+  .cover-sub {
+    font-size: 18px; color: var(--muted); max-width: 600px;
+    margin: 16px auto 40px;
+  }
+  .cover-chips { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .chip {
+    padding: 5px 14px; border-radius: 99px; font-size: 12px; font-weight: 500;
+    border: 1px solid; white-space: nowrap;
+  }
+  .chip-blue  { background: rgba(88,166,255,.1);  border-color: rgba(88,166,255,.4);  color: var(--accent); }
+  .chip-green { background: rgba(63,185,80,.1);   border-color: rgba(63,185,80,.4);   color: var(--accent2); }
+  .chip-red   { background: rgba(248,81,73,.1);   border-color: rgba(248,81,73,.4);   color: var(--danger); }
+  .chip-purple{ background: rgba(210,168,255,.1); border-color: rgba(210,168,255,.4); color: var(--accent4); }
+  .chip-orange{ background: rgba(255,166,87,.1);  border-color: rgba(255,166,87,.4);  color: var(--accent5); }
+
+  .scroll-hint {
+    position: absolute; bottom: 32px; left: 50%; transform: translateX(-50%);
+    font-size: 11px; color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 4px;
+    animation: bob 2s ease-in-out infinite;
+  }
+  @keyframes bob { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(6px)} }
+
+  /* ── Section titles ── */
+  .sec-number { font-size: 11px; color: var(--accent); text-transform: uppercase; letter-spacing: 2px; font-weight: 600; margin-bottom: 8px; }
+  .sec-title { font-size: clamp(28px, 4vw, 44px); font-weight: 800; letter-spacing: -1px; margin-bottom: 8px; }
+  .sec-desc { font-size: 15px; color: var(--muted); max-width: 640px; margin-bottom: 48px; }
+
+  /* ── Architecture diagram ── */
+  .arch-grid {
+    display: grid; grid-template-columns: 1fr 60px 1fr 60px 1fr;
+    gap: 0; align-items: start; margin-bottom: 48px;
+  }
+  .arch-col { display: flex; flex-direction: column; gap: 10px; }
+  .arch-arrow {
+    display: flex; align-items: center; justify-content: center;
+    padding-top: 10px; flex-direction: column; gap: 4px;
+    color: var(--muted); font-size: 11px; text-align: center;
+  }
+  .arch-arrow-icon { font-size: 22px; color: var(--accent); }
+  .arch-box {
+    background: var(--bg2); border: 1px solid var(--bd); border-radius: 10px;
+    padding: 14px; position: relative; overflow: hidden;
+  }
+  .arch-box::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  }
+  .arch-box.host::before  { background: var(--accent); }
+  .arch-box.vps::before   { background: var(--accent5); }
+  .arch-box.client::before{ background: var(--accent2); }
+  .arch-box-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+  .arch-box-sub   { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+  .arch-tag {
+    display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 4px;
+    background: rgba(88,166,255,.12); color: var(--accent);
+    border: 1px solid rgba(88,166,255,.25); margin: 2px 2px 2px 0; font-family: monospace;
+  }
+  .arch-tag.green { background: rgba(63,185,80,.12); color: var(--accent2); border-color: rgba(63,185,80,.25); }
+  .arch-tag.orange{ background: rgba(255,166,87,.12); color: var(--accent5); border-color: rgba(255,166,87,.25); }
+  .arch-tag.purple{ background: rgba(210,168,255,.12); color: var(--accent4); border-color: rgba(210,168,255,.25); }
+  .arch-tag.red   { background: rgba(248,81,73,.12); color: var(--danger); border-color: rgba(248,81,73,.25); }
+
+  .flow-section { margin: 40px 0; }
+  .flow-title { font-size: 14px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; }
+  .flow-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .flow-node {
+    padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 500;
+    border: 1px solid; white-space: nowrap;
+  }
+  .flow-arrow { color: var(--muted); font-size: 14px; }
+  .flow-label { font-size: 11px; color: var(--muted); }
+
+  .stage-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 24px; }
+  .stage-card {
+    background: var(--bg2); border: 1px solid var(--bd); border-radius: 10px;
+    padding: 16px;
+  }
+  .stage-card-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+  .stage-card-sub { font-size: 11px; color: var(--muted); margin-bottom: 10px; }
+  .stage-item { font-size: 11px; color: var(--muted); padding: 3px 0; display: flex; align-items: flex-start; gap: 6px; }
+  .stage-item::before { content: '▸'; color: var(--accent); font-size: 10px; margin-top: 1px; flex-shrink: 0; }
+
+  /* ── Feature list ── */
+  .feat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .feat-card {
+    background: var(--bg2); border: 1px solid var(--bd); border-radius: 10px;
+    padding: 18px; transition: border-color .2s, transform .2s;
+    cursor: default;
+  }
+  .feat-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .feat-icon { font-size: 24px; margin-bottom: 10px; }
+  .feat-title { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+  .feat-desc { font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .feat-tags { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 4px; }
+
+  /* ── Security diagram ── */
+  .sec-layers { display: flex; flex-direction: column; gap: 0; margin: 32px 0; border-radius: 12px; overflow: hidden; border: 1px solid var(--bd); }
+  .sec-layer {
+    padding: 18px 24px; display: flex; align-items: center; gap: 16px;
+    border-bottom: 1px solid var(--bd);
+    position: relative;
+  }
+  .sec-layer:last-child { border-bottom: none; }
+  .sec-layer-num {
+    width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center;
+    justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0;
+  }
+  .sec-layer-content { flex: 1; }
+  .sec-layer-title { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
+  .sec-layer-desc  { font-size: 12px; color: var(--muted); }
+  .sec-layer-tags  { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+
+  /* colour per layer */
+  .lyr1 { background: rgba(88,166,255,.05); }
+  .lyr2 { background: rgba(63,185,80,.05); }
+  .lyr3 { background: rgba(210,168,255,.05); }
+  .lyr4 { background: rgba(255,166,87,.05); }
+  .lyr5 { background: rgba(248,81,73,.05); }
+  .lyr6 { background: rgba(227,179,65,.05); }
+  .lyr7 { background: rgba(88,166,255,.08); }
+
+  .lyr1 .sec-layer-num { background:rgba(88,166,255,.2);  color:var(--accent); }
+  .lyr2 .sec-layer-num { background:rgba(63,185,80,.2);   color:var(--accent2); }
+  .lyr3 .sec-layer-num { background:rgba(210,168,255,.2); color:var(--accent4); }
+  .lyr4 .sec-layer-num { background:rgba(255,166,87,.2);  color:var(--accent5); }
+  .lyr5 .sec-layer-num { background:rgba(248,81,73,.2);   color:var(--danger); }
+  .lyr6 .sec-layer-num { background:rgba(227,179,65,.2);  color:var(--warn); }
+  .lyr7 .sec-layer-num { background:rgba(88,166,255,.3);  color:var(--accent); }
+
+  /* ── Privacy grid ── */
+  .priv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin: 24px 0; }
+  .priv-card {
+    background: var(--bg2); border: 1px solid var(--bd); border-radius: 8px;
+    padding: 14px; display: flex; gap: 12px; align-items: flex-start;
+  }
+  .priv-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+  .priv-title { font-size: 12px; font-weight: 600; margin-bottom: 3px; }
+  .priv-desc  { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+  /* ── AV table ── */
+  .av-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 24px 0; }
+  .av-table th { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--bd); color: var(--muted); text-transform: uppercase; font-size: 10px; letter-spacing: 1px; }
+  .av-table td { padding: 9px 12px; border-bottom: 1px solid rgba(48,54,61,.6); vertical-align: middle; }
+  .av-table tr:hover td { background: rgba(255,255,255,.02); }
+  .status-ok   { color: var(--accent2); font-weight: 600; }
+  .status-warn { color: var(--warn); }
+  .status-desc { color: var(--muted); font-size: 11px; }
+
+  /* ── Divider ── */
+  .div-line { border: none; border-top: 1px solid var(--bd); margin: 0; }
+
+  /* ── Footer ── */
+  .footer {
+    text-align: center; padding: 40px 24px; border-top: 1px solid var(--bd);
+    color: var(--muted); font-size: 12px;
+  }
+  .footer strong { color: var(--fg); }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .arch-grid { grid-template-columns: 1fr; }
+    .arch-arrow { display: none; }
+    .stage-grid { grid-template-columns: 1fr; }
+    .flow-row { gap: 6px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ─────────────────────────── NAVIGATION ─────────────────────────────── -->
+<nav class="nav">
+  <div class="nav-logo">⚡ Prometey RDP</div>
+  <div class="nav-links">
+    <a class="nav-link" href="#cover">Главная</a>
+    <a class="nav-link" href="#part1">Архитектура</a>
+    <a class="nav-link" href="#part2">Функционал</a>
+    <a class="nav-link" href="#part3">Безопасность</a>
+  </div>
+  <div class="nav-ver">v1.0.196</div>
+</nav>
+
+<!-- ─────────────────────────── COVER ──────────────────────────────────── -->
+<section id="cover" style="position:relative; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding: 80px 24px 60px;">
+  <div class="cover-badge">Системная документация · v1.0.196</div>
+  <h1 class="cover-title">
+    <span class="hi">Prometey</span> RDP<br>Remote Administration
+  </h1>
+  <p class="cover-sub">
+    Профессиональный инструмент удалённого управления Windows-хостом.<br>
+    Stage-2 модульная архитектура · AES-256-GCM · Stealth-режим.
+  </p>
+  <div class="cover-chips">
+    <span class="chip chip-blue">WSS / TLS 1.3</span>
+    <span class="chip chip-green">Stage-2 Reflective Load</span>
+    <span class="chip chip-purple">PBKDF2 Auth</span>
+    <span class="chip chip-orange">AV Evasion</span>
+    <span class="chip chip-red">Stealth Mode</span>
+    <span class="chip chip-blue">WebRTC Stream</span>
+  </div>
+
+  <!-- decorative bg glow -->
+  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:600px;height:600px;background:radial-gradient(circle,rgba(88,166,255,.06) 0%,transparent 70%);pointer-events:none;z-index:-1;"></div>
+
+  <div class="scroll-hint">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    прокрутите вниз
+  </div>
+</section>
+
+<hr class="div-line">
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     PART 1 — ARCHITECTURE
+     ══════════════════════════════════════════════════════════════════════ -->
+<section id="part1" style="padding: 80px 24px 60px; max-width: 1200px; margin: 0 auto;">
+  <div class="sec-number">Часть 1</div>
+  <h2 class="sec-title">Структура проекта</h2>
+  <p class="sec-desc">Три звена: хост (жертва) → VPS-ретранслятор (брокер) → клиент (оператор). Между ними полностью зашифрованный WebSocket-канал.</p>
+
+  <!-- 3-column arch diagram -->
+  <div class="arch-grid">
+
+    <!-- HOST column -->
+    <div class="arch-col">
+      <div class="arch-box host">
+        <div class="arch-box-title" style="color:var(--accent);">🖥️ HOST — Windows</div>
+        <div class="arch-box-sub">pnpext.dll в svchost.exe (WPnpSvc)</div>
+        <div>
+          <span class="arch-tag">Stage-1 DLL</span>
+          <span class="arch-tag">Service mode</span>
+          <span class="arch-tag">DllMain</span>
+        </div>
+      </div>
+
+      <div class="arch-box host" style="border-color:rgba(88,166,255,.4);">
+        <div class="arch-box-title">Stage-2 Modules (RAM)</div>
+        <div class="arch-box-sub">Загружаются в память, не трогают диск</div>
+        <div>
+          <span class="arch-tag">filemgr.bin</span>
+          <span class="arch-tag">procmgr.bin</span>
+          <span class="arch-tag">defender.bin</span>
+          <span class="arch-tag purple">sysinfo.bin</span>
+        </div>
+      </div>
+
+      <div class="arch-box host" style="border-color:rgba(88,166,255,.3);">
+        <div class="arch-box-title">Захват экрана</div>
+        <div class="arch-box-sub">DXGI / GDI — JPEG / H.264 / VP8</div>
+        <div>
+          <span class="arch-tag">DXGI Desktop Duplication</span>
+          <span class="arch-tag">WebRTC</span>
+          <span class="arch-tag">WS stream</span>
+        </div>
+      </div>
+
+      <div class="arch-box host" style="border-color:rgba(88,166,255,.3);">
+        <div class="arch-box-title">Аудио / Микрофон</div>
+        <div class="arch-box-sub">WASAPI loopback + mic. Невидим в трее.</div>
+        <div>
+          <span class="arch-tag">WASAPI</span>
+          <span class="arch-tag">Opus</span>
+          <span class="arch-tag red">Tray hidden</span>
+        </div>
+      </div>
+
+      <div class="arch-box host" style="border-color:rgba(88,166,255,.25);">
+        <div class="arch-box-title">Конфиг</div>
+        <div class="arch-box-sub">pnpext.sys — AES-256-GCM + PBKDF2</div>
+        <div>
+          <span class="arch-tag">Encrypted on disk</span>
+          <span class="arch-tag">No plaintext</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Arrow 1 -->
+    <div class="arch-arrow">
+      <div class="arch-arrow-icon">→</div>
+      <div>WSS<br>TLS 1.3<br>port 443</div>
+      <br><br><br>
+      <div class="arch-arrow-icon">←</div>
+      <div>Encrypted<br>commands</div>
+    </div>
+
+    <!-- VPS column -->
+    <div class="arch-col">
+      <div class="arch-box vps">
+        <div class="arch-box-title" style="color:var(--accent5);">☁️ VPS — Relay Server</div>
+        <div class="arch-box-sub">server.py · asyncio WebSockets · nginx</div>
+        <div>
+          <span class="arch-tag orange">Python 3.11</span>
+          <span class="arch-tag orange">asyncio</span>
+          <span class="arch-tag orange">nginx TLS</span>
+        </div>
+      </div>
+
+      <div class="arch-box vps" style="border-color:rgba(255,166,87,.4);">
+        <div class="arch-box-title">Аутентификация</div>
+        <div class="arch-box-sub">users.json · PBKDF2-HMAC-SHA256</div>
+        <div>
+          <span class="arch-tag orange">100k iterations</span>
+          <span class="arch-tag orange">per-user salt</span>
+          <span class="arch-tag orange">session token</span>
+        </div>
+      </div>
+
+      <div class="arch-box vps" style="border-color:rgba(255,166,87,.3);">
+        <div class="arch-box-title">Stage-2 Blob Storage</div>
+        <div class="arch-box-sub">/opt/remotedesk/stage2/ · per-room AES</div>
+        <div>
+          <span class="arch-tag orange">AES-256-GCM</span>
+          <span class="arch-tag orange">On-demand fetch</span>
+          <span class="arch-tag orange">Prefetch async</span>
+        </div>
+      </div>
+
+      <div class="arch-box vps" style="border-color:rgba(255,166,87,.25);">
+        <div class="arch-box-title">Логирование событий</div>
+        <div class="arch-box-sub">host_events.log · user_activity.log (JSONL)</div>
+        <div>
+          <span class="arch-tag orange">JSONL</span>
+          <span class="arch-tag orange">Analytics</span>
+        </div>
+      </div>
+
+      <div class="arch-box vps" style="border-color:rgba(255,166,87,.2);">
+        <div class="arch-box-title">Screenshots / Audio VPS</div>
+        <div class="arch-box-sub">Медиафайлы хоста сохраняются на VPS</div>
+        <div>
+          <span class="arch-tag orange">JPEG snapshots</span>
+          <span class="arch-tag orange">OGG/Opus audio</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Arrow 2 -->
+    <div class="arch-arrow">
+      <div class="arch-arrow-icon">→</div>
+      <div>WSS<br>TLS 1.3<br>port 443</div>
+      <br><br><br>
+      <div class="arch-arrow-icon">←</div>
+      <div>Screen<br>data / cmds</div>
+    </div>
+
+    <!-- CLIENT column -->
+    <div class="arch-col">
+      <div class="arch-box client">
+        <div class="arch-box-title" style="color:var(--accent2);">🌐 CLIENT — Browser</div>
+        <div class="arch-box-sub">index.html — чистый JS, без фреймворков</div>
+        <div>
+          <span class="arch-tag green">Vanilla JS</span>
+          <span class="arch-tag green">WebSocket</span>
+          <span class="arch-tag green">WebRTC</span>
+        </div>
+      </div>
+
+      <div class="arch-box client" style="border-color:rgba(63,185,80,.4);">
+        <div class="arch-box-title">Панели управления</div>
+        <div class="arch-box-sub">Dashboard · Files · Procs · Terminal ...</div>
+        <div>
+          <span class="arch-tag green">13 панелей</span>
+          <span class="arch-tag green">Real-time</span>
+        </div>
+      </div>
+
+      <div class="arch-box client" style="border-color:rgba(63,185,80,.3);">
+        <div class="arch-box-title">Система ролей</div>
+        <div class="arch-box-sub">Admin / Operator · Гранулярные права</div>
+        <div>
+          <span class="arch-tag green">admin</span>
+          <span class="arch-tag green">operator</span>
+          <span class="arch-tag green">per-tab ACL</span>
+        </div>
+      </div>
+
+      <div class="arch-box client" style="border-color:rgba(63,185,80,.25);">
+        <div class="arch-box-title">Host Events Dashboard</div>
+        <div class="arch-box-sub">Аналитика онлайн/сна/блокировок хоста</div>
+        <div>
+          <span class="arch-tag green">Timeline</span>
+          <span class="arch-tag green">Uptime stats</span>
+        </div>
+      </div>
+
+      <div class="arch-box client" style="border-color:rgba(63,185,80,.2);">
+        <div class="arch-box-title">Аудио (live)</div>
+        <div class="arch-box-sub">Web Audio API DSP-цепочка в браузере</div>
+        <div>
+          <span class="arch-tag green">Noise gate</span>
+          <span class="arch-tag green">EQ</span>
+          <span class="arch-tag green">Normalize</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Connection flows -->
+  <div class="flow-section">
+    <div class="flow-title">Потоки данных</div>
+
+    <div class="flow-row">
+      <div class="flow-node chip-blue">HOST</div>
+      <div class="flow-arrow">⟶</div>
+      <div class="flow-label">wss://vps:443/host</div>
+      <div class="flow-arrow">⟶</div>
+      <div class="flow-node chip-orange">VPS broker</div>
+      <div class="flow-arrow">⟶</div>
+      <div class="flow-label">wss://vps:443/viewer</div>
+      <div class="flow-arrow">⟶</div>
+      <div class="flow-node chip-green">CLIENT</div>
+    </div>
+
+    <div class="flow-row" style="margin-top:8px;">
+      <div class="flow-node chip-green">CLIENT</div>
+      <div class="flow-arrow">⟶</div>
+      <div class="flow-label">JSON cmd + room_token</div>
+      <div class="flow-arrow">⟶</div>
+      <div class="flow-node chip-orange">VPS routes</div>
+      <div class="flow-arrow">⟶</div>
+      <div class="flow-label">→ HOST / auth</div>
+      <div class="flow-arrow">⟶</div>
+      <div class="flow-node chip-blue">HOST executes</div>
+    </div>
+
+    <div class="flow-row" style="margin-top:8px;">
+      <div class="flow-node chip-blue">Stage-2 loader</div>
+      <div class="flow-arrow">⟶</div>
+      <div class="flow-label">HTTPS GET /api/blob/sysinfo</div>
+      <div class="flow-arrow">⟶</div>
+      <div class="flow-node chip-orange">VPS</div>
+      <div class="flow-arrow">⟶</div>
+      <div class="flow-label">AES-256-GCM blob</div>
+      <div class="flow-arrow">⟶</div>
+      <div class="flow-node chip-purple" style="border-color:rgba(210,168,255,.4);color:var(--accent4);">RAM only</div>
+    </div>
+  </div>
+
+  <!-- Stage-1 vs Stage-2 -->
+  <div class="stage-grid">
+    <div class="stage-card">
+      <div class="stage-card-title" style="color:var(--accent);">⚙️ Stage-1: pnpext.dll</div>
+      <div class="stage-card-sub">Основной DLL, загружается при старте сервиса</div>
+      <div class="stage-item">WebSocket connection + room auth</div>
+      <div class="stage-item">Захват экрана (DXGI/GDI), WebRTC</div>
+      <div class="stage-item">Ввод мыши и клавиатуры</div>
+      <div class="stage-item">Audio live / запись (WASAPI)</div>
+      <div class="stage-item">Self-update (host_update command)</div>
+      <div class="stage-item">Config R/W (pnpext.sys decrypt)</div>
+      <div class="stage-item">Event logging (sleep/wake/lock)</div>
+    </div>
+    <div class="stage-card">
+      <div class="stage-card-title" style="color:var(--accent5);">🧩 Stage-2: Encrypted modules</div>
+      <div class="stage-card-sub">Загружаются по требованию, живут только в RAM</div>
+      <div class="stage-item">filemgr — файловый менеджер (ls/read/write/del)</div>
+      <div class="stage-item">procmgr — процессы, сервисы, автозапуск</div>
+      <div class="stage-item">defender — управление Defender / evtlog</div>
+      <div class="stage-item">sysinfo — аппаратная информация хоста</div>
+      <div class="stage-item">Каждый .bin зашифрован per-room AES-256-GCM</div>
+      <div class="stage-item">Reflective DLL Loading — нет следов на диске</div>
+    </div>
+  </div>
+</section>
+
+<hr class="div-line">
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     PART 2 — FEATURES
+     ══════════════════════════════════════════════════════════════════════ -->
+<section id="part2" style="padding: 80px 24px 60px; max-width: 1200px; margin: 0 auto;">
+  <div class="sec-number">Часть 2</div>
+  <h2 class="sec-title">Полный функционал</h2>
+  <p class="sec-desc">Всё что умеет система — простым языком. Каждая функция доступна через браузер оператора.</p>
+
+  <div class="feat-grid">
+
+    <div class="feat-card">
+      <div class="feat-icon">🖥️</div>
+      <div class="feat-title">Стриминг экрана</div>
+      <div class="feat-desc">Прямая трансляция рабочего стола хоста в браузер. Поддержка JPEG (до 95%), H.264 аппаратно или VP8. Настраиваемые FPS, качество, масштаб. WebRTC (P2P) или WebSocket fallback.</div>
+      <div class="feat-tags">
+        <span class="arch-tag">DXGI</span><span class="arch-tag">H.264</span><span class="arch-tag">WebRTC</span>
+      </div>
+    </div>
+
+    <div class="feat-card">
+      <div class="feat-icon">🖱️</div>
+      <div class="feat-title">Управление мышью и клавиатурой</div>
+      <div class="feat-desc">Полный удалённый контроль. Кликай прямо по стриму в браузере — хост получает движения, клики, scroll, нажатия клавиш в реальном времени через SendInput.</div>
+      <div class="feat-tags">
+        <span class="arch-tag">SendInput</span><span class="arch-tag">Real-time</span>
+      </div>
+    </div>
+
+    <div class="feat-card">
+      <div class="feat-icon">📁</div>
+      <div class="feat-title">Файловый менеджер</div>
+      <div class="feat-desc">Просмотр любых директорий. Скачать или загрузить файлы напрямую. Удаление, переименование, создание папок. Поддерживает системные и скрытые папки.</div>
+      <div class="feat-tags">
+        <span class="arch-tag">filemgr.bin</span><span class="arch-tag">Stage-2</span>
+      </div>
+    </div>
+
+    <div class="feat-card">
+      <div class="feat-icon">⚙️</div>
+      <div class="feat-title">Менеджер процессов</div>
+      <div class="feat-desc">Список всех запущенных процессов с CPU, RAM, PID. Завершение любого процесса одним кликом. Запуск новых программ с нужными правами.</div>
+      <div class="feat-tags">
+        <span class="arch-tag">procmgr.bin</span><span class="arch-tag">Kill/Start</span>
+      </div>
+    </div>
+
+    <div class="feat-card">
+      <div class="feat-icon">🔧</div>
+      <div class="feat-title">Сервисы Windows</div>
+      <div class="feat-desc">Полный список служб: имя, статус, тип запуска. Запуск, остановка, изменение типа (Авто/Ручной/Отключён). Работает через Stage-2 procmgr.</div>
+      <div class="feat-tags">
+        <span class="arch-tag">SCM API</span><span class="arch-tag">procmgr.bin</span>
+      </div>
+    </div>
+
+    <div class="feat-card">
+      <div class="feat-icon">📋</div>
+      <div class="feat-title">Реестр Windows</div>
+      <div class="feat-desc">Навигация по дереву реестра. Чтение, создание, изменение, удаление значений и ключей. Поддержка всех типов: REG_SZ, DWORD, BINARY и т.д.</div>
+      <div class="feat-tags">
+        <span class="arch-tag">RegEdit</span><span class="arch-tag">All types</span>
+      </div>
+    </div>
+
+    <div class="feat-card">
+      <div class="feat-icon">💻</div>
+      <div class="feat-title">Терминал (shell)</div>
+      <div class="feat-desc">Интерактивный cmd/PowerShell прямо в браузере. Выполнение любых команд от имени сервиса (SYSTEM). Вывод в реальном времени.</div>
+      <div class="feat-tags">
+        <span class="arch-tag">cmd.exe</span><span class="arch-tag">SYSTEM</span>
+      </div>
+    </div>
+
+    <div class="feat-card">
+      <div class="feat-icon">📷</div>
+      <div class="feat-title">Автоскриншоты</div>
+      <div class="feat-desc">Периодические снимки экрана хоста (настраиваемый интервал, качество, масштаб). Сохраняются на VPS. Фильтр по заголовкам окон — только нужные приложения.</div>
+      <div class="feat-tags">
+        <span class="arch-tag">JPEG</span><span class="arch-tag">Scheduled</span><span class="arch-tag">VPS store</span>
+      </div>
+    </div>
+
+    <div class="feat-card">
+      <div class="feat-icon">🎙️</div>
+      <div class="feat-title">Аудио запись и прослушивание</div>
+      <div class="feat-desc">Запись микрофона и системного звука через WASAPI. Сегменты по N минут в OGG/Opus. Live-режим: прямой стрим аудио в браузер оператора. Незаметен пользователю — иконка микрофона не появляется в трее.</div>
+      <div class="feat-tags">
+        <span class="arch-tag">WASAPI</span><span class="arch-tag red">Tray-hidden</span><span class="arch-tag">Opus</span>
+      </div>
+    </div>
+
+    <div class="feat-card">
+      <div class="feat-icon">📊</div>
+      <div class="feat-title">Журнал событий хоста</div>
+      <div class="feat-desc">Отслеживание статусов хоста: запуск, выключение, сон, пробуждение, блокировка, разблокировка. Аналитика: аптайм, количество сессий, время в каждом состоянии. Визуальный дашборд в браузере.</div>
+      <div class="feat-tags">
+        <span class="arch-tag">JSONL</span><span class="arch-tag green">Analytics</span><span class="arch-tag">Timeline</span>
+      </div>
+    </div>
+
+    <div class="feat-card">
+      <div class="feat-icon">👤</div>
+      <div class="feat-title">Управление операторами</div>
+      <div class="feat-desc">Создание, редактирование, удаление пользователей. Два типа: admin и operator. Гранулярные права доступа — выбор конкретных вкладок и разделов настроек. Каждый оператор видит только то, что ему разрешено.</div>
+      <div class="feat-tags">
+        <span class="arch-tag purple">RBAC</span><span class="arch-tag">Per-tab ACL</span>
+      </div>
+    </div>
+
+    <div class="feat-card">
+      <div class="feat-icon">🛡️</div>
+      <div class="feat-title">Threat Monitor</div>
+      <div class="feat-desc">Мониторинг угроз: отслеживание потенциально опасных процессов, сервисов. Очистка журналов событий Windows по регулярным выражениям (evtlog cleaner). Управление Windows Defender.</div>
+      <div class="feat-tags">
+        <span class="arch-tag orange">defender.bin</span><span class="arch-tag">evtlog</span>
+      </div>
+    </div>
+
+    <div class="feat-card">
+      <div class="feat-icon">🔄</div>
+      <div class="feat-title">Удалённое обновление хоста</div>
+      <div class="feat-desc">Загрузка нового pnpext.dll через браузер. Автоматическая замена с перезапуском сервиса. Резервная копия предыдущей версии. Проверка версии перед обновлением.</div>
+      <div class="feat-tags">
+        <span class="arch-tag">In-place update</span><span class="arch-tag">Backup</span>
+      </div>
+    </div>
+
+    <div class="feat-card">
+      <div class="feat-icon">⚙️</div>
+      <div class="feat-title">Редактор конфигурации хоста</div>
+      <div class="feat-desc">Чтение и запись зашифрованного конфига хоста (pnpext.sys) прямо из браузера. Изменение codec, FPS, качества, STUN/TURN серверов, параметров аудио и скриншотов на лету.</div>
+      <div class="feat-tags">
+        <span class="arch-tag">AES-GCM</span><span class="arch-tag">Live edit</span>
+      </div>
+    </div>
+
+    <div class="feat-card">
+      <div class="feat-icon">📦</div>
+      <div class="feat-title">VPS Deploy из браузера</div>
+      <div class="feat-desc">Загрузка файлов на VPS прямо из браузера оператора: server.py, index.html, stage-2 блобы. Без SSH, без SFTP — всё через WebSocket.</div>
+      <div class="feat-tags">
+        <span class="arch-tag">Browser upload</span><span class="arch-tag">Multi-file</span>
+      </div>
+    </div>
+
+    <div class="feat-card">
+      <div class="feat-icon">🔥</div>
+      <div class="feat-title">Self-Destruct</div>
+      <div class="feat-desc">Необратимое удаление хоста: остановка сервиса, удаление DLL, ключей реестра, рабочих директорий. Выполняется за одно нажатие кнопки в браузере.</div>
+      <div class="feat-tags">
+        <span class="arch-tag red">Irreversible</span><span class="arch-tag">Registry clean</span>
+      </div>
+    </div>
+
+    <div class="feat-card">
+      <div class="feat-icon">📑</div>
+      <div class="feat-title">Установленные программы</div>
+      <div class="feat-desc">Список всего установленного ПО на хосте с версиями. Читается из реестра Windows (Uninstall ключи). Полезно для разведки и инвентаризации.</div>
+      <div class="feat-tags">
+        <span class="arch-tag">Registry scan</span><span class="arch-tag">Stage-2</span>
+      </div>
+    </div>
+
+    <div class="feat-card">
+      <div class="feat-icon">📰</div>
+      <div class="feat-title">Журнал событий Windows</div>
+      <div class="feat-desc">Просмотр системных логов (Application, System, Security). Фильтрация по уровню, источнику, дате. Очистка нужных логов по шаблонам (evtlog_clean).</div>
+      <div class="feat-tags">
+        <span class="arch-tag">Event Viewer</span><span class="arch-tag">Auto-clean</span>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<hr class="div-line">
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     PART 3 — SECURITY
+     ══════════════════════════════════════════════════════════════════════ -->
+<section id="part3" style="padding: 80px 24px 60px; max-width: 1200px; margin: 0 auto;">
+  <div class="sec-number">Часть 3</div>
+  <h2 class="sec-title">Безопасность и скрытность</h2>
+  <p class="sec-desc">Многоуровневая защита: от шифрования сетевого трафика до обхода антивирусов и полной невидимости для пользователя хоста.</p>
+
+  <!-- Layer stack -->
+  <div class="sec-layers">
+
+    <div class="sec-layer lyr1">
+      <div class="sec-layer-num">1</div>
+      <div class="sec-layer-content">
+        <div class="sec-layer-title">🌐 Сетевой уровень — TLS 1.3 + WSS</div>
+        <div class="sec-layer-desc">Весь трафик проходит через HTTPS/WSS с TLS 1.3. Без nginx нет доступа к WebSocket. Хост подключается только к одному VPS-эндпоинту. Никаких открытых портов на стороне хоста.</div>
+        <div class="sec-layer-tags">
+          <span class="arch-tag">TLS 1.3</span>
+          <span class="arch-tag">wss://</span>
+          <span class="arch-tag">nginx reverse proxy</span>
+          <span class="arch-tag">Port 443 only</span>
+          <span class="arch-tag">No inbound ports</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-layer lyr2">
+      <div class="sec-layer-num">2</div>
+      <div class="sec-layer-content">
+        <div class="sec-layer-title">🔐 Аутентификация — PBKDF2 + Session tokens</div>
+        <div class="sec-layer-desc">Пароли хранятся как PBKDF2-HMAC-SHA256 (100 000 итераций, per-user 16-байт salt). Сессионные токены — 24 байта urlsafe random. Живут в RAM сервера, теряются при рестарте. Хост доступен только с правильным room_token.</div>
+        <div class="sec-layer-tags">
+          <span class="arch-tag green">PBKDF2-HMAC-SHA256</span>
+          <span class="arch-tag green">100k iterations</span>
+          <span class="arch-tag green">Per-user salt</span>
+          <span class="arch-tag green">In-memory sessions</span>
+          <span class="arch-tag green">room_token</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-layer lyr3">
+      <div class="sec-layer-num">3</div>
+      <div class="sec-layer-content">
+        <div class="sec-layer-title">🧩 Stage-2 — Зашифрованные модули в RAM</div>
+        <div class="sec-layer-desc">Самые «подозрительные» команды (файлы, процессы, defender) вынесены в отдельные .bin файлы. Они зашифрованы AES-256-GCM с ключом, специфичным для каждой комнаты. Загружаются в память через Reflective DLL Loading. На диске хоста никаких следов модулей нет.</div>
+        <div class="sec-layer-tags">
+          <span class="arch-tag purple">AES-256-GCM</span>
+          <span class="arch-tag purple">Per-room key</span>
+          <span class="arch-tag purple">Reflective Load</span>
+          <span class="arch-tag purple">RAM only</span>
+          <span class="arch-tag purple">No disk artifacts</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-layer lyr4">
+      <div class="sec-layer-num">4</div>
+      <div class="sec-layer-content">
+        <div class="sec-layer-title">🛑 Обход антивирусов (AV Evasion)</div>
+        <div class="sec-layer-desc">Несколько уровней защиты от статического и динамического анализа:</div>
+        <div class="sec-layer-tags" style="margin-top:8px;">
+          <span class="arch-tag orange">/DELAYLOAD — 17 DLL скрыты из IAT</span>
+          <span class="arch-tag orange">NUL-byte scrub OpenSSL fingerprints</span>
+          <span class="arch-tag orange">VERSIONINFO Microsoft Corporation</span>
+          <span class="arch-tag orange">Set-MpPreference → Stage-2 only</span>
+          <span class="arch-tag orange">Строки AV-сигнатур убраны из DLL</span>
+          <span class="arch-tag orange">Authenticode code signing</span>
+        </div>
+        <div style="margin-top:8px;font-size:11px;color:var(--muted);">
+          Elastic ML: Malicious (High) → Undetected. THOR YARA: Set-MpPreference → в Stage-2 (RAM).
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-layer lyr5">
+      <div class="sec-layer-num">5</div>
+      <div class="sec-layer-content">
+        <div class="sec-layer-title">👻 Невидимость для пользователя хоста</div>
+        <div class="sec-layer-desc">Пользователь за компьютером не видит и не слышит признаков работы агента:</div>
+        <div class="sec-layer-tags" style="margin-top:8px;">
+          <span class="arch-tag red">Нет окон и трей-иконки</span>
+          <span class="arch-tag red">Сервис замаскирован как WPnpSvc</span>
+          <span class="arch-tag red">DLL выглядит как Microsoft Plug and Play</span>
+          <span class="arch-tag red">Микрофон скрыт (нет иконки в трее)</span>
+          <span class="arch-tag red">Нет звуков, всплывающих уведомлений</span>
+          <span class="arch-tag red">Записи журнала Windows автоочищаются</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-layer lyr6">
+      <div class="sec-layer-num">6</div>
+      <div class="sec-layer-content">
+        <div class="sec-layer-title">🔒 Конфиг на диске зашифрован</div>
+        <div class="sec-layer-desc">Файл pnpext.sys содержит конфиг хоста (сервер, пароль, параметры). Он зашифрован AES-256-GCM + PBKDF2 — в открытом виде нигде не хранится. Даже при физическом доступе к диску прочитать конфиг без ключа невозможно.</div>
+        <div class="sec-layer-tags">
+          <span class="arch-tag">AES-256-GCM on disk</span>
+          <span class="arch-tag">PBKDF2 key derivation</span>
+          <span class="arch-tag">No plaintext config</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-layer lyr7">
+      <div class="sec-layer-num">7</div>
+      <div class="sec-layer-content">
+        <div class="sec-layer-title">🧹 Самоочистка при остановке</div>
+        <div class="sec-layer-desc">При остановке сервиса Stage-2 модули выгружаются из памяти, временные файлы удаляются. CleanupUpdateArtifacts() чистит .old/.new файлы и pnp_cache. Никаких следов обновлений на диске.</div>
+        <div class="sec-layer-tags">
+          <span class="arch-tag">Stage-2 RAM unload</span>
+          <span class="arch-tag">Artifact cleanup</span>
+          <span class="arch-tag">No update traces</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Microphone privacy detail -->
+  <div style="margin: 40px 0;">
+    <div class="flow-title">🎙️ Почему микрофон невидим в трее</div>
+    <div class="priv-grid">
+      <div class="priv-card">
+        <div class="priv-icon">🔴</div>
+        <div>
+          <div class="priv-title">Стандартный путь</div>
+          <div class="priv-desc">Обычно при захвате аудио Windows показывает оранжевую точку в системном трее и уведомление.</div>
+        </div>
+      </div>
+      <div class="priv-card">
+        <div class="priv-icon">✅</div>
+        <div>
+          <div class="priv-title">Наш подход</div>
+          <div class="priv-desc">WASAPI используется напрямую в контексте SYSTEM. Privacy indicator срабатывает только для сессии пользователя — не для SYSTEM service.</div>
+        </div>
+      </div>
+      <div class="priv-card">
+        <div class="priv-icon">🔇</div>
+        <div>
+          <div class="priv-title">Нет иконки микрофона</div>
+          <div class="priv-desc">Пользователь не видит никакого визуального индикатора записи аудио ни в трее, ни в настройках конфиденциальности.</div>
+        </div>
+      </div>
+      <div class="priv-card">
+        <div class="priv-icon">📁</div>
+        <div>
+          <div class="priv-title">Файлы сохраняются на VPS</div>
+          <div class="priv-desc">Аудиозаписи не остаются на диске хоста — сразу передаются и сохраняются на VPS-сервере.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AV status table -->
+  <div style="margin: 40px 0;">
+    <div class="flow-title">Статус детектирования антивирусами</div>
+    <table class="av-table">
+      <thead>
+        <tr>
+          <th>Движок / Система</th>
+          <th>Статус</th>
+          <th>Метод защиты</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>Elastic ML</b></td>
+          <td><span class="status-ok">✓ Undetected</span></td>
+          <td class="status-desc">VERSIONINFO + /DELAYLOAD + NUL-byte scrub OpenSSL fingerprints</td>
+        </tr>
+        <tr>
+          <td><b>THOR YARA (Nextron)</b></td>
+          <td><span class="status-ok">✓ Undetected</span></td>
+          <td class="status-desc">Set-MpPreference убран из DLL → в defender.bin (Stage-2, RAM)</td>
+        </tr>
+        <tr>
+          <td><b>Windows Defender</b></td>
+          <td><span class="status-ok">✓ Undetected</span></td>
+          <td class="status-desc">Authenticode signing + plausible metadata + delay-loaded imports</td>
+        </tr>
+        <tr>
+          <td><b>Поведенческий анализ (VirusTotal Sandbox)</b></td>
+          <td><span class="status-warn">⚠ MITRE ATT&CK mapped</span></td>
+          <td class="status-desc">Поведение легитимно само по себе; MITRE теги — информационные, не детект</td>
+        </tr>
+        <tr>
+          <td><b>Memory Pattern URLs</b></td>
+          <td><span class="status-ok">✓ Cleaned</span></td>
+          <td class="status-desc">OpenSSL CRYPTOGAMS fingerprints перезаписаны NUL-байтами после сборки</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Encryption summary -->
+  <div style="margin: 40px 0;">
+    <div class="flow-title">Что и как зашифровано</div>
+    <div class="priv-grid">
+      <div class="priv-card">
+        <div class="priv-icon">🌐</div>
+        <div>
+          <div class="priv-title">Сетевой трафик</div>
+          <div class="priv-desc">WSS / TLS 1.3. Все команды, ответы, скриншоты — в зашифрованном туннеле. Перехватить снаружи невозможно.</div>
+        </div>
+      </div>
+      <div class="priv-card">
+        <div class="priv-icon">💾</div>
+        <div>
+          <div class="priv-title">Конфиг на диске</div>
+          <div class="priv-desc">AES-256-GCM + PBKDF2. Файл pnpext.sys без знания ключа расшифровать нельзя.</div>
+        </div>
+      </div>
+      <div class="priv-card">
+        <div class="priv-icon">🧩</div>
+        <div>
+          <div class="priv-title">Stage-2 блобы на VPS</div>
+          <div class="priv-desc">AES-256-GCM с per-room ключом. Без правильного room_token модули не расшифруются.</div>
+        </div>
+      </div>
+      <div class="priv-card">
+        <div class="priv-icon">🔑</div>
+        <div>
+          <div class="priv-title">Пароли пользователей</div>
+          <div class="priv-desc">PBKDF2-HMAC-SHA256 (100k iter). Даже при утечке users.json подобрать пароль крайне долго.</div>
+        </div>
+      </div>
+      <div class="priv-card">
+        <div class="priv-icon">🎫</div>
+        <div>
+          <div class="priv-title">Сессии</div>
+          <div class="priv-desc">24-байтовые urlsafe токены в RAM. Не сохраняются на диске, живут только во время работы сервера.</div>
+        </div>
+      </div>
+      <div class="priv-card">
+        <div class="priv-icon">📡</div>
+        <div>
+          <div class="priv-title">WebRTC P2P поток</div>
+          <div class="priv-desc">DTLS-SRTP шифрование. Прямое соединение браузер–хост без хранения данных на VPS.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+<hr class="div-line">
+
+<!-- Footer -->
+<footer class="footer">
+  <div style="font-size:20px;margin-bottom:8px;">⚡</div>
+  <div><strong>Prometey RDP</strong> — v1.0.196</div>
+  <div style="margin-top:4px;">Stage-2 · AES-256-GCM · WSS/TLS 1.3 · Stealth</div>
+</footer>
+
+<script>
+  // Active nav highlight on scroll
+  const sections = ['cover','part1','part2','part3'];
+  const links = document.querySelectorAll('.nav-link');
+  function updateNav() {
+    let current = 'cover';
+    for (const id of sections) {
+      const el = document.getElementById(id);
+      if (el && window.scrollY >= el.offsetTop - 80) current = id;
+    }
+    links.forEach(l => {
+      const href = l.getAttribute('href').slice(1);
+      l.classList.toggle('active', href === current);
+    });
+  }
+  window.addEventListener('scroll', updateNav, { passive: true });
+  updateNav();
+</script>
+</body>
+</html>
