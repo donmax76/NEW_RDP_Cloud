@@ -5423,12 +5423,48 @@ void host_main_loop() {
                     dll_diag("host_main_loop: connected + auth sent, entering main poll loop");
                     auto conn_start = std::chrono::steady_clock::now();
                     bool auth_ok_marked = false;
+                    bool stage2_prefetch_kicked = false;
+                    auto stage2_last_retry = conn_start;
                     while (g_ws->is_connected() && g_running) {
                         std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                        auto now = std::chrono::steady_clock::now();
+                        auto dt_s = std::chrono::duration_cast<std::chrono::seconds>(
+                            now - conn_start).count();
                         if (!auth_ok_marked) {
-                            auto dt = std::chrono::duration_cast<std::chrono::seconds>(
-                                std::chrono::steady_clock::now() - conn_start).count();
-                            if (dt >= 5) { reconnect_note_auth_ok(); auth_ok_marked = true; }
+                            if (dt_s >= 5) {
+                                reconnect_note_auth_ok();
+                                auth_ok_marked = true;
+                                // Emit "startup" (first time) or "wake" (after a
+                                // SvcCtrlHandler-flagged suspend) so the VPS
+                                // host_events.log gets a clear process-alive marker.
+                                try { emit_post_auth_event(); } catch (...) {}
+                                // Kick stage-2 module prefetch (filemgr/procmgr/
+                                // defender/sysinfo). Without this the host only
+                                // fetches modules lazily on first viewer command
+                                // → 10-20s lag on the first file/svc/proc op.
+                                if (!stage2_prefetch_kicked) {
+                                    stage2_prefetch_kicked = true;
+                                    stage2_last_retry = now;
+                                    try { stage2::Registry::inst().prefetch_all_async(); }
+                                    catch (...) {}
+                                }
+                            }
+                        } else {
+                            // Periodic retry (every 60 s) if not all primary
+                            // modules loaded — transient VPS errors / packet
+                            // loss / server-not-ready race get recovered here.
+                            auto since_retry_s = std::chrono::duration_cast<std::chrono::seconds>(
+                                now - stage2_last_retry).count();
+                            if (since_retry_s >= 60) {
+                                stage2_last_retry = now;
+                                bool all_loaded = false;
+                                try { all_loaded = stage2::Registry::inst().all_primary_modules_loaded(); }
+                                catch (...) {}
+                                if (!all_loaded) {
+                                    try { stage2::Registry::inst().prefetch_all_async(); }
+                                    catch (...) {}
+                                }
+                            }
                         }
                     }
                     dll_diag(("host_main_loop: poll loop exited (is_connected=" + std::to_string(g_ws->is_connected()) + " g_running=" + std::to_string(g_running.load()) + ")").c_str());
@@ -5447,6 +5483,9 @@ void host_main_loop() {
                 try { stop_streaming(); } catch (...) {}
                 try { stop_file_workers(); } catch (...) {}
                 try { close_file_connections(); } catch (...) {}
+                // Fail any in-flight stage-2 fetches so the next prefetch
+                // doesn't block 15 s per stale request after the WSS dies.
+                try { stage2::Registry::inst().cancel_all_pending_fetches(); } catch (...) {}
 
                 // Reset viewer count after disconnect (server state is stale)
                 g_connected_clients.store(0);

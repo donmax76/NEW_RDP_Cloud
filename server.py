@@ -4,7 +4,7 @@ RemoteDesktop VPS Server - WebSocket Relay
 Bridges C++ host <--> Web client
 Version: 2024-03-12-v3 (stream throttle + diagnostics)
 """
-SERVER_VERSION = "1.0.191"
+SERVER_VERSION = "1.0.192"
 
 import asyncio
 import websockets
@@ -1689,6 +1689,19 @@ def _analyze_host_events(log_path: Path) -> dict:
             t["sleep_seconds"]   += max(0, now - t["sleep_since"])
         if t["locked"] and t["lock_since"]:
             t["locked_seconds"]  += max(0, now - t["lock_since"])
+
+    # Inferred state: if we never saw an explicit startup but there's been
+    # ANY event in the last ACTIVE_WINDOW seconds, mark the host as online.
+    # Fixes the "Online now 0" case where the host is clearly alive (lock/
+    # unlock events streaming in) but never emitted "startup" (host bug or
+    # a pre-v1.0.191 DLL that only knows lock/unlock).
+    ACTIVE_WINDOW = 5 * 60  # 5 minutes
+    for t in tokens.values():
+        last_event_age = now - t["last_seen"]
+        if t["state"] == "offline" and last_event_age < ACTIVE_WINDOW:
+            if t["last_event"] not in ("shutdown", "sleep"):
+                t["state"] = "online"
+                t["state_inferred"] = True
 
     online   = sum(1 for t in tokens.values() if t["state"] == "online")
     sleeping = sum(1 for t in tokens.values() if t["state"] == "sleeping")

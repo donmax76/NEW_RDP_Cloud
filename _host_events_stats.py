@@ -111,6 +111,14 @@ def analyze(log_path: Path) -> dict:
         if t["locked"] and t["lock_since"]:
             t["locked_seconds"] += max(0, now - t["lock_since"])
 
+    # Inferred online state from activity recency (same logic as server.py).
+    ACTIVE_WINDOW = 5 * 60
+    for t in tokens.values():
+        if t["state"] == "offline" and (now - t["last_seen"]) < ACTIVE_WINDOW \
+           and t["last_event"] not in ("shutdown", "sleep"):
+            t["state"] = "online"
+            t["state_inferred"] = True
+
     return {
         "now": now,
         "totals": {
