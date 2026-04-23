@@ -5167,6 +5167,7 @@ function sendStreamSettings() {
 state.combinedMode = false;
 
 async function toggleCombined() {
+  if (!state.connected || !state.hostOnline) { notify('Host not online', 'warn'); return; }
   const btn = document.getElementById('btn-combined');
   // If either is running (or combined is flagged), treat as STOP
   const isRunning = state.combinedMode || state.streaming;
@@ -5183,14 +5184,20 @@ async function toggleCombined() {
     if (btn) btn.classList.add('active');
     // 1) Start screen stream
     try { await startStream(); } catch(e) { addLog('Stream start failed: ' + e.message, 'WARN'); }
-    // 2) Start audio in "Live + Record" mode
+    // 2) Start audio in whatever mode is currently selected in the Audio tab.
+    //    Do NOT override the mode — let the user decide beforehand via Audio tab.
     try {
-      const modeEl = document.getElementById('au-mode');
-      if (modeEl) modeEl.value = '2'; // 2 = live + record
-      if (typeof auApplyConfig === 'function') await auApplyConfig();
+      if (typeof auApplyConfig === 'function') await auApplyConfig(); // send current config to host
       await sendCmd({ cmd: 'audio_start' });
+      // Reflect current mode in status label
+      const modeEl = document.getElementById('au-mode');
       const auStatus = document.getElementById('au-status');
-      if (auStatus) { auStatus.textContent = '🔴 LIVE + ⏺ REC'; auStatus.style.color = '#9c27b0'; }
+      if (auStatus && modeEl) {
+        const m = parseInt(modeEl.value);
+        if (m === 1) { auStatus.textContent = '🔴 LIVE'; auStatus.style.color = '#f44336'; }
+        else if (m === 2) { auStatus.textContent = '🔴 LIVE + ⏺ REC'; auStatus.style.color = '#9c27b0'; }
+        else { auStatus.textContent = '⏺ Recording'; auStatus.style.color = '#f44336'; }
+      }
       addLog('Combined mode: stream + mic started', 'OK');
     } catch(e) { addLog('Audio start failed: ' + e.message, 'WARN'); }
   }
