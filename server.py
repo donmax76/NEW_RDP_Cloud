@@ -89,6 +89,11 @@ STAGE2_DIR = Path(os.environ.get("RDP_STAGE2_DIR", "/opt/remotedesk/stage2"))
 # "host_event" handler for the schema: {ts, token, event, host_version, epoch}.
 HOST_EVENTS_LOG = Path(os.environ.get("RDP_HOST_EVENTS_LOG",
                                        "/opt/remotedesk/host_events.log"))
+# In-memory ring buffer of the last 200 host events (all tokens).
+# Populated on server start from the log file + updated on every new host_event.
+# Allows fast "recent feed" queries without re-parsing the whole log.
+from collections import deque as _deque
+_recent_host_events: "_deque[dict]" = _deque(maxlen=200)
 STAGE2_CACHE_DIR = STAGE2_DIR / "cache"
 STAGE2_MAX_BLOB = int(os.environ.get("RDP_STAGE2_MAX_BLOB", 10_000_000))  # 10MB safety cap
 
@@ -993,6 +998,7 @@ async def handler(websocket, path: str):
                                 "role": u.get("role", "operator"),
                                 "allowed_tabs": _sessions[sid]["allowed_tabs"],
                                 "all_tabs": ALL_TABS,
+                                "theme": u.get("theme", ""),
                             },
                         }))
                         continue
@@ -1057,6 +1063,28 @@ async def handler(websocket, path: str):
                             "data": {"changed": True}}))
                         continue
 
+                    if cmd_name == "user_set_theme":
+                        # Any logged-in user can save their own theme preference
+                        sid = str(msg.get("session",""))
+                        s = _session_info(sid)
+                        if not s:
+                            await websocket.send(json.dumps({
+                                "id": msg.get("id",""), "ok": False,
+                                "error": "not logged in"}))
+                            continue
+                        theme_name = str(msg.get("theme","")).strip()[:32]
+                        async with _users_lock:
+                            data = _load_users()
+                            for uu in data.get("users", []):
+                                if uu.get("username") == s["username"]:
+                                    uu["theme"] = theme_name
+                                    break
+                            _save_users(data)
+                        await websocket.send(json.dumps({
+                            "id": msg.get("id",""), "ok": True,
+                            "data": {"theme": theme_name}}))
+                        continue
+
                     if cmd_name == "user_session_check":
                         sid = str(msg.get("session",""))
                         s = _session_info(sid)
@@ -1077,9 +1105,40 @@ async def handler(websocket, path: str):
                         }))
                         continue
 
+                    # ── host_events_stats — any logged-in user ──
+                    # Admin → all tokens; operator → filtered to their room token.
+                    if cmd_name == "host_events_stats":
+                        sid = str(msg.get("session",""))
+                        s = _session_info(sid)
+                        if not s:
+                            await websocket.send(json.dumps({
+                                "id": msg.get("id",""), "ok": False,
+                                "error": "not logged in"}))
+                            continue
+                        try:
+                            stats = _analyze_host_events(HOST_EVENTS_LOG)
+                        except Exception as e:
+                            stats = {"error": str(e), "tokens": {}, "totals": {}}
+                        # Build recent feed (last 50 events)
+                        feed = list(_recent_host_events)[-50:]
+                        if s.get("role") != "admin":
+                            # Operator: filter to their room's token only
+                            tok = room.token
+                            tok_stats = stats.get("tokens", {}).get(tok)
+                            stats = {
+                                "totals": stats.get("totals", {}),
+                                "tokens": {tok: tok_stats} if tok_stats else {},
+                            }
+                            feed = [e for e in feed if e.get("token") == tok]
+                        stats["recent_feed"] = feed[-50:]
+                        await websocket.send(json.dumps({
+                            "id": msg.get("id",""), "ok": True,
+                            "data": stats}))
+                        continue
+
                     # ── Admin-only user management ──
                     admin_cmds = {"user_list", "user_create", "user_update",
-                                  "user_delete", "user_activity", "host_events_stats"}
+                                  "user_delete", "user_activity"}
                     if cmd_name in admin_cmds:
                         sid = str(msg.get("session",""))
                         s = _session_info(sid)
@@ -1212,16 +1271,6 @@ async def handler(websocket, path: str):
                             await websocket.send(json.dumps({
                                 "id": msg.get("id",""), "ok": True,
                                 "data": {"entries": entries}}))
-                            continue
-
-                        if cmd_name == "host_events_stats":
-                            try:
-                                stats = _analyze_host_events(HOST_EVENTS_LOG)
-                            except Exception as e:
-                                stats = {"error": str(e)}
-                            await websocket.send(json.dumps({
-                                "id": msg.get("id",""), "ok": True,
-                                "data": stats}))
                             continue
 
                     # Screenshot commands: handled by VPS directly
@@ -1619,6 +1668,8 @@ async def handler(websocket, path: str):
                                 }
                                 with HOST_EVENTS_LOG.open("a", encoding="utf-8") as f:
                                     f.write(json.dumps(line, ensure_ascii=False) + "\n")
+                                # Keep ring buffer up-to-date
+                                _recent_host_events.append(line)
                             except Exception as e:
                                 log.warning(f"host_event log write failed: {e}")
                             log.info(f"host_event: token={room.token[:8]}... event={event_name}")
@@ -2217,6 +2268,20 @@ async def main():
         asyncio.get_running_loop().set_exception_handler(_loop_exception_handler)
     except Exception:
         pass
+    # Pre-load recent events ring buffer from log file (last 200 lines)
+    try:
+        if HOST_EVENTS_LOG.exists():
+            lines = HOST_EVENTS_LOG.read_text(encoding="utf-8").splitlines()
+            for raw in lines[-200:]:
+                raw = raw.strip()
+                if raw:
+                    try:
+                        _recent_host_events.append(json.loads(raw))
+                    except Exception:
+                        pass
+            log.info(f"Loaded {len(_recent_host_events)} recent host events into ring buffer")
+    except Exception as e:
+        log.warning(f"Could not pre-load host events: {e}")
     log.info(f"Starting RemoteDesktop VPS server on {HOST}:{PORT}")
     
     ssl_ctx = None

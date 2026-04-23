@@ -860,23 +860,135 @@ body {
 .form-row { display: flex; gap: 10px; }
 .form-row .form-group { flex: 1; }
 
+/* ── CSS variable aliases (bridge between design-system names and dialog code) ── */
+:root {
+  --panel-bg: var(--panel);
+  --bg-dark:  var(--bg);
+  --bd:       var(--border);
+  --fg:       var(--text);
+  --warning:  var(--warn);
+}
+
+/* ── Per-user theme presets ─────────────────────────────────────────── */
+/* Applied dynamically by applyTheme(name) — each preset overrides only
+   the color tokens; fonts/radius are inherited from :root unchanged.    */
+
+/* Theme: Obsidian (purple/violet) */
+.theme-obsidian {
+  --bg: #0d0b14; --panel: #13101e; --card: #1a1628;
+  --border: #2d2545; --accent: #a855f7; --accent2: #ec4899;
+  --success: #34d399; --danger: #f87171; --warn: #fbbf24;
+  --text: #e2e0f0; --muted: #6d6a82;
+  --glow: 0 0 20px rgba(168,85,247,.2);
+}
+/* Theme: Matrix (green) */
+.theme-matrix {
+  --bg: #080e0a; --panel: #0a1209; --card: #0f1a0e;
+  --border: #1e3320; --accent: #00ff41; --accent2: #00bb2d;
+  --success: #00ff41; --danger: #ff4444; --warn: #ffcc00;
+  --text: #c0ffcb; --muted: #4d7a55;
+  --glow: 0 0 20px rgba(0,255,65,.2);
+}
+/* Theme: Crimson (red) */
+.theme-crimson {
+  --bg: #100808; --panel: #160c0c; --card: #1e1010;
+  --border: #3d1515; --accent: #ff4444; --accent2: #ff8c00;
+  --success: #00dd77; --danger: #ff4444; --warn: #ffcc00;
+  --text: #f0d0d0; --muted: #7a4d4d;
+  --glow: 0 0 20px rgba(255,68,68,.2);
+}
+/* Theme: Gold (amber/dark) */
+.theme-gold {
+  --bg: #0e0c08; --panel: #14110a; --card: #1c1710;
+  --border: #3a2e15; --accent: #f59e0b; --accent2: #ef4444;
+  --success: #22c55e; --danger: #ef4444; --warn: #f59e0b;
+  --text: #f0e8d0; --muted: #7a6a45;
+  --glow: 0 0 20px rgba(245,158,11,.2);
+}
+/* Theme: Arctic (light blue) */
+.theme-arctic {
+  --bg: #07090d; --panel: #0b0f17; --card: #111722;
+  --border: #1d2840; --accent: #38bdf8; --accent2: #818cf8;
+  --success: #34d399; --danger: #fb7185; --warn: #fbbf24;
+  --text: #cde4f8; --muted: #506070;
+  --glow: 0 0 20px rgba(56,189,248,.2);
+}
+
+/* Theme picker popup */
+#theme-picker {
+  display: none; position: absolute; top: 52px; right: 60px; z-index: 9999;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px 16px; box-shadow: 0 4px 24px rgba(0,0,0,.6); min-width: 220px;
+}
+#theme-picker.open { display: block; }
+.theme-picker-title { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 10px; }
+.theme-swatches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.theme-swatch {
+  border: 2px solid transparent; border-radius: 8px; padding: 8px 6px;
+  cursor: pointer; text-align: center; font-size: 10px; font-weight: 600;
+  transition: all .15s; color: #fff; letter-spacing: .5px;
+}
+.theme-swatch:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,.5); }
+.theme-swatch.active { border-color: #fff !important; box-shadow: 0 0 0 1px #fff, 0 4px 12px rgba(0,0,0,.5); }
+.theme-dot { width: 14px; height: 14px; border-radius: 50%; margin: 0 auto 4px; }
+#theme-btn { font-size:14px; cursor:pointer; padding:4px 8px; background:transparent;
+  border:1px solid var(--border); border-radius:5px; color:var(--text); transition:.15s;
+  display:none; }
+#theme-btn:hover { border-color:var(--accent); color:var(--accent); }
+
 .btn-primary {
-  width: 100%;
-  padding: 10px;
-  background: var(--accent);
-  color: var(--bg);
+  padding: 8px 20px;
+  background: linear-gradient(135deg, var(--accent), #0099bb);
+  color: #000;
   border: none;
-  font-family: var(--display);
-  font-size: 16px;
+  font-family: var(--mono);
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  border-radius: var(--radius);
+  letter-spacing: .5px;
+  border-radius: 6px;
   cursor: pointer;
   transition: all .15s;
-  margin-top: 8px;
+  box-shadow: 0 0 10px rgba(0,217,255,.25);
 }
-.btn-primary:hover { opacity: .85; transform: translateY(-1px); }
+.btn-primary:hover { opacity: .9; transform: translateY(-1px); box-shadow: 0 2px 16px rgba(0,217,255,.4); }
+.btn-primary:active { transform: translateY(0); }
+
+/* Inline-width variant (login page) */
+.btn-primary.full-width { width: 100%; padding: 10px; font-size: 16px; font-family: var(--display); letter-spacing: 2px; text-transform: uppercase; margin-top: 8px; }
+
+.btn-secondary {
+  padding: 6px 14px;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.btn-secondary:hover { background: rgba(255,255,255,.06); border-color: var(--accent); color: var(--accent); }
+.btn-secondary:active { transform: translateY(1px); }
+
+/* Dialog input / select shared style */
+.dlg-input {
+  width: 100%;
+  padding: 9px 12px;
+  background: #0d1117;
+  border: 2px solid #3d444d;
+  color: var(--text);
+  border-radius: 5px;
+  font-family: var(--mono);
+  font-size: 12px;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.dlg-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0,217,255,.12);
+}
+.dlg-input:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ══════════════════════════════════════════════════
    NOTIFICATIONS
@@ -958,7 +1070,7 @@ body {
 
 <!-- ══════════════════════════════════════════ TOP BAR ══ -->
 <div id="topbar">
-  <div class="logo">Prometey</div>
+  <div class="logo"><img src="docs/img/logo.jpg" onerror="this.style.display='none'" alt="" style="height:28px;width:28px;object-fit:cover;border-radius:5px;margin-right:6px;vertical-align:middle;">Prometey</div>
   <div class="sep"></div>
   <div id="conn-status">
     <div id="conn-dot"></div>
@@ -990,6 +1102,32 @@ body {
     <button class="topbar-btn" id="btn-stream-toggle" data-i18n="stream">▶ STREAM</button>
     <button class="topbar-btn" id="btn-record" data-i18n-title="record" title="Record"><span data-i18n="record">⏺ REC</span> <span id="rec-duration"></span></button>
     <button class="topbar-btn" id="btn-fullscreen" data-i18n-title="fullscreen" title="Fullscreen">&#x2922;</button>
+    <button id="theme-btn" title="Сменить тему" onclick="toggleThemePicker()">🎨</button>
+  </div>
+</div>
+
+<!-- Theme picker popup -->
+<div id="theme-picker">
+  <div class="theme-picker-title">Тема оформления</div>
+  <div class="theme-swatches">
+    <div class="theme-swatch" data-theme="" style="background:#0d1117;" onclick="selectTheme('')">
+      <div class="theme-dot" style="background:#00d9ff;"></div>Cyber
+    </div>
+    <div class="theme-swatch" data-theme="obsidian" style="background:#13101e;" onclick="selectTheme('obsidian')">
+      <div class="theme-dot" style="background:#a855f7;"></div>Obsidian
+    </div>
+    <div class="theme-swatch" data-theme="matrix" style="background:#0a1209;" onclick="selectTheme('matrix')">
+      <div class="theme-dot" style="background:#00ff41;"></div>Matrix
+    </div>
+    <div class="theme-swatch" data-theme="crimson" style="background:#160c0c;" onclick="selectTheme('crimson')">
+      <div class="theme-dot" style="background:#ff4444;"></div>Crimson
+    </div>
+    <div class="theme-swatch" data-theme="gold" style="background:#14110a;" onclick="selectTheme('gold')">
+      <div class="theme-dot" style="background:#f59e0b;"></div>Gold
+    </div>
+    <div class="theme-swatch" data-theme="arctic" style="background:#0b0f17;" onclick="selectTheme('arctic')">
+      <div class="theme-dot" style="background:#38bdf8;"></div>Arctic
+    </div>
   </div>
 </div>
 
@@ -1696,8 +1834,10 @@ body {
     <div id="panel-host_events" class="panel" style="flex-direction:column;">
       <div class="panel-header">
         <span class="panel-title">Host Events Dashboard</span>
-        <div style="margin-left:auto;">
-          <button id="he-refresh" class="btn-secondary" style="padding:4px 10px;font-size:12px;">Refresh</button>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+          <span id="he-live-badge" style="display:none;font-size:10px;padding:2px 8px;border-radius:99px;background:rgba(63,185,80,.15);color:var(--success);border:1px solid rgba(63,185,80,.4);">● LIVE</span>
+          <span id="he-updated" style="font-size:11px;color:var(--muted);"></span>
+          <button id="he-refresh" class="btn-secondary" style="padding:4px 10px;font-size:12px;">⟳ Refresh</button>
         </div>
       </div>
       <div style="flex:1; overflow-y:auto; padding:12px;" id="he-body">
@@ -2064,7 +2204,10 @@ body {
 <!-- ══════════════════════════════════════════ CONNECT MODAL ══ -->
 <div id="modal-overlay">
   <div class="modal">
-    <div class="modal-title" style="color:var(--accent)">Prometey</div>
+    <div class="modal-title" style="color:var(--accent);display:flex;align-items:center;justify-content:center;gap:10px;">
+    <img src="docs/img/logo.jpg" onerror="this.style.display='none'" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:8px;">
+    Prometey
+  </div>
     <div class="modal-subtitle">Connect to your VPS relay server to begin remote monitoring</div>
 
     <div class="form-row">
@@ -2109,7 +2252,7 @@ body {
       </div>
     </div>
 
-    <button type="button" class="btn-primary" id="btn-modal-connect">⚡ CONNECT</button>
+    <button type="button" class="btn-primary full-width" id="btn-modal-connect">⚡ CONNECT</button>
     <div id="modal-error" style="color:var(--danger);font-size:12px;margin-top:10px;min-height:16px;"></div>
   </div>
 </div>
@@ -3185,6 +3328,10 @@ function handleText(raw) {
     addLog(label + ' @ ' + when.toLocaleTimeString(),
            ev === 'shutdown' || ev === 'sleep' ? 'WARN' : 'OK');
     state.hostPowerState = ev;
+    // Push to live feed + update dashboard if open
+    hePushEvent({ event: ev, ts: msg.ts || Math.floor(Date.now()/1000),
+                  epoch: msg.ts || 0, host_version: msg.host_version || '',
+                  token: state.roomToken || '' });
     // Enrich the connection-status pill based on the new state.
     const hostEl = document.getElementById('host-status');
     if (hostEl) {
@@ -3288,6 +3435,11 @@ function handleText(raw) {
         state.allTabs      = data.all_tabs || [];
         try { localStorage.setItem('rdp_user', uname); } catch (e) {}
         applyTabVisibility();
+        // Apply per-user theme from server (overrides localStorage default)
+        if (typeof applyTheme === 'function') {
+          applyTheme(data.theme || '');
+          showThemeBtn();
+        }
         addLog('Logged in as ' + state.username + ' (' + state.userRole + ')', 'OK');
         finishInit();
       })
@@ -10695,83 +10847,199 @@ function applyTabVisibility() {
 }
 
 // ── Host Events Dashboard (embedded) ──
+// Ring buffer of events received via WebSocket this session
+// (up to 200 entries). Used for the live feed without a round-trip.
+state._heFeed = state._heFeed || [];
+let _heAutoTimer = null;  // setInterval handle for auto-refresh
+
+const _heEventLabel = {
+  startup:  { text: '🟢 ONLINE (запуск)',        color: 'var(--success)' },
+  shutdown: { text: '🔴 ВЫКЛЮЧЕН',               color: 'var(--danger)'  },
+  sleep:    { text: '🌙 СОН',                    color: 'var(--warning)' },
+  wake:     { text: '🟡 ПРОСНУЛСЯ',              color: 'var(--warning)' },
+  lock:     { text: '🔒 ЗАБЛОКИРОВАН',           color: 'var(--muted)'   },
+  unlock:   { text: '🔓 РАЗБЛОКИРОВАН',          color: 'var(--accent)'  },
+};
+
+function heFmtDur(s) {
+  s = Math.max(0, Math.floor(s || 0));
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = s % 60;
+  if (d) return d + 'd ' + h + 'h ' + m + 'm';
+  if (h) return h + 'h ' + m + 'm';
+  if (m) return m + 'm ' + r + 's';
+  return r + 's';
+}
+function heFmtTs(t) {
+  if (!t) return '—';
+  const d = new Date(t * 1000);
+  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
+}
+function heFmtWhen(tsStr) {
+  // tsStr can be ISO string or epoch number
+  if (!tsStr) return '—';
+  const d = typeof tsStr === 'number' ? new Date(tsStr * 1000) : new Date(tsStr);
+  if (isNaN(d)) return tsStr;
+  const now = Date.now();
+  const diff = Math.floor((now - d.getTime()) / 1000);
+  if (diff < 10) return 'только что';
+  if (diff < 60) return diff + 'с назад';
+  if (diff < 3600) return Math.floor(diff/60) + 'м назад';
+  if (diff < 86400) return Math.floor(diff/3600) + 'ч назад';
+  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+}
+
 function heRender(data) {
   const body = document.getElementById('he-body');
   if (!body) return;
-  if (!data) { body.innerHTML = '<div style="color:var(--danger);">No data</div>'; return; }
-  const tot = data.totals || {};
-  const toks = data.tokens || {};
+  if (!data) { body.innerHTML = '<div style="color:var(--danger);padding:16px;">Нет данных от сервера</div>'; return; }
+
+  const tot  = data.totals  || {};
+  const toks = data.tokens  || {};
+  const feed = data.recent_feed || [];
   const names = Object.keys(toks).sort();
 
-  const fmtDur = (s) => {
-    s = Math.max(0, Math.floor(s || 0));
-    const d = Math.floor(s / 86400);
-    const h = Math.floor((s % 86400) / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const r = s % 60;
-    if (d) return d + 'd ' + h + 'h ' + m + 'm';
-    if (h) return h + 'h ' + m + 'm';
-    if (m) return m + 'm ' + r + 's';
-    return r + 's';
-  };
-  const fmtTs = (t) => t ? new Date(t * 1000).toLocaleString() : '—';
+  // Merge server feed with client-side WebSocket events
+  const clientFeed = (state._heFeed || []).slice(-50);
+  // Deduplicate by ts+event+token
+  const allFeed = [...feed];
+  const feedKeys = new Set(feed.map(e => (e.epoch||e.ts||'') + e.event + (e.token||'')));
+  for (const ev of clientFeed) {
+    const k = (ev.epoch||ev.ts||'') + ev.event + (ev.token||'');
+    if (!feedKeys.has(k)) { allFeed.push(ev); feedKeys.add(k); }
+  }
+  allFeed.sort((a,b) => {
+    const ta = a.epoch || (a.ts ? new Date(a.ts).getTime()/1000 : 0);
+    const tb = b.epoch || (b.ts ? new Date(b.ts).getTime()/1000 : 0);
+    return tb - ta; // newest first
+  });
 
-  let html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px;">';
-  const kpi = (label, val, color) => `<div style="background:var(--panel-bg);border:1px solid var(--bd);padding:10px 12px;border-radius:4px;"><div style="color:var(--muted);font-size:11px;text-transform:uppercase;">${label}</div><div style="font-size:22px;font-weight:600;${color?'color:'+color+';':''}">${val}</div></div>`;
-  html += kpi('Hosts tracked', tot.hosts || 0);
-  html += kpi('Online now',    tot.online || 0, 'var(--success)');
-  html += kpi('Sleeping',      tot.sleeping || 0, 'var(--warning)');
-  html += kpi('Offline',       tot.offline || 0, 'var(--danger)');
+  let html = '';
+
+  // ── KPI cards ──
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;">';
+  const kpi = (icon, label, val, col) =>
+    `<div style="background:var(--panel-bg);border:1px solid var(--bd);padding:12px 14px;border-radius:6px;">
+      <div style="font-size:18px;margin-bottom:4px;">${icon}</div>
+      <div style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.5px;">${label}</div>
+      <div style="font-size:24px;font-weight:700;${col?'color:'+col+';':''}">${val}</div>
+    </div>`;
+  html += kpi('💻', 'Объектов',     tot.hosts    || names.length || 0);
+  html += kpi('🟢', 'Online',       tot.online   || 0, 'var(--success)');
+  html += kpi('🌙', 'Спят',         tot.sleeping || 0, 'var(--warning)');
+  html += kpi('🔴', 'Offline',      tot.offline  || 0, 'var(--danger)');
   html += '</div>';
 
-  html += '<table style="width:100%;border-collapse:collapse;background:var(--panel-bg);border:1px solid var(--bd);font-size:12px;">';
-  html += '<thead><tr style="background:var(--bg-dark);">';
-  for (const h of ['Token','State','Uptime','Sleep','Locked','Starts','Sleeps','Locks','Last event','Last seen']) {
-    html += '<th style="padding:6px 8px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;">' + h + '</th>';
+  // ── Per-token table ──
+  if (names.length) {
+    html += '<div style="overflow-x:auto;margin-bottom:20px;">';
+    html += '<table style="width:100%;border-collapse:collapse;background:var(--panel-bg);border:1px solid var(--bd);font-size:12px;min-width:700px;">';
+    html += '<thead><tr style="background:var(--bg-dark);">';
+    for (const h of ['Объект (token)','Состояние','Аптайм','Сон','Блокировок','Запусков','Усыплений','Последнее событие','Последняя активность']) {
+      html += `<th style="padding:7px 10px;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;white-space:nowrap;">${h}</th>`;
+    }
+    html += '</tr></thead><tbody>';
+    for (const tok of names) {
+      const t = toks[tok];
+      if (!t) continue;
+      const stC = t.state === 'online'   ? 'var(--success)'  :
+                  t.state === 'sleeping' ? 'var(--warning)'  : 'var(--danger)';
+      const stL = { online:'ONLINE', sleeping:'СОН', offline:'OFFLINE' }[t.state] || t.state;
+      const lockBadge = t.locked
+        ? '<span style="margin-left:4px;font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(255,166,87,.2);color:var(--accent5);">+LOCK</span>' : '';
+      html += '<tr style="border-top:1px solid var(--bd);">';
+      html += `<td style="padding:7px 10px;font-family:monospace;font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;">${tok}</td>`;
+      html += `<td style="padding:7px 10px;white-space:nowrap;"><span style="padding:2px 8px;border-radius:4px;background:rgba(88,166,255,.1);color:${stC};font-weight:700;font-size:10px;">${stL}</span>${lockBadge}</td>`;
+      html += `<td style="padding:7px 10px;">${heFmtDur(t.uptime_seconds)}</td>`;
+      html += `<td style="padding:7px 10px;">${heFmtDur(t.sleep_seconds)}</td>`;
+      html += `<td style="padding:7px 10px;text-align:center;">${t.locks || 0}</td>`;
+      html += `<td style="padding:7px 10px;text-align:center;">${t.startups || 0}</td>`;
+      html += `<td style="padding:7px 10px;text-align:center;">${t.sleeps || 0}</td>`;
+      html += `<td style="padding:7px 10px;color:var(--muted);">${t.last_event || '—'}</td>`;
+      html += `<td style="padding:7px 10px;color:var(--muted);white-space:nowrap;">${heFmtTs(t.last_seen)}</td>`;
+      html += '</tr>';
+    }
+    html += '</tbody></table></div>';
+  } else {
+    html += '<div style="padding:20px;color:var(--muted);text-align:center;background:var(--panel-bg);border:1px solid var(--bd);border-radius:6px;margin-bottom:20px;">Событий ещё не зафиксировано. Ожидание подключения объекта...</div>';
   }
-  html += '</tr></thead><tbody>';
-  if (!names.length) {
-    html += '<tr><td colspan="10" style="padding:12px;color:var(--muted);">No events logged yet.</td></tr>';
+
+  // ── Live event feed ──
+  html += `<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;font-weight:600;">
+    📡 Живая лента событий
+    <span style="font-weight:400;font-size:10px;">(${allFeed.length} записей)</span>
+  </div>`;
+  html += '<div style="background:var(--panel-bg);border:1px solid var(--bd);border-radius:6px;overflow:hidden;">';
+  if (!allFeed.length) {
+    html += '<div style="padding:16px;color:var(--muted);">Событий пока нет — ожидаем активности объекта.</div>';
+  } else {
+    for (const ev of allFeed.slice(0, 60)) {
+      const lbl = _heEventLabel[ev.event] || { text: ev.event, color: 'var(--muted)' };
+      const tsDisplay = ev.ts ? heFmtWhen(ev.ts) : (ev.epoch ? heFmtWhen(ev.epoch) : '—');
+      const tok8 = (ev.token || '').substring(0, 12);
+      const ver = ev.host_version ? `<span style="color:var(--muted);font-size:10px;"> v${ev.host_version}</span>` : '';
+      html += `<div style="display:flex;align-items:center;gap:12px;padding:7px 12px;border-bottom:1px solid rgba(48,54,61,.6);">
+        <span style="font-size:13px;width:20px;flex-shrink:0;">${lbl.text.split(' ')[0]}</span>
+        <span style="font-weight:600;color:${lbl.color};font-size:12px;min-width:160px;">${lbl.text.replace(/^[^ ]+ /,'')}</span>
+        ${ver}
+        <span style="color:var(--muted);font-size:11px;font-family:monospace;">${tok8}…</span>
+        <span style="margin-left:auto;color:var(--muted);font-size:11px;white-space:nowrap;">${tsDisplay}</span>
+      </div>`;
+    }
   }
-  for (const tok of names) {
-    const t = toks[tok];
-    const stColor = t.state === 'online' ? 'var(--success)' :
-                    t.state === 'sleeping' ? 'var(--warning)' : 'var(--danger)';
-    html += '<tr style="border-top:1px solid var(--bd);">';
-    html += '<td style="padding:6px 8px;font-family:monospace;">' + tok + '</td>';
-    html += '<td style="padding:6px 8px;"><span style="padding:2px 6px;border-radius:3px;background:rgba(88,166,255,.14);color:' + stColor + ';font-weight:600;text-transform:uppercase;font-size:10px;">' + t.state + (t.locked?'+lock':'') + '</span></td>';
-    html += '<td style="padding:6px 8px;">' + fmtDur(t.uptime_seconds) + '</td>';
-    html += '<td style="padding:6px 8px;">' + fmtDur(t.sleep_seconds) + '</td>';
-    html += '<td style="padding:6px 8px;">' + fmtDur(t.locked_seconds) + '</td>';
-    html += '<td style="padding:6px 8px;">' + (t.startups || 0) + '</td>';
-    html += '<td style="padding:6px 8px;">' + (t.sleeps || 0) + '</td>';
-    html += '<td style="padding:6px 8px;">' + (t.locks || 0) + '</td>';
-    html += '<td style="padding:6px 8px;color:var(--muted);">' + (t.last_event || '—') + '</td>';
-    html += '<td style="padding:6px 8px;color:var(--muted);">' + fmtTs(t.last_seen) + '</td>';
-    html += '</tr>';
-  }
-  html += '</tbody></table>';
+  html += '</div>';
+
   body.innerHTML = html;
+
+  // Update header
+  const updEl = document.getElementById('he-updated');
+  if (updEl) updEl.textContent = 'обновлено ' + new Date().toLocaleTimeString();
+  const badge = document.getElementById('he-live-badge');
+  if (badge) badge.style.display = '';
 }
 
 async function heRefresh() {
   const body = document.getElementById('he-body');
   if (!body) return;
   if (!state.session) {
-    body.innerHTML = '<div style="color:var(--muted);padding:16px;">Not logged in. Reconnect with username + password.</div>';
-    return;
-  }
-  if (state.userRole !== 'admin') {
-    body.innerHTML = '<div style="color:var(--muted);padding:16px;">This dashboard is admin-only.</div>';
+    body.innerHTML = '<div style="color:var(--muted);padding:16px;">Не авторизован. Войдите с логином и паролем.</div>';
     return;
   }
   try {
-    // sendCmd resolves with msg.data on success, rejects with Error(msg.error)
     const data = await sendCmd({cmd:'host_events_stats', session: state.session});
     heRender(data);
   } catch(e) {
-    body.innerHTML = '<div style="color:var(--danger);padding:16px;">' + e.message + '</div>';
+    if (body && !body.innerHTML.includes('grid')) {
+      body.innerHTML = '<div style="color:var(--danger);padding:16px;">' + e.message + '</div>';
+    }
   }
+}
+
+// Called from host_event WebSocket handler — push event to client feed
+// and re-render dashboard if it's the active panel.
+function hePushEvent(ev) {
+  if (!state._heFeed) state._heFeed = [];
+  state._heFeed.push(ev);
+  if (state._heFeed.length > 200) state._heFeed.splice(0, state._heFeed.length - 200);
+  // Re-render live if dashboard is visible
+  const panel = document.getElementById('panel-host_events');
+  if (panel && panel.style.display !== 'none' && panel.classList.contains('active')) {
+    heRender({ tokens: {}, totals: {}, recent_feed: [] }); // quick local re-render
+    clearTimeout(state._heFullRefreshTimer);
+    state._heFullRefreshTimer = setTimeout(heRefresh, 300); // full refresh after short delay
+  }
+}
+
+// Start/stop auto-refresh interval tied to panel visibility
+function heStartAutoRefresh() {
+  heStopAutoRefresh();
+  heRefresh(); // immediate on open
+  _heAutoTimer = setInterval(heRefresh, 20000); // every 20s
+}
+function heStopAutoRefresh() {
+  if (_heAutoTimer) { clearInterval(_heAutoTimer); _heAutoTimer = null; }
 }
 
 // ── Users CRUD ──
@@ -10875,50 +11143,48 @@ function usrEditDialog(user) {
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;';
   const modal = document.createElement('div');
-  modal.style.cssText = 'background:var(--panel-bg);border:1px solid var(--bd);border-radius:6px;padding:20px;min-width:480px;max-width:640px;max-height:90vh;overflow-y:auto;';
+  modal.style.cssText = 'background:#0d1117;border:1px solid #3d444d;border-radius:8px;padding:24px;min-width:480px;max-width:640px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.6);';
   modal.innerHTML = `
-    <div style="font-size:16px;font-weight:600;margin-bottom:14px;color:var(--accent);">${isNew ? 'New user' : 'Edit: ' + cur.username}</div>
+    <div style="font-size:15px;font-weight:700;margin-bottom:16px;color:var(--accent);letter-spacing:.5px;">${isNew ? '➕ New user' : '✏️ Edit: ' + cur.username}</div>
 
-    <div style="margin-bottom:10px;">
-      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;">Username</div>
+    <div style="margin-bottom:12px;">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px;">Username</div>
       <input id="usr-dlg-name" value="${cur.username.replace(/"/g,'&quot;')}"
              ${isNew ? '' : 'disabled'}
-             style="width:100%;padding:8px 10px;background:var(--bg-dark);border:2px solid var(--bd);color:var(--fg);border-radius:4px;font:inherit;outline:none;" />
-    </div>
-
-    <div style="margin-bottom:10px;">
-      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;">${isNew ? 'Password' : 'New password (blank = keep current)'}</div>
-      <input id="usr-dlg-pass" type="password"
-             style="width:100%;padding:8px 10px;background:var(--bg-dark);border:2px solid var(--bd);color:var(--fg);border-radius:4px;font:inherit;outline:none;" />
+             class="dlg-input" />
     </div>
 
     <div style="margin-bottom:12px;">
-      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;">Role</div>
-      <select id="usr-dlg-role"
-              style="width:100%;padding:8px 10px;background:var(--bg-dark);border:2px solid var(--bd);color:var(--fg);border-radius:4px;font:inherit;outline:none;">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px;">${isNew ? 'Password' : 'New password (blank = keep current)'}</div>
+      <input id="usr-dlg-pass" type="password" class="dlg-input" />
+    </div>
+
+    <div style="margin-bottom:14px;">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px;">Role</div>
+      <select id="usr-dlg-role" class="dlg-input">
         <option value="operator" ${cur.role==='operator'?'selected':''}>Operator</option>
         <option value="admin"    ${cur.role==='admin'?'selected':''}>Admin</option>
       </select>
     </div>
 
     <div style="margin-bottom:14px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;">Allowed tabs</div>
-        <div>
-          <button type="button" id="usr-dlg-all"  class="btn-secondary" style="padding:2px 8px;font-size:10px;">Select all</button>
-          <button type="button" id="usr-dlg-none" class="btn-secondary" style="padding:2px 8px;font-size:10px;">None</button>
-          <button type="button" id="usr-dlg-def"  class="btn-secondary" style="padding:2px 8px;font-size:10px;">Role default</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">Allowed tabs</div>
+        <div style="display:flex;gap:4px;">
+          <button type="button" id="usr-dlg-all"  class="btn-secondary" style="padding:3px 9px;font-size:10px;">All</button>
+          <button type="button" id="usr-dlg-none" class="btn-secondary" style="padding:3px 9px;font-size:10px;">None</button>
+          <button type="button" id="usr-dlg-def"  class="btn-secondary" style="padding:3px 9px;font-size:10px;">Default</button>
         </div>
       </div>
-      <div id="usr-dlg-tabs" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:8px;background:var(--bg-dark);border:1px solid var(--bd);border-radius:3px;max-height:200px;overflow-y:auto;"></div>
-      <div id="usr-dlg-settings-sub" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:8px;background:var(--bg-dark);border:1px solid var(--bd);border-top:none;border-radius:0 0 3px 3px;max-height:160px;overflow-y:auto;"></div>
+      <div id="usr-dlg-tabs" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:10px;background:#0a0c10;border:2px solid #3d444d;border-radius:5px;max-height:200px;overflow-y:auto;"></div>
+      <div id="usr-dlg-settings-sub" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:10px;background:#0a0c10;border:2px solid #3d444d;border-top:none;border-radius:0 0 5px 5px;max-height:160px;overflow-y:auto;"></div>
     </div>
 
-    <div id="usr-dlg-err" style="color:var(--danger);font-size:12px;min-height:16px;margin-bottom:8px;"></div>
+    <div id="usr-dlg-err" style="color:var(--danger);font-size:12px;min-height:18px;margin-bottom:10px;"></div>
 
     <div style="display:flex;justify-content:flex-end;gap:8px;">
-      <button type="button" id="usr-dlg-cancel" class="btn-secondary" style="padding:7px 18px;">Cancel</button>
-      <button type="button" id="usr-dlg-save"   class="btn-primary"   style="padding:7px 18px;">${isNew?'Create':'Save'}</button>
+      <button type="button" id="usr-dlg-cancel" class="btn-secondary" style="padding:8px 20px;">Отмена</button>
+      <button type="button" id="usr-dlg-save"   class="btn-primary"   style="padding:8px 22px;">${isNew?'✓ Создать':'✓ Сохранить'}</button>
     </div>
   `;
   overlay.appendChild(modal);
@@ -11035,32 +11301,29 @@ function myPasswordDialog() {
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;';
   const modal = document.createElement('div');
-  modal.style.cssText = 'background:var(--panel-bg);border:1px solid var(--bd);border-radius:6px;padding:20px;min-width:380px;max-width:480px;';
+  modal.style.cssText = 'background:#0d1117;border:1px solid #3d444d;border-radius:8px;padding:24px;min-width:380px;max-width:480px;box-shadow:0 8px 32px rgba(0,0,0,.6);';
   modal.innerHTML = `
-    <div style="font-size:16px;font-weight:600;margin-bottom:14px;color:var(--accent);">Change my password</div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">
-      Logged in as <b style="color:var(--fg);">${state.username || ''}</b>
+    <div style="font-size:15px;font-weight:700;margin-bottom:6px;color:var(--accent);">🔑 Смена пароля</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:18px;">
+      Пользователь: <b style="color:var(--text);">${state.username || ''}</b>
     </div>
 
-    <div style="margin-bottom:10px;">
-      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;">Current password</div>
-      <input id="mypw-old" type="password" autocomplete="current-password"
-             style="width:100%;padding:8px 10px;background:var(--bg-dark);border:2px solid var(--bd);color:var(--fg);border-radius:4px;font:inherit;outline:none;" />
-    </div>
-    <div style="margin-bottom:10px;">
-      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;">New password</div>
-      <input id="mypw-new" type="password" autocomplete="new-password"
-             style="width:100%;padding:8px 10px;background:var(--bg-dark);border:2px solid var(--bd);color:var(--fg);border-radius:4px;font:inherit;outline:none;" />
+    <div style="margin-bottom:12px;">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px;">Текущий пароль</div>
+      <input id="mypw-old" type="password" autocomplete="current-password" class="dlg-input" />
     </div>
     <div style="margin-bottom:12px;">
-      <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;">Repeat new password</div>
-      <input id="mypw-new2" type="password" autocomplete="new-password"
-             style="width:100%;padding:8px 10px;background:var(--bg-dark);border:2px solid var(--bd);color:var(--fg);border-radius:4px;font:inherit;outline:none;" />
+      <div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px;">Новый пароль</div>
+      <input id="mypw-new" type="password" autocomplete="new-password" class="dlg-input" />
     </div>
-    <div id="mypw-err" style="color:var(--danger);font-size:12px;min-height:16px;margin-bottom:8px;"></div>
+    <div style="margin-bottom:16px;">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px;">Повтор нового пароля</div>
+      <input id="mypw-new2" type="password" autocomplete="new-password" class="dlg-input" />
+    </div>
+    <div id="mypw-err" style="color:var(--danger);font-size:12px;min-height:18px;margin-bottom:10px;"></div>
     <div style="display:flex;justify-content:flex-end;gap:8px;">
-      <button type="button" id="mypw-cancel" class="btn-secondary" style="padding:7px 18px;">Cancel</button>
-      <button type="button" id="mypw-save"   class="btn-primary"   style="padding:7px 18px;">Save</button>
+      <button type="button" id="mypw-cancel" class="btn-secondary" style="padding:8px 20px;">Отмена</button>
+      <button type="button" id="mypw-save"   class="btn-primary"   style="padding:8px 22px;">✓ Сохранить</button>
     </div>
   `;
   overlay.appendChild(modal);
@@ -11120,12 +11383,31 @@ async function usrRefresh() {
   }
 }
 
-// Wire panel-open hooks. Refresh when user navigates to the panel.
+// Wire panel-open hooks. Auto-refresh + stop on leave.
 (function wireHostEventsAndUsers() {
-  document.querySelectorAll('.nav-btn[data-panel="host_events"]').forEach(b =>
-    b.addEventListener('click', () => setTimeout(heRefresh, 50)));
-  document.querySelectorAll('.nav-btn[data-panel="users"]').forEach(b =>
-    b.addEventListener('click', () => setTimeout(usrRefresh, 50)));
+  // Track which panel is currently active to stop auto-refresh when leaving
+  const origShowPanel = window.showPanel;
+  window.showPanel = function(panelId) {
+    if (origShowPanel) origShowPanel(panelId);
+    if (panelId === 'host_events') {
+      heStartAutoRefresh();
+    } else {
+      heStopAutoRefresh();
+    }
+  };
+
+  document.querySelectorAll('.nav-btn[data-panel]').forEach(b => {
+    b.addEventListener('click', () => {
+      const p = b.getAttribute('data-panel');
+      if (p === 'host_events') {
+        setTimeout(heStartAutoRefresh, 50);
+      } else {
+        heStopAutoRefresh();
+      }
+      if (p === 'users') setTimeout(usrRefresh, 50);
+    });
+  });
+
   const he = document.getElementById('he-refresh');
   if (he) he.onclick = heRefresh;
   const ur = document.getElementById('usr-refresh');
@@ -11144,6 +11426,81 @@ async function usrRefresh() {
       const el = document.getElementById('in-user');
       if (el) el.value = saved;
     }
+  } catch(e) {}
+})();
+
+// ═══════════════════════════════════════════════════════════════════════
+// PER-USER THEME SYSTEM
+// Themes are CSS classes applied to <body>. Preference is stored in
+// server's users.json (via user_set_theme command) and in localStorage
+// as a fallback. Applied immediately on login.
+// ═══════════════════════════════════════════════════════════════════════
+
+const THEME_NAMES = {
+  '':         'Cyber',
+  'obsidian': 'Obsidian',
+  'matrix':   'Matrix',
+  'crimson':  'Crimson',
+  'gold':     'Gold',
+  'arctic':   'Arctic',
+};
+const ALL_THEME_CLASSES = Object.keys(THEME_NAMES).filter(t => t).map(t => 'theme-' + t);
+
+/** Apply a theme by name. '' = default Cyber. */
+function applyTheme(name) {
+  // Remove all theme classes
+  document.body.classList.remove(...ALL_THEME_CLASSES);
+  if (name && THEME_NAMES[name]) {
+    document.body.classList.add('theme-' + name);
+  }
+  // Mark active swatch
+  document.querySelectorAll('.theme-swatch').forEach(s => {
+    s.classList.toggle('active', s.dataset.theme === name);
+  });
+  // Update glow on scrollbar (force var recompute)
+  try { localStorage.setItem('rdp_theme', name || ''); } catch(e) {}
+}
+
+/** Toggle theme picker popup */
+function toggleThemePicker() {
+  const p = document.getElementById('theme-picker');
+  if (p) p.classList.toggle('open');
+}
+
+/** User selected a theme swatch */
+async function selectTheme(name) {
+  applyTheme(name);
+  // Save to server
+  if (state.session) {
+    try {
+      await sendCmd({ cmd: 'user_set_theme', session: state.session, theme: name });
+    } catch(e) { /* ignore */ }
+  }
+  // Close picker
+  const p = document.getElementById('theme-picker');
+  if (p) p.classList.remove('open');
+}
+
+/** Show theme button after login */
+function showThemeBtn() {
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.style.display = '';
+}
+
+// Close theme picker on outside click
+document.addEventListener('click', function(e) {
+  const picker = document.getElementById('theme-picker');
+  const btn = document.getElementById('theme-btn');
+  if (picker && btn && !picker.contains(e.target) && !btn.contains(e.target)) {
+    picker.classList.remove('open');
+  }
+});
+
+// Apply saved theme from localStorage immediately (before login, for faster UX)
+(function() {
+  try {
+    const saved = localStorage.getItem('rdp_theme');
+    if (saved !== null) applyTheme(saved);
   } catch(e) {}
 })();
 
