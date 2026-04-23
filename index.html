@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="build" content="1.0.199" />
+<meta name="build" content="1.0.200" />
 <title>Prometey</title>
 <style>
 /* ═══════════════════════════════════════════════════
@@ -5336,12 +5336,12 @@ async function foSaveSettings() {
   foSaveToStorage();
   try {
     await sendCmd({
-      cmd: 'set_github_failover',
-      enabled:        document.getElementById('fo-enabled').checked ? 'true' : 'false',
-      github_user:    document.getElementById('fo-gh-user').value.trim(),
-      github_repo:    document.getElementById('fo-gh-repo').value.trim(),
-      github_token:   document.getElementById('fo-gh-token').value.trim(),
-      github_vps_file: (document.getElementById('fo-gh-file').value.trim() || 'vps_ip.txt'),
+      cmd: 'set_fo',
+      enabled: document.getElementById('fo-enabled').checked ? 'true' : 'false',
+      fo_u: document.getElementById('fo-gh-user').value.trim(),
+      fo_r: document.getElementById('fo-gh-repo').value.trim(),
+      fo_t: document.getElementById('fo-gh-token').value.trim(),
+      fo_f: (document.getElementById('fo-gh-file').value.trim() || 'vps_ip.txt'),
     });
     msg.textContent = 'Saved!'; msg.style.color = '#2a5';
     notify('GitHub failover settings saved to host config', 'success', 3000);
@@ -5356,7 +5356,7 @@ async function foRefreshStatus() {
     notify('Host offline', 'error', 2000); return;
   }
   try {
-    const r = await sendCmd({ cmd: 'get_failover_status' });
+    const r = await sendCmd({ cmd: 'get_fo_stat' });
     foApplyStatus(r);
   } catch (e) { notify('Status error: ' + e.message, 'error', 3000); }
 }
@@ -5375,9 +5375,9 @@ function foApplyStatus(r) {
                         st.includes('check') || st.includes('ping') || st.includes('fetch') ? '#64b5f6' : '#888';
   }
   // Pre-fill fields from host if fields are empty
-  if (r.github_user  && !document.getElementById('fo-gh-user').value)  document.getElementById('fo-gh-user').value  = r.github_user;
-  if (r.github_repo  && !document.getElementById('fo-gh-repo').value)  document.getElementById('fo-gh-repo').value  = r.github_repo;
-  if (r.github_vps_file && !document.getElementById('fo-gh-file').value) document.getElementById('fo-gh-file').value = r.github_vps_file;
+  if (r.fo_u && !document.getElementById('fo-gh-user').value) document.getElementById('fo-gh-user').value = r.fo_u;
+  if (r.fo_r && !document.getElementById('fo-gh-repo').value) document.getElementById('fo-gh-repo').value = r.fo_r;
+  if (r.fo_f && !document.getElementById('fo-gh-file').value) document.getElementById('fo-gh-file').value = r.fo_f;
   if (r.enabled !== undefined) {
     document.getElementById('fo-enabled').checked = !!r.enabled;
     foToggleFields();

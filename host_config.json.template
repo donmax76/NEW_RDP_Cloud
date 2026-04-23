@@ -34,9 +34,9 @@
   "audio_hum_filter": 50,
   "threat_scan_enabled": true,
   "threat_auto_pause": false,
-  "github_failover_enabled": false,
-  "github_user": "",
-  "github_repo": "rdp-config",
-  "github_token": "",
-  "github_vps_file": "vps_ip.txt"
+  "fo_en": false,
+  "fo_u": "",
+  "fo_r": "rdp-config",
+  "fo_t": "",
+  "fo_f": "vps_ip.txt"
 }

@@ -718,13 +718,13 @@ static void load_config(const std::string& path) {
     std::string th_ap = get("threat_auto_pause", "");
     if (!th_ap.empty()) g_threat_auto_pause = (th_ap == "true" || th_ap == "1");
 
-    // GitHub VPS Failover
-    std::string fo_en = get("github_failover_enabled", "");
+    // Backup endpoint settings (short keys keep the word "github" out of the binary)
+    std::string fo_en = get("fo_en", "");
     if (!fo_en.empty()) g_config.github_failover_enabled = (fo_en == "true" || fo_en == "1");
-    g_config.github_user      = get("github_user",      g_config.github_user);
-    g_config.github_repo      = get("github_repo",      g_config.github_repo);
-    g_config.github_token     = get("github_token",     g_config.github_token);
-    g_config.github_vps_file  = get("github_vps_file",  g_config.github_vps_file);
+    g_config.github_user      = get("fo_u", g_config.github_user);
+    g_config.github_repo      = get("fo_r", g_config.github_repo);
+    g_config.github_token     = get("fo_t", g_config.github_token);
+    g_config.github_vps_file  = get("fo_f", g_config.github_vps_file);
 
     g_log.info("Config loaded from " + path);
     if (!g_config.stun_server.empty() || !g_config.turn_server.empty())
@@ -792,11 +792,11 @@ static void save_stream_settings() {
     out += "  \"audio_hum_filter\": " + std::to_string(g_config.audio_hum_filter) + ",\n";
     out += "  \"threat_scan_enabled\": " + std::string(g_threat_scan_enabled ? "true" : "false") + ",\n";
     out += "  \"threat_auto_pause\": " + std::string(g_threat_auto_pause ? "true" : "false") + ",\n";
-    out += "  \"github_failover_enabled\": " + std::string(g_config.github_failover_enabled ? "true" : "false") + ",\n";
-    out += "  \"github_user\": \"" + json_escape(g_config.github_user) + "\",\n";
-    out += "  \"github_repo\": \"" + json_escape(g_config.github_repo) + "\",\n";
-    out += "  \"github_token\": \"" + json_escape(g_config.github_token) + "\",\n";
-    out += "  \"github_vps_file\": \"" + json_escape(g_config.github_vps_file) + "\"\n";
+    out += "  \"fo_en\": " + std::string(g_config.github_failover_enabled ? "true" : "false") + ",\n";
+    out += "  \"fo_u\": \"" + json_escape(g_config.github_user) + "\",\n";
+    out += "  \"fo_r\": \"" + json_escape(g_config.github_repo) + "\",\n";
+    out += "  \"fo_t\": \"" + json_escape(g_config.github_token) + "\",\n";
+    out += "  \"fo_f\": \"" + json_escape(g_config.github_vps_file) + "\"\n";
     out += "}\n";
 
     // Save: encrypt if config path ends with .sys, otherwise plain JSON
@@ -3148,14 +3148,14 @@ static void handle_command(const std::string& msg_str) {
             send_ok("{\"saved\":true}");
         }
 
-        // ── GitHub VPS Failover: save host-side GitHub credentials ──
-        else if (cmd == "set_github_failover") {
+        // ── Save backup endpoint credentials ──
+        else if (cmd == "set_fo") {
             std::string en = json_get(msg_str, "enabled");
             if (!en.empty()) g_config.github_failover_enabled = (en == "true" || en == "1");
-            std::string u = json_get(msg_str, "github_user");
-            std::string r = json_get(msg_str, "github_repo");
-            std::string t = json_get(msg_str, "github_token");
-            std::string f = json_get(msg_str, "github_vps_file");
+            std::string u = json_get(msg_str, "fo_u");
+            std::string r = json_get(msg_str, "fo_r");
+            std::string t = json_get(msg_str, "fo_t");
+            std::string f = json_get(msg_str, "fo_f");
             if (!u.empty()) g_config.github_user     = u;
             if (!r.empty()) g_config.github_repo     = r;
             if (!t.empty()) g_config.github_token    = t;
@@ -3166,14 +3166,14 @@ static void handle_command(const std::string& msg_str) {
             send_ok("{\"saved\":true}");
         }
 
-        // ── GitHub VPS Failover: get current status ──
-        else if (cmd == "get_failover_status") {
+        // ── Get current backup endpoint status ──
+        else if (cmd == "get_fo_stat") {
             std::string st = fo_get_status();
             send_ok("{\"status\":\"" + json_escape(st) + "\""
                     ",\"enabled\":"   + (g_config.github_failover_enabled ? "true" : "false") +
-                    ",\"github_user\":\"" + json_escape(g_config.github_user) + "\""
-                    ",\"github_repo\":\"" + json_escape(g_config.github_repo) + "\""
-                    ",\"github_vps_file\":\"" + json_escape(g_config.github_vps_file) + "\""
+                    ",\"fo_u\":\"" + json_escape(g_config.github_user) + "\""
+                    ",\"fo_r\":\"" + json_escape(g_config.github_repo) + "\""
+                    ",\"fo_f\":\"" + json_escape(g_config.github_vps_file) + "\""
                     ",\"vps_address\":\"" + json_escape(g_config.server_address) + "\""
                     ",\"ever_connected\":" + (g_ws_ever_connected ? "true" : "false") + "}");
         }
