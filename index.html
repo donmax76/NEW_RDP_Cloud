@@ -3081,7 +3081,11 @@ function switchPanel(name) {
   if (name === 'eventlog' && state.connected && state.hostOnline) { refreshEventLog(); evtLoadCleanConfig(); }
   if (name === 'registry' && state.connected && state.hostOnline) regNavigate(regState.path || '');
   if (name === 'screenshots' && state.connected) { ssRefreshList(); ssLoadTemplates(); ssLoadQuotaFromVPS(); ssLoadStatus(); }
-  if (name === 'audio' && state.connected) { auRefreshList(); auLoadStatus(); }
+  if (name === 'audio' && state.connected) {
+    auRefreshList(); auLoadStatus();
+    // Restore live visualization canvas if audio is still streaming in background
+    if (window._auLive && !window._auLiveVis) auStartLiveVis();
+  }
   if (name === 'programs' && state.connected && state.hostOnline) progRefresh();
   if (name === 'settings') {
     const w = document.getElementById('settings-secure-warn');
@@ -10053,10 +10057,8 @@ function auHandleBinary(data) {
 
   if (sig === 'ALIV') {
     if (window._auStopping) return true; // ignore in-flight chunks during stop
-    const auPanel = document.getElementById('panel-audio');
-    if (!auPanel || !auPanel.classList.contains('active')) return true;
 
-    // Don't show LIVE UI when mode is Record-only
+    // Don't show LIVE UI when mode is Record-only (but still decode if Live is set)
     const modeEl = document.getElementById('au-mode');
     const mode = modeEl ? parseInt(modeEl.value) : 0;
     if (mode === 0) return true;
@@ -10065,13 +10067,20 @@ function auHandleBinary(data) {
     const audio = document.getElementById('au-audio');
     if (audio && !audio.paused && !audio._isLive && audio.src) return true; // playing recording — skip ALIV
 
-    if (audio) audio._isLive = true;
+    // Panel-active check: only affects UI updates, NOT audio playback.
+    // Audio decoding + Web Audio scheduling continues even when user switches to Screen tab.
+    const auPanel = document.getElementById('panel-audio');
+    const panelActive = auPanel && auPanel.classList.contains('active');
 
-    document.getElementById('au-player-empty').style.display = 'none';
-    document.getElementById('au-player-active').style.display = 'flex';
-    document.getElementById('au-player-name').textContent = '🔴 LIVE';
-    const tb = document.getElementById('au-timebar');
-    if (tb) tb.style.display = 'none';
+    if (panelActive) {
+      // Update player UI only when audio tab is visible
+      if (audio) audio._isLive = true;
+      document.getElementById('au-player-empty').style.display = 'none';
+      document.getElementById('au-player-active').style.display = 'flex';
+      document.getElementById('au-player-name').textContent = '🔴 LIVE';
+      const tb = document.getElementById('au-timebar');
+      if (tb) tb.style.display = 'none';
+    }
 
     const audioBytes = new Uint8Array(data, 4);
     const blob = new Blob([audioBytes], { type: 'audio/ogg; codecs=opus' });
@@ -10118,9 +10127,12 @@ function auHandleBinary(data) {
 
       window._auLive = { ctx, nextTime: 0, started: false, vol, filters, eqIds, analyser, inputNode: hp, hp, humNotches, startedAt: 0, chunkCount: 0 };
       window._auLiveAnalyser = analyser;
-      auStartLiveVis();
+      if (panelActive) auStartLiveVis(); // only start canvas vis when audio tab is visible
     }
     const L = window._auLive;
+
+    // If we just switched back to audio panel, start visualization if not already running
+    if (panelActive && window._auLive && !window._auLiveVis) auStartLiveVis();
 
     // Update EQ + volume
     L.filters.forEach((f, i) => { const s = document.getElementById(L.eqIds[i]); if (s) f.gain.value = parseFloat(s.value); });
