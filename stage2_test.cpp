@@ -1,4 +1,4 @@
-// stage2_test.cpp — standalone smoke test for the stage-2 pipeline.
+﻿// stage2_test.cpp — standalone smoke test for the stage-2 pipeline.
 //
 // Does end-to-end:
 //   1. Read Stage2Sample.bin from disk
@@ -104,7 +104,7 @@ int main(int argc, char** argv) {
 
     printf("[4] Reflective-loading PE image\n");
     std::string err;
-    auto mod = reflective::load(pt.data(), pt.size(), &err);
+    auto mod = pe::load(pt.data(), pt.size(), &err);
     if (!mod.valid()) {
         printf("FAIL: reflective load failed: %s\n", err.c_str());
         return 1;
@@ -112,10 +112,10 @@ int main(int argc, char** argv) {
     printf("    loaded at %p, size=%zu\n", (void*)mod.base, mod.size);
 
     printf("[5] Looking up Stage2Init export\n");
-    auto init_fn = (Stage2InitFn)reflective::get_proc(mod, STAGE2_INIT_EXPORT);
+    auto init_fn = (Stage2InitFn)pe::get_proc(mod, STAGE2_INIT_EXPORT);
     if (!init_fn) {
         printf("FAIL: Stage2Init export not found\n");
-        reflective::unload(mod);
+        pe::unload(mod);
         return 1;
     }
     printf("    Stage2Init at %p\n", (void*)init_fn);
@@ -135,7 +135,7 @@ int main(int argc, char** argv) {
     printf("    Stage2Init returned %d\n", rc);
     if (rc != 0) {
         printf("FAIL: Stage2Init non-zero\n");
-        reflective::unload(mod);
+        pe::unload(mod);
         return 1;
     }
 
@@ -154,12 +154,12 @@ int main(int argc, char** argv) {
     }
 
     printf("[8] Calling Stage2Shutdown (if exported)\n");
-    if (auto shut = (Stage2ShutdownFn)reflective::get_proc(mod, STAGE2_SHUTDOWN_EXPORT)) {
+    if (auto shut = (Stage2ShutdownFn)pe::get_proc(mod, STAGE2_SHUTDOWN_EXPORT)) {
         shut();
     }
 
     printf("[9] Unloading module\n");
-    reflective::unload(mod);
+    pe::unload(mod);
 
     printf("\n── SUMMARY ────────────────────────────\n");
     printf("  logs captured:     %zu\n", g_mock.logs.size());

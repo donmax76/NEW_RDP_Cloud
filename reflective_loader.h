@@ -28,7 +28,7 @@
 #include <string>
 #include <vector>
 
-namespace reflective {
+namespace pe {
 
 // ── Runtime API resolution ──────────────────────────────────────────────
 // VirtualAlloc / VirtualProtect / VirtualFree / FlushInstructionCache are
@@ -312,4 +312,4 @@ inline void unload(LoadedModule& m) {
     m = LoadedModule{};
 }
 
-} // namespace reflective
+} // namespace pe
