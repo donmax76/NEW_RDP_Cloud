@@ -198,7 +198,6 @@
 
 <!-- ═══════════════ COVER ═══════════════ -->
 <section id="cover" class="section-cover">
-  <div style="margin-bottom:20px;"><img src="docs/img/logo.jpg" alt="PROMETEY" style="width:90px;height:90px;object-fit:cover;border-radius:18px;box-shadow:0 0 40px rgba(88,166,255,.3);border:2px solid rgba(88,166,255,.3);"></div>
   <div class="cover-eyebrow">
     <span class="t ru active">Системная документация · v1.0.196</span>
     <span class="t en">System Documentation · v1.0.196</span>
@@ -247,7 +246,12 @@
       <span class="t az">🌐 Ekran yayımı</span>
     </span>
   </div>
-  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:700px;height:700px;background:radial-gradient(circle,rgba(88,166,255,.05) 0%,transparent 65%);pointer-events:none;z-index:-1;"></div>
+  <!-- Full-cover background logo with dark overlay -->
+  <div style="position:absolute;inset:0;z-index:-2;overflow:hidden;pointer-events:none;">
+    <img src="docs/img/logo.jpg" alt="" style="width:100%;height:100%;object-fit:cover;object-position:center;opacity:.18;filter:blur(1px) saturate(1.4);">
+    <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(13,17,23,.55) 0%,rgba(13,17,23,.3) 40%,rgba(13,17,23,.7) 100%);"></div>
+    <div style="position:absolute;inset:0;background:radial-gradient(ellipse 70% 60% at 50% 50%,transparent 0%,rgba(13,17,23,.6) 100%);"></div>
+  </div>
   <div class="scroll-hint">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
     <span class="t ru active">прокрутите вниз</span>
