@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PROMETEY — Руководство оператора</title>
+<style>
+  :root {
+    --bg:#0d1117; --bg2:#161b22; --bg3:#21262d;
+    --accent:#58a6ff; --accent2:#3fb950; --accent3:#f78166;
+    --accent4:#d2a8ff; --accent5:#ffa657;
+    --fg:#e6edf3; --muted:#8b949e; --bd:#30363d;
+    --danger:#f85149; --warn:#e3b341;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html{scroll-behavior:smooth;}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--fg);line-height:1.5;}
+
+  /* ── Nav ── */
+  .nav{position:fixed;top:0;left:0;right:0;z-index:999;background:rgba(13,17,23,.96);border-bottom:1px solid var(--bd);backdrop-filter:blur(8px);display:flex;align-items:center;height:52px;padding:0 16px;gap:4px;}
+  .nav-logo{font-size:15px;font-weight:800;color:var(--accent);letter-spacing:.5px;white-space:nowrap;margin-right:8px;}
+  .nav-links{display:flex;flex:1;overflow-x:auto;}
+  .nav-link{padding:0 12px;height:52px;display:flex;align-items:center;font-size:12px;font-weight:500;color:var(--muted);text-decoration:none;border-bottom:2px solid transparent;transition:all .2s;cursor:pointer;white-space:nowrap;}
+  .nav-link:hover,.nav-link.active{color:var(--fg);border-bottom-color:var(--accent);}
+  .lang-btns{margin-left:auto;display:flex;gap:4px;flex-shrink:0;}
+  .lang-btn{padding:4px 10px;border-radius:6px;border:1px solid var(--bd);background:transparent;color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;letter-spacing:.5px;}
+  .lang-btn:hover{color:var(--fg);border-color:var(--accent);}
+  .lang-btn.active{background:rgba(88,166,255,.15);border-color:var(--accent);color:var(--accent);}
+  .nav-badge{padding:2px 10px;font-size:10px;color:var(--muted);font-family:monospace;white-space:nowrap;border-left:1px solid var(--bd);margin-left:4px;}
+
+  /* ── Layout ── */
+  .page{display:flex;min-height:100vh;}
+  .sidebar{width:240px;flex-shrink:0;position:fixed;top:52px;left:0;bottom:0;overflow-y:auto;border-right:1px solid var(--bd);background:var(--bg2);padding:16px 0;}
+  .sidebar-section{padding:8px 16px 4px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);font-weight:700;}
+  .sidebar-link{display:block;padding:6px 16px 6px 24px;font-size:12px;color:var(--muted);text-decoration:none;transition:all .15s;border-left:2px solid transparent;margin:1px 0;}
+  .sidebar-link:hover{color:var(--fg);background:rgba(255,255,255,.03);}
+  .sidebar-link.active{color:var(--accent);border-left-color:var(--accent);background:rgba(88,166,255,.06);}
+  .content{margin-left:240px;padding:80px 40px 80px;max-width:960px;}
+
+  /* ── Section titles ── */
+  .sec-eyebrow{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--accent);font-weight:700;margin-bottom:6px;}
+  .sec-title{font-size:clamp(22px,3vw,34px);font-weight:800;letter-spacing:-1px;margin-bottom:8px;}
+  .sec-lead{font-size:15px;color:var(--muted);line-height:1.7;margin-bottom:32px;max-width:700px;}
+
+  h2{font-size:20px;font-weight:700;margin:40px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--bd);}
+  h3{font-size:15px;font-weight:700;margin:28px 0 10px;color:var(--accent4);}
+  p{font-size:13px;color:var(--muted);line-height:1.75;margin-bottom:10px;}
+  p b,p strong{color:var(--fg);}
+
+  /* ── Step list ── */
+  .steps{display:flex;flex-direction:column;gap:0;border-radius:10px;overflow:hidden;border:1px solid var(--bd);margin:16px 0 24px;}
+  .step{display:flex;align-items:flex-start;gap:14px;padding:14px 18px;border-bottom:1px solid var(--bd);}
+  .step:last-child{border-bottom:none;}
+  .step:nth-child(odd){background:rgba(255,255,255,.015);}
+  .step-num{width:26px;height:26px;border-radius:50%;background:rgba(88,166,255,.2);color:var(--accent);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+  .step-body{flex:1;}
+  .step-title{font-size:13px;font-weight:600;color:var(--fg);margin-bottom:3px;}
+  .step-desc{font-size:12px;color:var(--muted);line-height:1.65;}
+
+  /* ── Code block ── */
+  .code{background:var(--bg3);border:1px solid var(--bd);border-radius:8px;padding:12px 16px;font-family:'Cascadia Code','Consolas',monospace;font-size:12px;color:var(--accent4);margin:10px 0 16px;overflow-x:auto;white-space:pre;}
+  .code .cm{color:var(--muted);}
+  .code .kw{color:var(--accent);}
+  .code .st{color:var(--accent2);}
+  .code .nu{color:var(--accent5);}
+
+  /* ── Info / warn / tip boxes ── */
+  .box{padding:12px 16px;border-radius:8px;font-size:12px;line-height:1.7;margin:12px 0;}
+  .box.blue{background:rgba(88,166,255,.08);border-left:3px solid var(--accent);color:var(--fg);}
+  .box.green{background:rgba(63,185,80,.08);border-left:3px solid var(--accent2);color:var(--fg);}
+  .box.orange{background:rgba(255,166,87,.08);border-left:3px solid var(--accent5);color:var(--fg);}
+  .box.red{background:rgba(248,81,73,.08);border-left:3px solid var(--danger);color:var(--fg);}
+  .box b{color:inherit;font-weight:700;}
+
+  /* ── Feature table ── */
+  .ftable{width:100%;border-collapse:collapse;font-size:12px;margin:12px 0 20px;}
+  .ftable th{text-align:left;padding:8px 12px;border-bottom:1px solid var(--bd);color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;}
+  .ftable td{padding:8px 12px;border-bottom:1px solid rgba(48,54,61,.5);vertical-align:top;color:var(--muted);}
+  .ftable td:first-child{color:var(--fg);font-weight:500;white-space:nowrap;}
+  .ftable tr:hover td{background:rgba(255,255,255,.02);}
+  .tag{display:inline-block;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;margin-left:4px;}
+  .tag-b{background:rgba(88,166,255,.15);color:var(--accent);}
+  .tag-g{background:rgba(63,185,80,.15);color:var(--accent2);}
+  .tag-r{background:rgba(248,81,73,.15);color:var(--danger);}
+  .tag-o{background:rgba(255,166,87,.15);color:var(--accent5);}
+
+  /* ── UI screenshot mockup ── */
+  .ui-mock{background:var(--bg2);border:1px solid var(--bd);border-radius:10px;overflow:hidden;margin:16px 0;}
+  .ui-mock-bar{background:var(--bg3);padding:8px 14px;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--bd);}
+  .ui-mock-dot{width:10px;height:10px;border-radius:50%;background:var(--bd);}
+  .ui-mock-body{padding:16px;font-size:12px;color:var(--muted);}
+
+  /* ── Tab strip ── */
+  .tab-strip{display:flex;gap:2px;flex-wrap:wrap;background:var(--bg3);border:1px solid var(--bd);border-radius:8px;padding:4px;margin:8px 0 16px;}
+  .tab-item{padding:5px 12px;border-radius:5px;font-size:11px;font-weight:600;color:var(--muted);cursor:default;}
+  .tab-item.on{background:rgba(88,166,255,.2);color:var(--accent);}
+
+  /* ── Lang content ── */
+  .t{display:none;}
+  .t.active{display:block;}
+  .ti{display:none;}
+  .ti.active{display:inline;}
+
+  /* ── Divider ── */
+  hr{border:none;border-top:1px solid var(--bd);margin:40px 0;}
+
+  footer{text-align:center;padding:40px 24px;border-top:1px solid var(--bd);color:var(--muted);font-size:12px;margin-left:240px;}
+
+  @media(max-width:860px){
+    .sidebar{display:none;}
+    .content{margin-left:0;padding:72px 20px 60px;}
+    footer{margin-left:0;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav class="nav">
+  <div class="nav-logo">
+    <img src="docs/img/logo.jpg" alt="" style="height:26px;width:26px;object-fit:cover;border-radius:5px;vertical-align:middle;margin-right:6px;">
+    ⚡ PROMETEY
+  </div>
+  <div class="nav-links">
+    <a class="nav-link" href="#install">
+      <span class="t ru active">Установка</span>
+      <span class="t en">Installation</span>
+      <span class="t az">Quraşdırma</span>
+    </a>
+    <a class="nav-link" href="#login">
+      <span class="t ru active">Вход</span>
+      <span class="t en">Login</span>
+      <span class="t az">Giriş</span>
+    </a>
+    <a class="nav-link" href="#interface">
+      <span class="t ru active">Интерфейс</span>
+      <span class="t en">Interface</span>
+      <span class="t az">İnterfeys</span>
+    </a>
+    <a class="nav-link" href="#settings">
+      <span class="t ru active">Настройки</span>
+      <span class="t en">Settings</span>
+      <span class="t az">Parametrlər</span>
+    </a>
+    <a class="nav-link" href="#failover">
+      <span class="t ru active">GitHub Failover</span>
+      <span class="t en">GitHub Failover</span>
+      <span class="t az">GitHub Failover</span>
+    </a>
+    <a class="nav-link" href="#update">
+      <span class="t ru active">Обновление</span>
+      <span class="t en">Update</span>
+      <span class="t az">Yeniləmə</span>
+    </a>
+    <a class="nav-link" href="#users">
+      <span class="t ru active">Пользователи</span>
+      <span class="t en">Users</span>
+      <span class="t az">İstifadəçilər</span>
+    </a>
+    <a class="nav-link" href="#trouble">
+      <span class="t ru active">Проблемы</span>
+      <span class="t en">Troubleshooting</span>
+      <span class="t az">Problemlər</span>
+    </a>
+  </div>
+  <div class="lang-btns">
+    <button class="lang-btn active" onclick="setLang('ru')">RU</button>
+    <button class="lang-btn" onclick="setLang('en')">EN</button>
+    <button class="lang-btn" onclick="setLang('az')">AZ</button>
+  </div>
+  <div class="nav-badge">
+    <span class="t ru active">Руководство · v1.0.197</span>
+    <span class="t en">Manual · v1.0.197</span>
+    <span class="t az">Təlimat · v1.0.197</span>
+  </div>
+</nav>
+
+<div class="page">
+
+<!-- ══════════════ SIDEBAR ══════════════ -->
+<div class="sidebar">
+  <div class="sidebar-section">
+    <span class="t ru active">Начало работы</span>
+    <span class="t en">Getting started</span>
+    <span class="t az">Başlanğıc</span>
+  </div>
+  <a class="sidebar-link" href="#install">
+    <span class="t ru active">Установка агента</span>
+    <span class="t en">Agent installation</span>
+    <span class="t az">Agent quraşdırması</span>
+  </a>
+  <a class="sidebar-link" href="#login">
+    <span class="t ru active">Первый вход</span>
+    <span class="t en">First login</span>
+    <span class="t az">İlk giriş</span>
+  </a>
+
+  <div class="sidebar-section" style="margin-top:12px;">
+    <span class="t ru active">Интерфейс</span>
+    <span class="t en">Interface</span>
+    <span class="t az">İnterfeys</span>
+  </div>
+  <a class="sidebar-link" href="#tab-screen">
+    <span class="t ru active">Экран</span>
+    <span class="t en">Screen</span>
+    <span class="t az">Ekran</span>
+  </a>
+  <a class="sidebar-link" href="#tab-files">
+    <span class="t ru active">Файлы</span>
+    <span class="t en">Files</span>
+    <span class="t az">Fayllar</span>
+  </a>
+  <a class="sidebar-link" href="#tab-proc">
+    <span class="t ru active">Процессы</span>
+    <span class="t en">Processes</span>
+    <span class="t az">Proseslər</span>
+  </a>
+  <a class="sidebar-link" href="#tab-terminal">
+    <span class="t ru active">Терминал</span>
+    <span class="t en">Terminal</span>
+    <span class="t az">Terminal</span>
+  </a>
+  <a class="sidebar-link" href="#tab-registry">
+    <span class="t ru active">Реестр</span>
+    <span class="t en">Registry</span>
+    <span class="t az">Reyestr</span>
+  </a>
+  <a class="sidebar-link" href="#tab-screenshots">
+    <span class="t ru active">Скриншоты</span>
+    <span class="t en">Screenshots</span>
+    <span class="t az">Ekran görüntüləri</span>
+  </a>
+  <a class="sidebar-link" href="#tab-audio">
+    <span class="t ru active">Аудио</span>
+    <span class="t en">Audio</span>
+    <span class="t az">Audio</span>
+  </a>
+
+  <div class="sidebar-section" style="margin-top:12px;">
+    <span class="t ru active">Управление</span>
+    <span class="t en">Management</span>
+    <span class="t az">İdarəetmə</span>
+  </div>
+  <a class="sidebar-link" href="#settings">
+    <span class="t ru active">Настройки агента</span>
+    <span class="t en">Agent settings</span>
+    <span class="t az">Agent parametrləri</span>
+  </a>
+  <a class="sidebar-link" href="#failover">
+    <span class="t ru active">GitHub Failover</span>
+    <span class="t en">GitHub Failover</span>
+    <span class="t az">GitHub Failover</span>
+  </a>
+  <a class="sidebar-link" href="#update">
+    <span class="t ru active">Обновление агента</span>
+    <span class="t en">Agent update</span>
+    <span class="t az">Agent yeniləməsi</span>
+  </a>
+  <a class="sidebar-link" href="#users">
+    <span class="t ru active">Пользователи VPS</span>
+    <span class="t en">VPS users</span>
+    <span class="t az">VPS istifadəçiləri</span>
+  </a>
+
+  <div class="sidebar-section" style="margin-top:12px;">
+    <span class="t ru active">Справка</span>
+    <span class="t en">Help</span>
+    <span class="t az">Yardım</span>
+  </div>
+  <a class="sidebar-link" href="#trouble">
+    <span class="t ru active">Устранение неполадок</span>
+    <span class="t en">Troubleshooting</span>
+    <span class="t az">Problemlərin aradan qaldırılması</span>
+  </a>
+  <a class="sidebar-link" href="#security">
+    <span class="t ru active">Безопасность</span>
+    <span class="t en">Security notes</span>
+    <span class="t az">Təhlükəsizlik</span>
+  </a>
+</div>
+
+<!-- ══════════════ CONTENT ══════════════ -->
+<div class="content">
+
+<!-- ────────────── INSTALL ────────────── -->
+<section id="install">
+  <div class="sec-eyebrow">
+    <span class="t ru active">Раздел 1</span>
+    <span class="t en">Section 1</span>
+    <span class="t az">Bölmə 1</span>
+  </div>
+  <h1 class="sec-title">
+    <span class="t ru active">Установка агента</span>
+    <span class="t en">Agent Installation</span>
+    <span class="t az">Agent Quraşdırması</span>
+  </h1>
+  <p class="sec-lead">
+    <span class="t ru active">Агент устанавливается на компьютер объекта один раз. После установки он автоматически запускается при каждом старте Windows и поддерживает постоянное соединение с VPS.</span>
+    <span class="t en">The agent is installed on the target computer once. After installation it starts automatically on every Windows boot and maintains a persistent connection to the VPS.</span>
+    <span class="t az">Agent obyekt kompüterinə bir dəfə quraşdırılır. Quraşdırıldıqdan sonra hər Windows başlanğıcında avtomatik işə düşür və VPS ilə daimi əlaqəni saxlayır.</span>
+  </p>
+
+  <h2>
+    <span class="t ru active">Что нужно</span>
+    <span class="t en">Requirements</span>
+    <span class="t az">Tələblər</span>
+  </h2>
+  <table class="ftable">
+    <thead>
+      <tr>
+        <th><span class="t ru active">Компонент</span><span class="t en">Component</span><span class="t az">Komponent</span></th>
+        <th><span class="t ru active">Описание</span><span class="t en">Description</span><span class="t az">Açıqlama</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>pnpext.dll</td>
+        <td><span class="t ru active">Главный агент. Маскируется под системный компонент PnP.</span><span class="t en">Main agent. Disguised as a system PnP component.</span><span class="t az">Əsas agent. Sistem PnP komponenti kimi maskalanır.</span></td>
+      </tr>
+      <tr>
+        <td>pnpext.sys</td>
+        <td><span class="t ru active">Зашифрованный конфиг (адрес VPS, токен, пароль). Читается только агентом.</span><span class="t en">Encrypted config (VPS address, token, password). Readable only by the agent.</span><span class="t az">Şifrəli konfiq (VPS ünvanı, token, parol). Yalnız agent tərəfindən oxunur.</span></td>
+      </tr>
+      <tr>
+        <td>install.bat / install.ps1</td>
+        <td><span class="t ru active">Скрипт установки — регистрирует сервис и запускает агент.</span><span class="t en">Install script — registers the service and starts the agent.</span><span class="t az">Quraşdırma skripti — servisi qeydiyyata alır və agenti işə salır.</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="box orange">
+    <b>⚠ <span class="t ru active">Права администратора</span><span class="t en">Administrator rights</span><span class="t az">Administrator hüquqları</span></b><br>
+    <span class="t ru active">Для установки сервиса требуются права администратора Windows. Скрипт запрашивает UAC автоматически.</span>
+    <span class="t en">Installing a service requires Windows administrator rights. The script requests UAC automatically.</span>
+    <span class="t az">Servis quraşdırmaq üçün Windows administrator hüquqları tələb olunur. Skript UAC-ı avtomatik olaraq tələb edir.</span>
+  </div>
+
+  <h2>
+    <span class="t ru active">Способ 1 — USB-флешка (рекомендуется)</span>
+    <span class="t en">Method 1 — USB drive (recommended)</span>
+    <span class="t az">Üsul 1 — USB flaş (tövsiyə edilir)</span>
+  </h2>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title"><span class="t ru active">Скопируйте папку dist/usb на USB-флешку</span><span class="t en">Copy the dist/usb folder to a USB drive</span><span class="t az">dist/usb qovluğunu USB flaşa kopyalayın</span></div>
+        <div class="step-desc"><span class="t ru active">Внутри находятся: pnpext.dll, pnpext.sys, install.bat, uninstall.bat и вспомогательные скрипты.</span><span class="t en">Inside: pnpext.dll, pnpext.sys, install.bat, uninstall.bat and helper scripts.</span><span class="t az">İçərisindəkilər: pnpext.dll, pnpext.sys, install.bat, uninstall.bat və köməkçi skriptlər.</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title"><span class="t ru active">Вставьте флешку в компьютер объекта</span><span class="t en">Insert the USB drive into the target computer</span><span class="t az">USB flaşı obyekt kompüterinə taxın</span></div>
+        <div class="step-desc"><span class="t ru active">Убедитесь, что на компьютере есть доступ в интернет — агент сразу попытается подключиться к VPS.</span><span class="t en">Make sure the computer has internet access — the agent will immediately try to connect to the VPS.</span><span class="t az">Kompüterin internetə girişi olduğundan əmin olun — agent dərhal VPS-ə qoşulmağa çalışacaq.</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title"><span class="t ru active">Запустите install.bat от имени администратора</span><span class="t en">Run install.bat as administrator</span><span class="t az">install.bat-ı administrator olaraq işə salın</span></div>
+        <div class="step-desc"><span class="t ru active">Правый клик → «Запуск от имени администратора». Появится UAC-запрос — подтвердите. Окно закроется само, установка завершена.</span><span class="t en">Right-click → "Run as administrator". A UAC prompt appears — confirm. The window closes automatically, installation complete.</span><span class="t az">Sağ klik → "Administrator olaraq işə sal". UAC sorğusu görünür — təsdiqləyin. Pəncərə özü örtülür, quraşdırma tamamlandı.</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title"><span class="t ru active">Проверьте подключение в браузере</span><span class="t en">Verify the connection in the browser</span><span class="t az">Brauzerdə əlaqəni yoxlayın</span></div>
+        <div class="step-desc"><span class="t ru active">Откройте панель оператора. Если агент подключился — в правом верхнем углу появится зелёный статус «Online».</span><span class="t en">Open the operator panel. If the agent connected — a green "Online" status appears in the top-right corner.</span><span class="t az">Operator panelini açın. Agent qoşuldusa — sağ yuxarı küncdə yaşıl "Online" statusu görünəcək.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <h2>
+    <span class="t ru active">Способ 2 — Удалённая установка через браузер</span>
+    <span class="t en">Method 2 — Remote install via browser</span>
+    <span class="t az">Üsul 2 — Brauzer vasitəsilə uzaqdan quraşdırma</span>
+  </h2>
+  <p>
+    <span class="t ru active">Если у вас есть временный удалённый доступ к объекту (RDP, TeamViewer и т.п.) — можно установить агента дистанционно.</span>
+    <span class="t en">If you have temporary remote access to the target (RDP, TeamViewer, etc.) — you can install the agent remotely.</span>
+    <span class="t az">Hədəfə müvəqqəti uzaqdan girişiniz varsa (RDP, TeamViewer və s.) — agenti uzaqdan quraşdıra bilərsiniz.</span>
+  </p>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title"><span class="t ru active">Откройте браузер на объекте и зайдите на VPS</span><span class="t en">Open a browser on the target and go to the VPS URL</span><span class="t az">Obyektdə brauzeri açın və VPS URL-inə daxil olun</span></div>
+        <div class="step-desc"><span class="t ru active">Например: <code>https://64.226.66.66</code></span><span class="t en">Example: <code>https://64.226.66.66</code></span><span class="t az">Məsələn: <code>https://64.226.66.66</code></span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title"><span class="t ru active">Войдите в панель и перейдите в раздел «Установить агент»</span><span class="t en">Log in to the panel and go to "Install Agent"</span><span class="t az">Panelə daxil olun və "Agenti quraşdır" bölməsinə keçin</span></div>
+        <div class="step-desc"><span class="t ru active">Нажмите «Скачать установщик» — браузер загрузит install-web.bat. Запустите его от администратора.</span><span class="t en">Click "Download installer" — the browser downloads install-web.bat. Run it as administrator.</span><span class="t az">"Quraşdırıcını yüklə" düyməsinə basın — brauzer install-web.bat-ı yükləyir. Onu administrator olaraq işə salın.</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title"><span class="t ru active">Скрипт скачает агент с VPS и установит его</span><span class="t en">The script downloads the agent from VPS and installs it</span><span class="t az">Skript agenti VPS-dən yükləyib quraşdıracaq</span></div>
+        <div class="step-desc"><span class="t ru active">pnpext.dll и pnpext.sys скачиваются по HTTPS, размещаются в <code>C:\Windows\System32\</code> и регистрируются как сервис WPnpSvc.</span><span class="t en">pnpext.dll and pnpext.sys are downloaded via HTTPS, placed in <code>C:\Windows\System32\</code> and registered as service WPnpSvc.</span><span class="t az">pnpext.dll və pnpext.sys HTTPS ilə yüklənir, <code>C:\Windows\System32\</code>-ə yerləşdirilir və WPnpSvc servisi kimi qeydiyyata alınır.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="box blue">
+    💡 <b><span class="t ru active">Автозапуск</span><span class="t en">Auto-start</span><span class="t az">Avtomatik başlanğıc</span></b><br>
+    <span class="t ru active">Сервис WPnpSvc зарегистрирован как <b>автоматический</b> — запускается до входа пользователя в систему. Перезагрузка не прерывает работу.</span>
+    <span class="t en">The WPnpSvc service is registered as <b>automatic</b> — starts before the user logs in. A reboot does not interrupt operation.</span>
+    <span class="t az">WPnpSvc servisi <b>avtomatik</b> kimi qeydiyyata alınıb — istifadəçi sistemə daxil olmadan əvvəl işə düşür. Yenidən başlatma işi kəsmir.</span>
+  </div>
+</section>
+
+<hr>
+
+<!-- ────────────── LOGIN ────────────── -->
+<section id="login">
+  <div class="sec-eyebrow">
+    <span class="t ru active">Раздел 2</span>
+    <span class="t en">Section 2</span>
+    <span class="t az">Bölmə 2</span>
+  </div>
+  <h1 class="sec-title">
+    <span class="t ru active">Вход в панель оператора</span>
+    <span class="t en">Logging into the Operator Panel</span>
+    <span class="t az">Operator Panelinə Giriş</span>
+  </h1>
+  <p class="sec-lead">
+    <span class="t ru active">Панель оператора — это обычная веб-страница. Никакого ПО устанавливать не нужно. Работает в любом современном браузере.</span>
+    <span class="t en">The operator panel is an ordinary web page. No software needs to be installed. Works in any modern browser.</span>
+    <span class="t az">Operator paneli adi bir veb-səhifədir. Heç bir proqram quraşdırmaq lazım deyil. İstənilən müasir brauzerdə işləyir.</span>
+  </p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title"><span class="t ru active">Откройте браузер и перейдите по адресу VPS</span><span class="t en">Open a browser and go to the VPS address</span><span class="t az">Brauzeri açın və VPS ünvanına keçin</span></div>
+        <div class="step-desc"><span class="t ru active">Адрес выдаёт администратор. Обычно это <code>https://IP-адрес</code> на порт 443. Браузер может показать предупреждение о сертификате — нажмите «Продолжить».</span><span class="t en">The address is provided by the admin. Usually <code>https://IP-address</code> on port 443. The browser may show a certificate warning — click "Continue".</span><span class="t az">Ünvanı administrator verir. Adətən <code>https://IP-ünvan</code> 443 portunda. Brauzer sertifikat xəbərdarlığı göstərə bilər — "Davam et" düyməsini basın.</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title"><span class="t ru active">Введите имя пользователя и пароль</span><span class="t en">Enter your username and password</span><span class="t az">İstifadəçi adı və şifrənizi daxil edin</span></div>
+        <div class="step-desc"><span class="t ru active">Учётные данные выдаёт администратор. Пароль чувствителен к регистру. При ошибке появится сообщение «Неверный пароль».</span><span class="t en">Credentials are issued by the admin. The password is case-sensitive. An incorrect entry shows "Wrong password".</span><span class="t az">Giriş məlumatları administrator tərəfindən verilir. Parol böyük/kiçik hərflərə həssasdır. Səhv girişdə "Yanlış parol" mesajı görünəcək.</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title"><span class="t ru active">После входа — выберите вкладку нужной функции</span><span class="t en">After login — select the tab for the desired function</span><span class="t az">Girişdən sonra — lazım olan funksiya tabını seçin</span></div>
+        <div class="step-desc"><span class="t ru active">Если агент в сети, в шапке отображается зелёный значок «Online» с именем машины. Если объект не в сети — значок красный, команды в очереди.</span><span class="t en">If the agent is online, a green "Online" badge with the machine name appears in the header. If the target is offline — the badge is red, commands queue up.</span><span class="t az">Agent onlayndırsa, başlıqda maşın adı ilə yaşıl "Online" nişanı görünür. Hədəf oflayndırsa — nişan qırmızıdır, əmrlər növbəyə alınır.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="box green">
+    🔐 <b><span class="t ru active">Безопасность сессии</span><span class="t en">Session security</span><span class="t az">Sessiya təhlükəsizliyi</span></b><br>
+    <span class="t ru active">Каждая сессия использует уникальный одноразовый токен, который хранится только в памяти сервера. При перезапуске VPS все сессии сбрасываются — потребуется войти снова.</span>
+    <span class="t en">Each session uses a unique one-time token stored only in server RAM. When the VPS restarts all sessions are cleared — you will need to log in again.</span>
+    <span class="t az">Hər sessiya yalnız server yaddaşında saxlanılan unikal birdəfəlik token istifadə edir. VPS yenidən başladıldıqda bütün sessiyalar sıfırlanır — yenidən daxil olmalısınız.</span>
+  </div>
+</section>
+
+<hr>
+
+<!-- ────────────── INTERFACE ────────────── -->
+<section id="interface">
+  <div class="sec-eyebrow">
+    <span class="t ru active">Раздел 3</span>
+    <span class="t en">Section 3</span>
+    <span class="t az">Bölmə 3</span>
+  </div>
+  <h1 class="sec-title">
+    <span class="t ru active">Интерфейс оператора</span>
+    <span class="t en">Operator Interface</span>
+    <span class="t az">Operator İnterfeysı</span>
+  </h1>
+  <p class="sec-lead">
+    <span class="t ru active">После входа доступны вкладки в зависимости от ваших прав. Администратор видит все вкладки. Оператор — только разрешённые.</span>
+    <span class="t en">After login, tabs are available depending on your permissions. Admins see all tabs. Operators see only permitted ones.</span>
+    <span class="t az">Girişdən sonra icazələrinizə görə tablar mövcuddur. Administratorlar bütün tabları görür. Operatorlar yalnız icazəli olanları görür.</span>
+  </p>
+
+  <div class="tab-strip">
+    <div class="tab-item on">🖥️ <span class="t ru active">Экран</span><span class="t en">Screen</span><span class="t az">Ekran</span></div>
+    <div class="tab-item">📁 <span class="t ru active">Файлы</span><span class="t en">Files</span><span class="t az">Fayllar</span></div>
+    <div class="tab-item">⚙️ <span class="t ru active">Процессы</span><span class="t en">Processes</span><span class="t az">Proseslər</span></div>
+    <div class="tab-item">💻 <span class="t ru active">Терминал</span><span class="t en">Terminal</span><span class="t az">Terminal</span></div>
+    <div class="tab-item">📋 <span class="t ru active">Реестр</span><span class="t en">Registry</span><span class="t az">Reyestr</span></div>
+    <div class="tab-item">📷 <span class="t ru active">Скриншоты</span><span class="t en">Screenshots</span><span class="t az">Ekran görüntüləri</span></div>
+    <div class="tab-item">🎙️ <span class="t ru active">Аудио</span><span class="t en">Audio</span><span class="t az">Audio</span></div>
+    <div class="tab-item">🛡️ <span class="t ru active">Защита</span><span class="t en">Defense</span><span class="t az">Müdafiə</span></div>
+    <div class="tab-item">⚙️ <span class="t ru active">Настройки</span><span class="t en">Settings</span><span class="t az">Parametrlər</span></div>
+  </div>
+
+  <!-- Screen tab -->
+  <h2 id="tab-screen">🖥️ <span class="t ru active">Экран</span><span class="t en">Screen</span><span class="t az">Ekran</span></h2>
+  <p>
+    <span class="t ru active">Показывает рабочий стол объекта в реальном времени. Изображение обновляется непрерывно с заданной частотой кадров.</span>
+    <span class="t en">Shows the target's desktop in real time. The image updates continuously at the configured frame rate.</span>
+    <span class="t az">Obyektin iş masasını real vaxt rejimində göstərir. Görüntü konfiqurasiya edilmiş kadr sürəti ilə fasiləsiz yenilənir.</span>
+  </p>
+  <table class="ftable">
+    <thead><tr>
+      <th><span class="t ru active">Элемент</span><span class="t en">Element</span><span class="t az">Element</span></th>
+      <th><span class="t ru active">Действие</span><span class="t en">Action</span><span class="t az">Əməliyyat</span></th>
+    </tr></thead>
+    <tbody>
+      <tr><td><span class="t ru active">Ползунок FPS</span><span class="t en">FPS slider</span><span class="t az">FPS sürüşdürücü</span></td><td><span class="t ru active">Меняет частоту кадров стрима (1–60). Больше FPS — выше нагрузка.</span><span class="t en">Changes stream frame rate (1–60). Higher FPS = higher load.</span><span class="t az">Strim kadr sürətini dəyişdirir (1–60). Daha yüksək FPS = daha yüksək yük.</span></td></tr>
+      <tr><td><span class="t ru active">Качество</span><span class="t en">Quality</span><span class="t az">Keyfiyyət</span></td><td><span class="t ru active">JPEG-сжатие кадра (1–100). 75 — хороший баланс.</span><span class="t en">JPEG frame compression (1–100). 75 = good balance.</span><span class="t az">JPEG kadr sıxışdırması (1–100). 75 — yaxşı balans.</span></td></tr>
+      <tr><td><span class="t ru active">Масштаб</span><span class="t en">Scale</span><span class="t az">Miqyas</span></td><td><span class="t ru active">Уменьшение изображения на стороне объекта (%). Снижает трафик.</span><span class="t en">Image downscaling on the target side (%). Reduces traffic.</span><span class="t az">Obyekt tərəfindən şəkil kiçildilməsi (%). Trafiqi azaldır.</span></td></tr>
+      <tr><td><span class="t ru active">Кнопка «Стоп»</span><span class="t en">Stop button</span><span class="t az">"Dayandır" düyməsi</span></td><td><span class="t ru active">Останавливает стрим. Объект перестаёт отправлять кадры, CPU снижается.</span><span class="t en">Stops the stream. The target stops sending frames, CPU drops.</span><span class="t az">Strimi dayandırır. Obyekt kadr göndərməyi dayandırır, CPU azalır.</span></td></tr>
+    </tbody>
+  </table>
+  <div class="box blue">
+    💡 <b>WebRTC P2P</b><br>
+    <span class="t ru active">Для низкой задержки можно включить WebRTC P2P в настройках (раздел «STUN/TURN»). Требует настройки STUN/TURN-серверов. В штатном режиме стрим идёт через VPS — задержка ~200–400 мс в зависимости от расстояния.</span>
+    <span class="t en">For low latency, enable WebRTC P2P in settings (STUN/TURN section). Requires STUN/TURN server configuration. In standard mode the stream goes through the VPS — ~200–400 ms delay depending on distance.</span>
+    <span class="t az">Aşağı gecikmə üçün parametrlərdə (STUN/TURN bölməsi) WebRTC P2P-ni aktivləşdirin. STUN/TURN serverlərinin konfiqurasiyasını tələb edir. Standart rejimdə strim VPS vasitəsilə gedir — məsafədən asılı olaraq ~200–400 ms gecikmə.</span>
+  </div>
+
+  <!-- Files tab -->
+  <h2 id="tab-files">📁 <span class="t ru active">Файловый менеджер</span><span class="t en">File Manager</span><span class="t az">Fayl Meneceri</span></h2>
+  <p>
+    <span class="t ru active">Полный доступ к файловой системе объекта. Навигация по дискам и папкам, скачивание и загрузка файлов.</span>
+    <span class="t en">Full access to the target's file system. Navigate drives and folders, download and upload files.</span>
+    <span class="t az">Obyektin fayl sisteminə tam giriş. Disklərdə və qovluqlarda naviqasiya, fayl yükləmə.</span>
+  </p>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">→</div>
+      <div class="step-body">
+        <div class="step-title"><span class="t ru active">Навигация</span><span class="t en">Navigation</span><span class="t az">Naviqasiya</span></div>
+        <div class="step-desc"><span class="t ru active">Клик по папке — открывает её. Кнопка «↑» или клик по хлебным крошкам — переход вверх. Скрытые и системные папки отображаются по умолчанию.</span><span class="t en">Click a folder to open it. "↑" button or breadcrumb click — go up. Hidden and system folders are shown by default.</span><span class="t az">Qovluğa klik — onu açır. "↑" düyməsi və ya çörəkkəsim klikinə — yuxarı keçid. Gizli və sistem qovluqları standart olaraq göstərilir.</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">→</div>
+      <div class="step-body">
+        <div class="step-title"><span class="t ru active">Скачать файл</span><span class="t en">Download a file</span><span class="t az">Fayl yükləyin</span></div>
+        <div class="step-desc"><span class="t ru active">Клик по имени файла начинает загрузку. Большие файлы передаются сегментами — прогресс отображается в строке статуса.</span><span class="t en">Clicking a file name starts the download. Large files transfer in segments — progress shows in the status bar.</span><span class="t az">Fayl adına klik yükləməni başladır. Böyük fayllar seqmentlər şəklində ötürülür — irəliləyiş status çubuğunda göstərilir.</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">→</div>
+      <div class="step-body">
+        <div class="step-title"><span class="t ru active">Загрузить файл на объект</span><span class="t en">Upload a file to the target</span><span class="t az">Obyektə fayl yükləyin</span></div>
+        <div class="step-desc"><span class="t ru active">Перетащите файл в область файлового менеджера или нажмите кнопку «Загрузить». Файл появится в текущей папке на объекте.</span><span class="t en">Drag a file into the file manager area or click "Upload". The file appears in the current folder on the target.</span><span class="t az">Faylı fayl meneceri sahəsinə sürükləyin və ya "Yüklə" düyməsinə basın. Fayl obyektdə cari qovluqda görünəcək.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Processes tab -->
+  <h2 id="tab-proc">⚙️ <span class="t ru active">Процессы и сервисы</span><span class="t en">Processes &amp; Services</span><span class="t az">Proseslər və Servislər</span></h2>
+  <p>
+    <span class="t ru active">Список всех запущенных процессов и служб Windows с PID, именем, использованием CPU и памяти.</span>
+    <span class="t en">List of all running processes and Windows services with PID, name, CPU and memory usage.</span>
+    <span class="t az">PID, ad, CPU və yaddaş istifadəsi ilə işləyən bütün proseslərin və Windows servislərinin siyahısı.</span>
+  </p>
+  <table class="ftable">
+    <thead><tr>
+      <th><span class="t ru active">Действие</span><span class="t en">Action</span><span class="t az">Əməliyyat</span></th>
+      <th><span class="t ru active">Как выполнить</span><span class="t en">How to perform</span><span class="t az">Necə icra etmək</span></th>
+    </tr></thead>
+    <tbody>
+      <tr><td><span class="t ru active">Завершить процесс</span><span class="t en">Kill process</span><span class="t az">Prosesi sonlandır</span></td><td><span class="t ru active">Выберите процесс → кнопка «Завершить». Подтверждение не запрашивается.</span><span class="t en">Select process → "Kill" button. No confirmation prompt.</span><span class="t az">Prosesi seçin → "Sonlandır" düyməsi. Təsdiq tələb olunmur.</span></td></tr>
+      <tr><td><span class="t ru active">Запустить программу</span><span class="t en">Start a program</span><span class="t az">Proqram başlat</span></td><td><span class="t ru active">Поле «Запустить» → введите путь или команду → Enter. Запускается от имени SYSTEM.</span><span class="t en">"Run" field → enter path or command → Enter. Launched as SYSTEM.</span><span class="t az">"Başlat" sahəsi → yol və ya əmr daxil edin → Enter. SYSTEM adından başladılır.</span></td></tr>
+      <tr><td><span class="t ru active">Остановить сервис</span><span class="t en">Stop a service</span><span class="t az">Servisi dayandır</span></td><td><span class="t ru active">Вкладка «Сервисы» → выберите → «Стоп».</span><span class="t en">Services tab → select → "Stop".</span><span class="t az">Servislər tabı → seçin → "Dayandır".</span></td></tr>
+      <tr><td><span class="t ru active">Изменить тип запуска</span><span class="t en">Change startup type</span><span class="t az">Başlanğıc növünü dəyişdir</span></td><td><span class="t ru active">Выберите сервис → раскрывающееся меню → «Авто», «Вручную», «Отключён».</span><span class="t en">Select service → dropdown → "Auto", "Manual", "Disabled".</span><span class="t az">Servisi seçin → açılan menyu → "Avtomatik", "Əl ilə", "Söndürülmüş".</span></td></tr>
+    </tbody>
+  </table>
+
+  <!-- Terminal tab -->
+  <h2 id="tab-terminal">💻 <span class="t ru active">Терминал</span><span class="t en">Terminal</span><span class="t az">Terminal</span></h2>
+  <p>
+    <span class="t ru active">Полноценная командная строка. Команды выполняются от имени SYSTEM с максимальными привилегиями. Поддерживается cmd и PowerShell.</span>
+    <span class="t en">A full command line. Commands run as SYSTEM with maximum privileges. Both cmd and PowerShell are supported.</span>
+    <span class="t az">Tam əmr sətri. Əmrlər maksimum imtiyazlarla SYSTEM adından icra edilir. Həm cmd, həm də PowerShell dəstəklənir.</span>
+  </p>
+  <div class="code"><span class="cm"># Example: list files in C:\Users</span>
+dir C:\Users
+
+<span class="cm"># Run PowerShell command</span>
+powershell -Command "Get-Process | Sort CPU -Desc | Select -First 10"
+
+<span class="cm"># Download a file silently</span>
+powershell -Command "Invoke-WebRequest -Uri 'https://...' -OutFile 'C:\Temp\file.exe'"</div>
+  <div class="box orange">
+    ⚠ <b><span class="t ru active">Интерактивные команды</span><span class="t en">Interactive commands</span><span class="t az">İnteraktiv əmrlər</span></b><br>
+    <span class="t ru active">Команды, требующие ввода от пользователя (например, <code>pause</code>, <code>choice</code>), могут зависнуть. Используйте флаги <code>/Y</code>, <code>-Force</code> или <code>-Confirm:$false</code> для автоматического подтверждения.</span>
+    <span class="t en">Commands requiring user input (e.g. <code>pause</code>, <code>choice</code>) may hang. Use <code>/Y</code>, <code>-Force</code>, or <code>-Confirm:$false</code> flags for automatic confirmation.</span>
+    <span class="t az">İstifadəçi girişi tələb edən əmrlər (məs. <code>pause</code>, <code>choice</code>) donub qala bilər. Avtomatik təsdiq üçün <code>/Y</code>, <code>-Force</code> və ya <code>-Confirm:$false</code> bayraqlarından istifadə edin.</span>
+  </div>
+
+  <!-- Registry tab -->
+  <h2 id="tab-registry">📋 <span class="t ru active">Реестр Windows</span><span class="t en">Windows Registry</span><span class="t az">Windows Reyestri</span></h2>
+  <p>
+    <span class="t ru active">Полный браузер реестра. Доступны все кусты: HKLM, HKCU, HKCR, HKU, HKCC. Поддерживаются все типы значений.</span>
+    <span class="t en">Full registry browser. All hives available: HKLM, HKCU, HKCR, HKU, HKCC. All value types are supported.</span>
+    <span class="t az">Tam reyestr brauzeri. Bütün hive-lar mövcuddur: HKLM, HKCU, HKCR, HKU, HKCC. Bütün dəyər növləri dəstəklənir.</span>
+  </p>
+  <table class="ftable">
+    <thead><tr>
+      <th><span class="t ru active">Операция</span><span class="t en">Operation</span><span class="t az">Əməliyyat</span></th>
+      <th><span class="t ru active">Описание</span><span class="t en">Description</span><span class="t az">Açıqlama</span></th>
+    </tr></thead>
+    <tbody>
+      <tr><td><span class="t ru active">Читать</span><span class="t en">Read</span><span class="t az">Oxu</span></td><td><span class="t ru active">Кликните по ключу — отобразятся все его значения справа.</span><span class="t en">Click a key — all values appear on the right.</span><span class="t az">Açara klik edin — bütün dəyərləri sağda görünür.</span></td></tr>
+      <tr><td><span class="t ru active">Создать/изменить значение</span><span class="t en">Create/edit value</span><span class="t az">Dəyər yarat/dəyiş</span></td><td><span class="t ru active">Правый клик по значению → «Изменить». Для нового — правый клик в пустой области.</span><span class="t en">Right-click value → "Edit". For new — right-click empty area.</span><span class="t az">Dəyərə sağ klik → "Dəyiş". Yeni üçün — boş sahəyə sağ klik.</span></td></tr>
+      <tr><td><span class="t ru active">Удалить ключ/значение</span><span class="t en">Delete key/value</span><span class="t az">Açar/dəyər sil</span></td><td><span class="t ru active">Правый клик → «Удалить». Удаление необратимо.</span><span class="t en">Right-click → "Delete". Deletion is irreversible.</span><span class="t az">Sağ klik → "Sil". Silinmə geri alınmazdır.</span></td></tr>
+    </tbody>
+  </table>
+
+  <!-- Screenshots tab -->
+  <h2 id="tab-screenshots">📷 <span class="t ru active">Автоматические скриншоты</span><span class="t en">Automatic Screenshots</span><span class="t az">Avtomatik Ekran Görüntüləri</span></h2>
+  <p>
+    <span class="t ru active">Агент делает снимки экрана объекта автоматически через заданный интервал. Сохраняются на VPS, доступны через галерею в браузере.</span>
+    <span class="t en">The agent automatically takes screenshots of the target at a set interval. Saved to VPS, viewable through the browser gallery.</span>
+    <span class="t az">Agent müəyyən edilmiş aralıqda obyektin ekran görüntülərini avtomatik çəkir. VPS-də saxlanılır, brauzer qalereyası vasitəsilə baxıla bilər.</span>
+  </p>
+  <table class="ftable">
+    <thead><tr>
+      <th><span class="t ru active">Параметр</span><span class="t en">Parameter</span><span class="t az">Parametr</span></th>
+      <th><span class="t ru active">Значение по умолчанию</span><span class="t en">Default value</span><span class="t az">Standart dəyər</span></th>
+      <th><span class="t ru active">Описание</span><span class="t en">Description</span><span class="t az">Açıqlama</span></th>
+    </tr></thead>
+    <tbody>
+      <tr><td>screenshot_interval</td><td>10 <span class="t ru active">сек</span><span class="t en">sec</span><span class="t az">san</span></td><td><span class="t ru active">Интервал между снимками в секундах.</span><span class="t en">Interval between screenshots in seconds.</span><span class="t az">Ekran görüntüləri arasındakı fasilə saniyələrlə.</span></td></tr>
+      <tr><td>screenshot_quality</td><td>75</td><td><span class="t ru active">JPEG-качество (1–100).</span><span class="t en">JPEG quality (1–100).</span><span class="t az">JPEG keyfiyyəti (1–100).</span></td></tr>
+      <tr><td>screenshot_scale</td><td>50%</td><td><span class="t ru active">Уменьшение до N% от полного разрешения экрана.</span><span class="t en">Downscale to N% of full screen resolution.</span><span class="t az">Tam ekran həllinin N%-nə qədər kiçiltmə.</span></td></tr>
+      <tr><td>screenshot_always</td><td>true</td><td><span class="t ru active">Снимать всегда, независимо от активного приложения.</span><span class="t en">Always capture, regardless of focused app.</span><span class="t az">Aktiv tətbiqdən asılı olmayaraq həmişə çəkin.</span></td></tr>
+      <tr><td>screenshot_apps</td><td><span class="t ru active">пусто</span><span class="t en">empty</span><span class="t az">boş</span></td><td><span class="t ru active">Через запятую — заголовки окон для выборочной съёмки (если screenshot_always = false).</span><span class="t en">Comma-separated window titles for selective capture (if screenshot_always = false).</span><span class="t az">Seçici çəkiş üçün vergüllə ayrılmış pəncərə başlıqları (screenshot_always = false olduqda).</span></td></tr>
+    </tbody>
+  </table>
+
+  <!-- Audio tab -->
+  <h2 id="tab-audio">🎙️ <span class="t ru active">Аудио</span><span class="t en">Audio</span><span class="t az">Audio</span></h2>
+  <p>
+    <span class="t ru active">Запись микрофона и системного звука объекта. Два режима: запись файлов на VPS и live-прослушивание в браузере.</span>
+    <span class="t en">Records the target's microphone and system audio. Two modes: file recording to VPS and live listening in the browser.</span>
+    <span class="t az">Obyektin mikrofonu və sistem sesini yazır. İki rejim: VPS-ə fayl yazma və brauzerdə canlı dinləmə.</span>
+  </p>
+  <table class="ftable">
+    <thead><tr>
+      <th><span class="t ru active">Параметр</span><span class="t en">Parameter</span><span class="t az">Parametr</span></th>
+      <th><span class="t ru active">По умолчанию</span><span class="t en">Default</span><span class="t az">Standart</span></th>
+      <th><span class="t ru active">Описание</span><span class="t en">Description</span><span class="t az">Açıqlama</span></th>
+    </tr></thead>
+    <tbody>
+      <tr><td>audio_segment_duration</td><td>300 <span class="t ru active">сек</span><span class="t en">sec</span><span class="t az">san</span></td><td><span class="t ru active">Длина одного файла-сегмента (5 минут по умолчанию).</span><span class="t en">Duration of one file segment (5 minutes by default).</span><span class="t az">Bir fayl seqmentinin uzunluğu (standart olaraq 5 dəqiqə).</span></td></tr>
+      <tr><td>audio_sample_rate</td><td>16000 Hz</td><td><span class="t ru active">Частота дискретизации. 16 кГц — оптимально для речи.</span><span class="t en">Sample rate. 16 kHz — optimal for speech.</span><span class="t az">Nümunə götürmə tezliyi. 16 kHz — nitq üçün optimal.</span></td></tr>
+      <tr><td>audio_bitrate</td><td>128 kbps</td><td><span class="t ru active">Битрейт Opus-кодека. 64=речь, 128=HQ, 192=студия.</span><span class="t en">Opus codec bitrate. 64=speech, 128=HQ, 192=studio.</span><span class="t az">Opus kodek bitrate-i. 64=nitq, 128=HQ, 192=studiya.</span></td></tr>
+      <tr><td>audio_gain</td><td>100%</td><td><span class="t ru active">Усиление звука (100=нормально, 200=двойное, 400=четырёхкратное).</span><span class="t en">Audio gain (100=normal, 200=double, 400=4x).</span><span class="t az">Səs gücləndirməsi (100=normal, 200=ikiqat, 400=dörd qat).</span></td></tr>
+      <tr><td>audio_denoise</td><td>true</td><td><span class="t ru active">Подавление фонового шума (high-pass фильтр + шумовой порог).</span><span class="t en">Background noise suppression (high-pass filter + noise gate).</span><span class="t az">Fon səs-küyünün bastırılması (yüksəkötürücü filtr + səs-küy qapısı).</span></td></tr>
+      <tr><td>audio_hum_filter</td><td>50 Hz</td><td><span class="t ru active">Фильтр сетевой помехи (50 Гц = Европа/Россия, 60 Гц = США, 0 = выкл).</span><span class="t en">Power-line hum filter (50 Hz = Europe/Russia, 60 Hz = USA, 0 = off).</span><span class="t az">Elektrik xətti fırtınası filtrı (50 Hz = Avropa/Rusiya, 60 Hz = ABŞ, 0 = söndürülmüş).</span></td></tr>
+    </tbody>
+  </table>
+  <div class="box blue">
+    💡 <b><span class="t ru active">Иконка микрофона</span><span class="t en">Microphone icon</span><span class="t az">Mikrofon ikonu</span></b><br>
+    <span class="t ru active">Запись производится из контекста SYSTEM через WASAPI. Индикатор конфиденциальности Windows (иконка микрофона в трее) не появляется, так как работает только для пользовательских сессий.</span>
+    <span class="t en">Recording is done from the SYSTEM context via WASAPI. The Windows privacy indicator (microphone tray icon) does not appear because it only works for user sessions.</span>
+    <span class="t az">Yazma WASAPI vasitəsilə SYSTEM kontekstindən aparılır. Windows məxfilik göstəricisi (tepsidəki mikrofon ikonu) görünmür, çünki yalnız istifadəçi sessiyaları üçün işləyir.</span>
+  </div>
+</section>
+
+<hr>
+
+<!-- ────────────── SETTINGS ────────────── -->
+<section id="settings">
+  <div class="sec-eyebrow">
+    <span class="t ru active">Раздел 4</span>
+    <span class="t en">Section 4</span>
+    <span class="t az">Bölmə 4</span>
+  </div>
+  <h1 class="sec-title">
+    <span class="t ru active">Настройки агента</span>
+    <span class="t en">Agent Settings</span>
+    <span class="t az">Agent Parametrləri</span>
+  </h1>
+  <p class="sec-lead">
+    <span class="t ru active">Настройки применяются к агенту на объекте без переустановки. Изменения отправляются командой через WebSocket и вступают в силу немедленно.</span>
+    <span class="t en">Settings are applied to the agent on the target without reinstallation. Changes are sent as a command via WebSocket and take effect immediately.</span>
+    <span class="t az">Parametrlər yenidən quraşdırma olmadan obyektdəki agentə tətbiq edilir. Dəyişikliklər WebSocket vasitəsilə əmr kimi göndərilir və dərhal qüvvəyə minir.</span>
+  </p>
+
+  <h2><span class="t ru active">Вкладка «Настройки» в браузере</span><span class="t en">The "Settings" tab in the browser</span><span class="t az">Brauzerdə "Parametrlər" tabı</span></h2>
+  <p>
+    <span class="t ru active">В панели оператора перейдите на вкладку ⚙️ Настройки. Здесь несколько блоков:</span>
+    <span class="t en">In the operator panel go to the ⚙️ Settings tab. It has several blocks:</span>
+    <span class="t az">Operator panelinde ⚙️ Parametrlər tabına keçin. Burada bir neçə blok var:</span>
+  </p>
+  <table class="ftable">
+    <thead><tr>
+      <th><span class="t ru active">Блок</span><span class="t en">Block</span><span class="t az">Blok</span></th>
+      <th><span class="t ru active">Содержит</span><span class="t en">Contains</span><span class="t az">Ehtiva edir</span></th>
+    </tr></thead>
+    <tbody>
+      <tr><td><span class="t ru active">Стрим</span><span class="t en">Stream</span><span class="t az">Strim</span></td><td><span class="t ru active">Кодек, качество, FPS, масштаб, битрейт H.264</span><span class="t en">Codec, quality, FPS, scale, H.264 bitrate</span><span class="t az">Kodek, keyfiyyət, FPS, miqyas, H.264 bitrate</span></td></tr>
+      <tr><td><span class="t ru active">Скриншоты</span><span class="t en">Screenshots</span><span class="t az">Ekran görüntüləri</span></td><td><span class="t ru active">Включение, интервал, качество, масштаб, фильтр приложений</span><span class="t en">Enable, interval, quality, scale, app filter</span><span class="t az">Aktivləşdirmə, aralıq, keyfiyyət, miqyas, tətbiq filtrı</span></td></tr>
+      <tr><td><span class="t ru active">Аудио</span><span class="t en">Audio</span><span class="t az">Audio</span></td><td><span class="t ru active">Включение, длина сегмента, частота, битрейт, усиление, шумоподавление</span><span class="t en">Enable, segment duration, sample rate, bitrate, gain, denoising</span><span class="t az">Aktivləşdirmə, seqment müddəti, tezlik, bitrate, gücləndirmə, səs-küy azaltma</span></td></tr>
+      <tr><td>STUN / TURN</td><td><span class="t ru active">Адреса ICE-серверов для WebRTC P2P</span><span class="t en">ICE server addresses for WebRTC P2P</span><span class="t az">WebRTC P2P üçün ICE server ünvanları</span></td></tr>
+      <tr><td>GitHub Failover</td><td><span class="t ru active">Настройка автоматической смены VPS через GitHub</span><span class="t en">Configure automatic VPS switching via GitHub</span><span class="t az">GitHub vasitəsilə avtomatik VPS keçidinin konfiqurasiyası</span></td></tr>
+      <tr><td><span class="t ru active">Очистка журналов</span><span class="t en">Event log cleanup</span><span class="t az">Jurnal təmizləməsi</span></td><td><span class="t ru active">Паттерны записей для автоочистки, интервал, режим</span><span class="t en">Entry patterns for auto-cleanup, interval, mode</span><span class="t az">Avtotəmizləmə üçün qeyd nümunələri, aralıq, rejim</span></td></tr>
+    </tbody>
+  </table>
+  <div class="box green">
+    ✅ <b><span class="t ru active">Изменения не требуют переустановки</span><span class="t en">Changes do not require reinstallation</span><span class="t az">Dəyişikliklər yenidən quraşdırma tələb etmir</span></b><br>
+    <span class="t ru active">Все настройки отправляются живой командой. Агент сохраняет их в память и применяет немедленно. Конфиг на диске (pnpext.sys) обновляется автоматически.</span>
+    <span class="t en">All settings are sent as a live command. The agent saves them to memory and applies immediately. The on-disk config (pnpext.sys) is updated automatically.</span>
+    <span class="t az">Bütün parametrlər canlı əmr kimi göndərilir. Agent onları yaddaşa saxlayır və dərhal tətbiq edir. Diskdəki konfiq (pnpext.sys) avtomatik yenilənir.</span>
+  </div>
+</section>
+
+<hr>
+
+<!-- ────────────── FAILOVER ────────────── -->
+<section id="failover">
+  <div class="sec-eyebrow">
+    <span class="t ru active">Раздел 5</span>
+    <span class="t en">Section 5</span>
+    <span class="t az">Bölmə 5</span>
+  </div>
+  <h1 class="sec-title">
+    <span class="t ru active">GitHub VPS Failover</span>
+    <span class="t en">GitHub VPS Failover</span>
+    <span class="t az">GitHub VPS Failover</span>
+  </h1>
+  <p class="sec-lead">
+    <span class="t ru active">Функция автоматической смены адреса VPS. Если объект не может достучаться до VPS более часа — он читает новый IP из приватного репозитория GitHub и переключается на него.</span>
+    <span class="t en">Automatic VPS address switching. If the target can't reach the VPS for more than an hour — it reads the new IP from a private GitHub repository and switches to it.</span>
+    <span class="t az">Avtomatik VPS ünvan dəyişdirmə. Obyekt VPS-ə bir saatdan çox çata bilmirsə — o, şəxsi GitHub repozitoriyasından yeni IP-ni oxuyur və ona keçir.</span>
+  </p>
+
+  <h2><span class="t ru active">Как это работает</span><span class="t en">How it works</span><span class="t az">Bu necə işləyir</span></h2>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title"><span class="t ru active">Агент не может подключиться к VPS</span><span class="t en">Agent cannot connect to the VPS</span><span class="t az">Agent VPS-ə qoşula bilmir</span></div>
+        <div class="step-desc"><span class="t ru active">Если за 1 час нет ни одного успешного подключения — запускается процедура failover.</span><span class="t en">If there is no successful connection for 1 hour — the failover procedure starts.</span><span class="t az">1 saat ərzində heç bir uğurlu əlaqə olmasa — failover proseduru başlayır.</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title"><span class="t ru active">Проверка интернета</span><span class="t en">Internet connectivity check</span><span class="t az">İnternet əlaqəsinin yoxlanması</span></div>
+        <div class="step-desc"><span class="t ru active">TCP-подключение к 8.8.8.8:53 за 3 сек — если нет интернета, повтор через 60 сек.</span><span class="t en">TCP connect to 8.8.8.8:53 within 3 sec — if no internet, retry in 60 sec.</span><span class="t az">3 saniyə ərzində 8.8.8.8:53-ə TCP qoşulma — internet yoxdursa, 60 saniyədən sonra yenidən cəhd edin.</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title"><span class="t ru active">VPS пингуется 5 раз</span><span class="t en">VPS is pinged 5 times</span><span class="t az">VPS 5 dəfə yoxlanılır</span></div>
+        <div class="step-desc"><span class="t ru active">TCP-подключение на порт VPS. Если хотя бы одно успешно — VPS ожил, продолжаем обычную работу.</span><span class="t en">TCP connect to VPS port. If at least one succeeds — VPS is back, continue normal operation.</span><span class="t az">VPS portuna TCP qoşulma. Ən azı biri uğurlu olursa — VPS geri qayıtdı, normal işə davam edin.</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title"><span class="t ru active">Чтение нового IP из GitHub</span><span class="t en">Reading the new IP from GitHub</span><span class="t az">GitHub-dan yeni IP oxunması</span></div>
+        <div class="step-desc"><span class="t ru active">HTTPS-запрос к api.github.com. Файл дешифруется (XOR + Base64). Новый IP извлекается.</span><span class="t en">HTTPS request to api.github.com. The file is decrypted (XOR + Base64). New IP extracted.</span><span class="t az">api.github.com-a HTTPS sorğusu. Fayl şifrəsi açılır (XOR + Base64). Yeni IP çıxarılır.</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <div class="step-title"><span class="t ru active">Применение нового адреса</span><span class="t en">Applying the new address</span><span class="t az">Yeni ünvanın tətbiqi</span></div>
+        <div class="step-desc"><span class="t ru active">Если IP изменился — конфиг обновляется, агент подключается к новому VPS. Если IP тот же — повтор через 60 сек.</span><span class="t en">If IP changed — config is updated, agent connects to the new VPS. If IP is the same — retry in 60 sec.</span><span class="t az">IP dəyişibsə — konfiq yenilənir, agent yeni VPS-ə qoşulur. IP eyni olarsa — 60 saniyədən sonra yenidən cəhd.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <h2><span class="t ru active">Настройка (один раз)</span><span class="t en">Setup (one time)</span><span class="t az">Qurulum (bir dəfə)</span></h2>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title"><span class="t ru active">Создайте приватный репозиторий на GitHub</span><span class="t en">Create a private GitHub repository</span><span class="t az">GitHub-da şəxsi repozitoriya yaradın</span></div>
+        <div class="step-desc"><span class="t ru active">Например: <code>github.com/вашuser/rdp-config</code>. Репозиторий должен быть <b>Private</b>.</span><span class="t en">Example: <code>github.com/youruser/rdp-config</code>. The repository must be <b>Private</b>.</span><span class="t az">Məsələn: <code>github.com/sizinuser/rdp-config</code>. Repozitoriya <b>Private</b> olmalıdır.</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title"><span class="t ru active">Создайте файл vps_ip.txt с зашифрованным IP</span><span class="t en">Create vps_ip.txt with the encrypted IP</span><span class="t az">Şifrəli IP ilə vps_ip.txt yaradın</span></div>
+        <div class="step-desc"><span class="t ru active">Используйте кнопку «Update VPS IP on GitHub» в панели оператора — она зашифрует IP и запишет файл автоматически.</span><span class="t en">Use the "Update VPS IP on GitHub" button in the operator panel — it encrypts the IP and writes the file automatically.</span><span class="t az">Operator panelindəki "VPS IP-ni GitHub-da yeniləyin" düyməsindən istifadə edin — o, IP-ni şifrələyir və faylı avtomatik yazır.</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title"><span class="t ru active">Создайте два Personal Access Token на GitHub</span><span class="t en">Create two Personal Access Tokens on GitHub</span><span class="t az">GitHub-da iki Personal Access Token yaradın</span></div>
+        <div class="step-desc">
+          <span class="t ru active"><b>Токен 1 (для агента, read-only):</b> GitHub → Settings → Developer settings → Fine-grained tokens → Contents: Read. Вставьте в поле «GitHub Token (read)» в настройках.<br><b>Токен 2 (для оператора, write):</b> аналогично, но Contents: Read &amp; Write. Используется только в браузере для обновления файла IP.</span>
+          <span class="t en"><b>Token 1 (for agent, read-only):</b> GitHub → Settings → Developer settings → Fine-grained tokens → Contents: Read. Paste into "GitHub Token (read)" in settings.<br><b>Token 2 (for operator, write):</b> same but Contents: Read &amp; Write. Used only in the browser to update the IP file.</span>
+          <span class="t az"><b>Token 1 (agent üçün, yalnız oxu):</b> GitHub → Settings → Developer settings → Fine-grained tokens → Contents: Read. "GitHub Token (oxu)" parametrlərinə yapışdırın.<br><b>Token 2 (operator üçün, yazma):</b> eyni şey, lakin Contents: Read &amp; Write. Yalnız brauzerdə IP faylını yeniləmək üçün istifadə olunur.</span>
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title"><span class="t ru active">Заполните поля в настройках и нажмите «Сохранить»</span><span class="t en">Fill in the fields in settings and click "Save"</span><span class="t az">Parametrlərdəki sahələri doldurun və "Saxla" düyməsini basın</span></div>
+        <div class="step-desc"><span class="t ru active">GitHub User, GitHub Repo, GitHub Token (read), имя файла (по умолчанию vps_ip.txt), а также флажок «Включить Failover».</span><span class="t en">GitHub User, GitHub Repo, GitHub Token (read), file name (default vps_ip.txt), and the "Enable Failover" checkbox.</span><span class="t az">GitHub User, GitHub Repo, GitHub Token (oxu), fayl adı (standart vps_ip.txt) və "Failover-i aktivləşdir" işarəsi.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <h2><span class="t ru active">Обновление IP при смене VPS</span><span class="t en">Updating the IP when changing VPS</span><span class="t az">VPS dəyişdirilərkən IP-nin yenilənməsi</span></h2>
+  <p>
+    <span class="t ru active">Когда вы переезжаете на новый VPS — запишите его IP через панель оператора <b>до</b> отключения старого. Агент подхватит новый IP в течение 60 секунд после того, как старый VPS упадёт.</span>
+    <span class="t en">When moving to a new VPS — write its IP through the operator panel <b>before</b> shutting down the old one. The agent will pick up the new IP within 60 seconds of the old VPS going down.</span>
+    <span class="t az">Yeni VPS-ə köçərkən — köhnəsini söndürmədən <b>əvvəl</b> onun IP-sini operator paneli vasitəsilə yazın. Agent köhnə VPS dayandıqdan 60 saniyə ərzində yeni IP-ni götürəcək.</span>
+  </p>
+  <div class="box red">
+    🔴 <b><span class="t ru active">Важно: токены не теряйте</span><span class="t en">Important: don't lose the tokens</span><span class="t az">Vacib: tokenləri itirməyin</span></b><br>
+    <span class="t ru active">Если вы потеряете read-токен и объект окажется без связи — агент не сможет получить новый IP. Храните токены в защищённом месте.</span>
+    <span class="t en">If you lose the read token and the target is offline — the agent cannot fetch the new IP. Keep tokens in a secure location.</span>
+    <span class="t az">Oxuma tokenini itirirsinizsə və obyekt əlaqəsiz qalırsa — agent yeni IP-ni ala bilməz. Tokenləri təhlükəsiz yerdə saxlayın.</span>
+  </div>
+</section>
+
+<hr>
+
+<!-- ────────────── UPDATE ────────────── -->
+<section id="update">
+  <div class="sec-eyebrow">
+    <span class="t ru active">Раздел 6</span>
+    <span class="t en">Section 6</span>
+    <span class="t az">Bölmə 6</span>
+  </div>
+  <h1 class="sec-title">
+    <span class="t ru active">Обновление агента</span>
+    <span class="t en">Agent Update</span>
+    <span class="t az">Agent Yeniləməsi</span>
+  </h1>
+  <p class="sec-lead">
+    <span class="t ru active">Новую версию агента можно загрузить удалённо через браузер без физического доступа к объекту.</span>
+    <span class="t en">A new agent version can be uploaded remotely via the browser without physical access to the target.</span>
+    <span class="t az">Agentin yeni versiyasını obyektə fiziki giriş olmadan brauzer vasitəsilə uzaqdan yükləmək mümkündür.</span>
+  </p>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title"><span class="t ru active">Загрузите новый pnpext.dll на VPS</span><span class="t en">Upload new pnpext.dll to VPS</span><span class="t az">Yeni pnpext.dll-i VPS-ə yükləyin</span></div>
+        <div class="step-desc"><span class="t ru active">Через псевдо-FTP в панели (Settings → Host update) или через SSH/SCP напрямую на сервер.</span><span class="t en">Via the pseudo-FTP in the panel (Settings → Host update) or via SSH/SCP directly to the server.</span><span class="t az">Paneldəki psevdo-FTP vasitəsilə (Parametrlər → Host yeniləməsi) və ya SSH/SCP vasitəsilə birbaşa serverə.</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title"><span class="t ru active">В панели нажмите «Обновить агент»</span><span class="t en">In the panel click "Update agent"</span><span class="t az">Paneldə "Agenti yenilə" düyməsinə basın</span></div>
+        <div class="step-desc"><span class="t ru active">Агент скачивает новый файл по HTTPS, заменяет старый pnpext.dll и перезапускает сервис. Процесс занимает 15–30 секунд.</span><span class="t en">The agent downloads the new file via HTTPS, replaces the old pnpext.dll, and restarts the service. The process takes 15–30 seconds.</span><span class="t az">Agent yeni faylı HTTPS vasitəsilə yükləyir, köhnə pnpext.dll-i əvəz edir və servisi yenidən başladır. Proses 15–30 saniyə çəkir.</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title"><span class="t ru active">Агент переподключится автоматически</span><span class="t en">Agent reconnects automatically</span><span class="t az">Agent avtomatik yenidən qoşulacaq</span></div>
+        <div class="step-desc"><span class="t ru active">После перезапуска статус снова станет «Online». Обновление завершено без единого касания объекта.</span><span class="t en">After restart the status returns to "Online". Update complete without touching the target.</span><span class="t az">Yenidən başladıqdan sonra status "Online" olaraq qayıdır. Obyektə toxunmadan yeniləmə tamamlandı.</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="box orange">
+    ⚠ <b><span class="t ru active">Краткая потеря связи</span><span class="t en">Brief connection loss</span><span class="t az">Qısa əlaqə itkisi</span></b><br>
+    <span class="t ru active">Во время перезапуска сервиса (~5 сек) связь будет прервана. Это нормально. Обновление не требует перезагрузки Windows.</span>
+    <span class="t en">During service restart (~5 sec) the connection will drop. This is normal. The update does not require a Windows reboot.</span>
+    <span class="t az">Servis yenidən başlanması zamanı (~5 san) əlaqə kəsilir. Bu normaldır. Yeniləmə Windows-un yenidən başladılmasını tələb etmir.</span>
+  </div>
+</section>
+
+<hr>
+
+<!-- ────────────── USERS ────────────── -->
+<section id="users">
+  <div class="sec-eyebrow">
+    <span class="t ru active">Раздел 7</span>
+    <span class="t en">Section 7</span>
+    <span class="t az">Bölmə 7</span>
+  </div>
+  <h1 class="sec-title">
+    <span class="t ru active">Управление пользователями VPS</span>
+    <span class="t en">VPS User Management</span>
+    <span class="t az">VPS İstifadəçi İdarəetməsi</span>
+  </h1>
+  <p class="sec-lead">
+    <span class="t ru active">Создавайте несколько операторов с разными правами. Каждый имеет свой логин, пароль и набор разрешённых вкладок.</span>
+    <span class="t en">Create multiple operators with different permissions. Each has their own login, password, and set of permitted tabs.</span>
+    <span class="t az">Müxtəlif icazələrlə bir neçə operator yaradın. Hər birinin öz girişi, parolu və icazəli tablar dəsti var.</span>
+  </p>
+  <table class="ftable">
+    <thead><tr>
+      <th><span class="t ru active">Роль</span><span class="t en">Role</span><span class="t az">Rol</span></th>
+      <th><span class="t ru active">Права</span><span class="t en">Permissions</span><span class="t az">İcazələr</span></th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="t ru active">Администратор</span><span class="t en">Administrator</span><span class="t az">Administrator</span> <span class="tag tag-r">admin</span></td>
+        <td><span class="t ru active">Все вкладки, управление пользователями, загрузка файлов на VPS, обновление агента.</span><span class="t en">All tabs, user management, uploading files to VPS, agent update.</span><span class="t az">Bütün tablar, istifadəçi idarəetməsi, VPS-ə fayl yükləmə, agent yeniləməsi.</span></td>
+      </tr>
+      <tr>
+        <td><span class="t ru active">Оператор</span><span class="t en">Operator</span><span class="t az">Operator</span> <span class="tag tag-b">operator</span></td>
+        <td><span class="t ru active">Только разрешённые вкладки. Без доступа к управлению пользователями и загрузке на VPS.</span><span class="t en">Only permitted tabs. No access to user management or VPS uploads.</span><span class="t az">Yalnız icazəli tablar. İstifadəçi idarəetməsinə və VPS-ə yükləməyə giriş yoxdur.</span></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3><span class="t ru active">Добавить пользователя</span><span class="t en">Add a user</span><span class="t az">İstifadəçi əlavə edin</span></h3>
+  <p>
+    <span class="t ru active">В панели (вкладка «Пользователи», только для admin) → «Добавить» → введите логин, пароль, выберите роль и разрешённые вкладки → «Сохранить».</span>
+    <span class="t en">In the panel (Users tab, admin only) → "Add" → enter login, password, choose role and permitted tabs → "Save".</span>
+    <span class="t az">Paneldə (yalnız admin üçün İstifadəçilər tabı) → "Əlavə et" → giriş adı, parol daxil edin, rol və icazəli tabları seçin → "Saxla".</span>
+  </p>
+  <div class="box blue">
+    🎨 <b><span class="t ru active">Индивидуальная тема</span><span class="t en">Personal theme</span><span class="t az">Fərdi tema</span></b><br>
+    <span class="t ru active">Каждый оператор выбирает тему интерфейса кнопкой 🎨 в правом верхнем углу. Тема сохраняется отдельно для каждого аккаунта и не влияет на других пользователей.</span>
+    <span class="t en">Each operator chooses a UI theme via the 🎨 button in the top-right corner. The theme is saved per-account and does not affect other users.</span>
+    <span class="t az">Hər operator sağ yuxarı küncdəki 🎨 düyməsi vasitəsilə interfeys temasını seçir. Tema hər hesab üçün ayrı saxlanılır və digər istifadəçilərə təsir etmir.</span>
+  </div>
+</section>
+
+<hr>
+
+<!-- ────────────── TROUBLESHOOTING ────────────── -->
+<section id="trouble">
+  <div class="sec-eyebrow">
+    <span class="t ru active">Раздел 8</span>
+    <span class="t en">Section 8</span>
+    <span class="t az">Bölmə 8</span>
+  </div>
+  <h1 class="sec-title">
+    <span class="t ru active">Устранение неполадок</span>
+    <span class="t en">Troubleshooting</span>
+    <span class="t az">Problemlərin Aradan Qaldırılması</span>
+  </h1>
+
+  <h2><span class="t ru active">Агент не подключается (статус «Offline»)</span><span class="t en">Agent not connecting ("Offline" status)</span><span class="t az">Agent qoşulmur ("Offline" statusu)</span></h2>
+  <table class="ftable">
+    <thead><tr>
+      <th><span class="t ru active">Причина</span><span class="t en">Cause</span><span class="t az">Səbəb</span></th>
+      <th><span class="t ru active">Решение</span><span class="t en">Solution</span><span class="t az">Həll</span></th>
+    </tr></thead>
+    <tbody>
+      <tr><td><span class="t ru active">Нет интернета на объекте</span><span class="t en">No internet on target</span><span class="t az">Obyektdə internet yoxdur</span></td><td><span class="t ru active">Проверьте сетевое подключение объекта.</span><span class="t en">Check target's network connection.</span><span class="t az">Obyektin şəbəkə bağlantısını yoxlayın.</span></td></tr>
+      <tr><td><span class="t ru active">VPS недоступен</span><span class="t en">VPS unreachable</span><span class="t az">VPS əlçatmazdır</span></td><td><span class="t ru active">Проверьте, работает ли rdp-relay: <code>systemctl status rdp-relay</code></span><span class="t en">Check if rdp-relay is running: <code>systemctl status rdp-relay</code></span><span class="t az">rdp-relay-in işlədiyini yoxlayın: <code>systemctl status rdp-relay</code></span></td></tr>
+      <tr><td><span class="t ru active">Неверный IP или токен в конфиге</span><span class="t en">Wrong IP or token in config</span><span class="t az">Konfiqda yanlış IP və ya token</span></td><td><span class="t ru active">Переустановите агент с правильным pnpext.sys.</span><span class="t en">Reinstall the agent with the correct pnpext.sys.</span><span class="t az">Düzgün pnpext.sys ilə agenti yenidən quraşdırın.</span></td></tr>
+      <tr><td><span class="t ru active">Сервис WPnpSvc не запущен</span><span class="t en">WPnpSvc service not running</span><span class="t az">WPnpSvc servisi işləmir</span></td><td><span class="t ru active">На объекте: <code>sc start WPnpSvc</code> от администратора.</span><span class="t en">On target: <code>sc start WPnpSvc</code> as administrator.</span><span class="t az">Obyektdə: administrator olaraq <code>sc start WPnpSvc</code>.</span></td></tr>
+      <tr><td><span class="t ru active">Брандмауэр блокирует порт 443</span><span class="t en">Firewall blocks port 443</span><span class="t az">Firewall 443 portu bloklayır</span></td><td><span class="t ru active">Порт 443 (HTTPS) крайне редко блокируется. Проверьте корпоративный прокси.</span><span class="t en">Port 443 (HTTPS) is rarely blocked. Check corporate proxy settings.</span><span class="t az">443 portu (HTTPS) nadir hallarda bloklanır. Korporativ proksi parametrlərini yoxlayın.</span></td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="t ru active">Экран не обновляется</span><span class="t en">Screen doesn't update</span><span class="t az">Ekran yenilənmir</span></h2>
+  <p>
+    <span class="t ru active">Убедитесь что стрим запущен (кнопка «Старт» на вкладке Экран). Попробуйте снизить FPS до 5–10 и качество до 50. Если не помогает — перезапустите стрим (Стоп → Старт).</span>
+    <span class="t en">Make sure the stream is running (Start button on the Screen tab). Try lowering FPS to 5–10 and quality to 50. If that doesn't help — restart the stream (Stop → Start).</span>
+    <span class="t az">Strimin işlədiyinə əmin olun (Ekran tabında Başlat düyməsi). FPS-i 5–10-a, keyfiyyəti 50-ə endirməyə çalışın. Kömək etmirsə — strimi yenidən başladın (Dayandır → Başlat).</span>
+  </p>
+
+  <h2><span class="t ru active">Файловый менеджер не отвечает</span><span class="t en">File manager not responding</span><span class="t az">Fayl meneceri cavab vermir</span></h2>
+  <p>
+    <span class="t ru active">Модуль filemgr загружается из VPS при первом открытии вкладки. Если загрузка не произошла — проверьте файл <code>/opt/remotedesk/stage2/filemgr.dll</code> на сервере и очистите кеш: <code>rm -rf /opt/remotedesk/stage2/cache/*/</code></span>
+    <span class="t en">The filemgr module loads from VPS on first tab open. If it didn't load — check <code>/opt/remotedesk/stage2/filemgr.dll</code> on the server and clear cache: <code>rm -rf /opt/remotedesk/stage2/cache/*/</code></span>
+    <span class="t az">filemgr modulu tabın ilk açılışında VPS-dən yüklənir. Yüklənmədisə — serverdə <code>/opt/remotedesk/stage2/filemgr.dll</code>-i yoxlayın və keşi təmizləyin: <code>rm -rf /opt/remotedesk/stage2/cache/*/</code></span>
+  </p>
+
+  <h2><span class="t ru active">GitHub Failover не работает</span><span class="t en">GitHub Failover not working</span><span class="t az">GitHub Failover işləmir</span></h2>
+  <table class="ftable">
+    <thead><tr>
+      <th><span class="t ru active">Проблема</span><span class="t en">Issue</span><span class="t az">Problem</span></th>
+      <th><span class="t ru active">Решение</span><span class="t en">Fix</span><span class="t az">Həll</span></th>
+    </tr></thead>
+    <tbody>
+      <tr><td><span class="t ru active">Статус «disabled»</span><span class="t en">Status "disabled"</span><span class="t az">Status "disabled"</span></td><td><span class="t ru active">Включите флажок «Enable Failover» в настройках и нажмите «Сохранить».</span><span class="t en">Enable the "Enable Failover" checkbox in settings and click "Save".</span><span class="t az">Parametrlərdə "Failover-i aktivləşdir" işarəsini qoyun və "Saxla" düyməsini basın.</span></td></tr>
+      <tr><td><span class="t ru active">Статус «fetch_error»</span><span class="t en">Status "fetch_error"</span><span class="t az">Status "fetch_error"</span></td><td><span class="t ru active">Проверьте токен, имя пользователя, репозиторий и имя файла. Убедитесь, что репозиторий Private и токен имеет доступ к Contents:Read.</span><span class="t en">Check token, username, repo, and filename. Ensure repo is Private and token has Contents:Read access.</span><span class="t az">Token, istifadəçi adı, repo və fayl adını yoxlayın. Repozitoriyanın Private olduğundan və tokenin Contents:Read girişinə malik olduğundan əmin olun.</span></td></tr>
+      <tr><td><span class="t ru active">IP не меняется</span><span class="t en">IP doesn't change</span><span class="t az">IP dəyişmir</span></td><td><span class="t ru active">Failover активируется только если VPS недоступен &gt;1 часа. Пока VPS отвечает — смена не произойдёт.</span><span class="t en">Failover only activates if VPS is unreachable for &gt;1 hour. While VPS responds — no switch occurs.</span><span class="t az">Failover yalnız VPS &gt;1 saat əlçatmaz olduqda aktivləşir. VPS cavab verərkən — keçid baş verməyəcək.</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<hr>
+
+<!-- ────────────── SECURITY NOTES ────────────── -->
+<section id="security">
+  <div class="sec-eyebrow">
+    <span class="t ru active">Раздел 9</span>
+    <span class="t en">Section 9</span>
+    <span class="t az">Bölmə 9</span>
+  </div>
+  <h1 class="sec-title">
+    <span class="t ru active">Рекомендации по безопасности</span>
+    <span class="t en">Security Recommendations</span>
+    <span class="t az">Təhlükəsizlik Tövsiyələri</span>
+  </h1>
+  <div class="box red">
+    🔴 <b><span class="t ru active">Защита VPS</span><span class="t en">VPS protection</span><span class="t az">VPS mühafizəsi</span></b><br>
+    <span class="t ru active">VPS — самое уязвимое звено. Используйте сложный пароль SSH, отключите парольную аутентификацию, оставьте только ключи. Регулярно меняйте пароли операторов.</span>
+    <span class="t en">The VPS is the most vulnerable link. Use a strong SSH password, disable password authentication, leave only keys. Regularly change operator passwords.</span>
+    <span class="t az">VPS ən həssas həlqədir. Güclü SSH parolu istifadə edin, parol autentifikasiyasını söndürün, yalnız açarlar buraxın. Operator parollarını mütəmadi dəyişdirin.</span>
+  </div>
+  <div class="box orange">
+    ⚠ <b><span class="t ru active">GitHub-токены</span><span class="t en">GitHub tokens</span><span class="t az">GitHub tokenləri</span></b><br>
+    <span class="t ru active">Read-токен передаётся агенту и хранится в зашифрованном конфиге на объекте. Write-токен <b>никогда</b> не передаётся агенту — он используется только в браузере оператора.</span>
+    <span class="t en">The read token is sent to the agent and stored in the encrypted config on the target. The write token is <b>never</b> sent to the agent — it is only used in the operator's browser.</span>
+    <span class="t az">Oxuma tokeni agentə göndərilir və obyektdəki şifrəli konfiqda saxlanılır. Yazma tokeni agentə <b>heç vaxt</b> göndərilmir — o yalnız operatorun brauzerində istifadə olunur.</span>
+  </div>
+  <div class="box blue">
+    💡 <b><span class="t ru active">Периодически меняйте токен комнаты</span><span class="t en">Periodically change the room token</span><span class="t az">Vaxtaşırı otaq tokenini dəyişdirin</span></b><br>
+    <span class="t ru active">Токен комнаты (room_token) — идентификатор объекта на VPS. При подозрении на компрометацию — смените токен, перегенерируйте pnpext.sys и переустановите агент.</span>
+    <span class="t en">The room token (room_token) is the target identifier on the VPS. If compromise is suspected — change the token, regenerate pnpext.sys and reinstall the agent.</span>
+    <span class="t az">Otaq tokeni (room_token) VPS-dəki obyektin identifikatorudur. Kompromis şübhəsi varsa — tokeni dəyişdirin, pnpext.sys-i yenidən yaradın və agenti yenidən quraşdırın.</span>
+  </div>
+</section>
+
+</div><!-- /content -->
+</div><!-- /page -->
+
+<footer>
+  <div style="font-size:20px;margin-bottom:6px;">⚡</div>
+  <div style="font-size:14px;font-weight:700;color:var(--fg);">PROMETEY</div>
+  <div style="margin-top:4px;">
+    <span class="t ru active">Руководство оператора · v1.0.197</span>
+    <span class="t en">Operator Manual · v1.0.197</span>
+    <span class="t az">Operator Təlimatı · v1.0.197</span>
+  </div>
+</footer>
+
+<script>
+// ── Language switcher ──
+function setLang(lang) {
+  document.querySelectorAll('.t').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.t.' + lang).forEach(el => el.classList.add('active'));
+  document.querySelectorAll('.lang-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent.toLowerCase() === lang);
+  });
+  document.documentElement.lang = lang;
+  localStorage.setItem('pmt_manual_lang', lang);
+}
+
+// ── Restore saved lang ──
+(function() {
+  const saved = localStorage.getItem('pmt_manual_lang') || 'ru';
+  setLang(saved);
+})();
+
+// ── Active sidebar on scroll ──
+const sideLinks = document.querySelectorAll('.sidebar-link[href^="#"]');
+const sectionIds = Array.from(sideLinks).map(l => l.getAttribute('href').slice(1));
+function updateSidebar() {
+  let cur = sectionIds[0];
+  for (const id of sectionIds) {
+    const el = document.getElementById(id);
+    if (el && window.scrollY >= el.offsetTop - 100) cur = id;
+  }
+  sideLinks.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + cur));
+}
+window.addEventListener('scroll', updateSidebar, { passive: true });
+updateSidebar();
+
+// ── Active nav on scroll ──
+const navLinks = document.querySelectorAll('.nav-link[href^="#"]');
+function updateNav() {
+  let cur = sectionIds[0];
+  for (const id of sectionIds) {
+    const el = document.getElementById(id);
+    if (el && window.scrollY >= el.offsetTop - 100) cur = id;
+  }
+  navLinks.forEach(l => l.classList.toggle('active', l.getAttribute('href') === '#' + cur));
+}
+window.addEventListener('scroll', updateNav, { passive: true });
+updateNav();
+</script>
+</body>
+</html>

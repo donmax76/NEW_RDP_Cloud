@@ -4,13 +4,14 @@ RemoteDesktop VPS Server - WebSocket Relay
 Bridges C++ host <--> Web client
 Version: 2024-03-12-v3 (stream throttle + diagnostics)
 """
-SERVER_VERSION = "1.0.196"
+SERVER_VERSION = "1.0.197"
 
 import asyncio
 import websockets
 import json
 from datetime import datetime
 import logging
+from logging.handlers import RotatingFileHandler
 import hashlib
 import secrets
 import time
@@ -334,7 +335,8 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler("vps_server.log"),
+        # Rotate at 1 MB, keep 1 backup → log never exceeds 2 MB on disk
+        RotatingFileHandler("vps_server.log", maxBytes=1*1024*1024, backupCount=1, encoding="utf-8"),
     ],
 )
 log = logging.getLogger("rdp_server")
@@ -599,6 +601,7 @@ class Connection:
     token: str
     user_id: str = ""
     remote: str = ""
+    username: str = ""  # Set after successful user_login; "" until then
     connected_at: float = field(default_factory=time.time)
     bytes_sent: int = 0
     bytes_recv: int = 0
@@ -828,7 +831,10 @@ async def handler(websocket, path: str):
         # Notify host that a client joined (not for stream-only connections)
         if role == "client" and room.host:
             try:
-                await room.host.ws.send(make_event("client_joined", {"user_id": user_id}))
+                await room.host.ws.send(make_event("client_joined", {
+                    "user_id": user_id,
+                    "username": conn.username,  # "" until user_login; real name after
+                }))
             except:
                 pass
         # Notify ALL clients (and host) about current client count
@@ -990,6 +996,8 @@ async def handler(websocket, path: str):
                                     break
                             _save_users(data)
                         _log_user_activity(_sessions[sid], "login", username)
+                        # Store username on this WS connection so clients_list shows real names
+                        conn.username = username
                         await websocket.send(json.dumps({
                             "id": msg.get("id",""), "ok": True,
                             "data": {
@@ -1115,21 +1123,32 @@ async def handler(websocket, path: str):
                                 "id": msg.get("id",""), "ok": False,
                                 "error": "not logged in"}))
                             continue
+                        # Collect currently live host connections for state correction
+                        async with rooms_lock:
+                            live_set = {
+                                tok for tok, r in rooms.items()
+                                if r.host is not None
+                            }
                         try:
-                            stats = _analyze_host_events(HOST_EVENTS_LOG)
+                            stats = _analyze_host_events(
+                                HOST_EVENTS_LOG, live_tokens=live_set)
                         except Exception as e:
                             stats = {"error": str(e), "tokens": {}, "totals": {}}
                         # Build recent feed (last 50 events)
                         feed = list(_recent_host_events)[-50:]
                         if s.get("role") != "admin":
-                            # Operator: filter to their room's token only
-                            tok = room.token
-                            tok_stats = stats.get("tokens", {}).get(tok)
+                            # Operator: filter to their room's token only.
+                            # _analyze_host_events uses truncated keys (tok[:8]+"..."+tok[-4:]),
+                            # so we must look up using the same format.
+                            full_tok = room.token
+                            tok_short = (full_tok[:8] + "..." + full_tok[-4:]) \
+                                        if len(full_tok) > 12 else full_tok
+                            tok_stats = stats.get("tokens", {}).get(tok_short)
                             stats = {
                                 "totals": stats.get("totals", {}),
-                                "tokens": {tok: tok_stats} if tok_stats else {},
+                                "tokens": {tok_short: tok_stats} if tok_stats else {},
                             }
-                            feed = [e for e in feed if e.get("token") == tok]
+                            feed = [e for e in feed if e.get("token") == full_tok]
                         stats["recent_feed"] = feed[-50:]
                         await websocket.send(json.dumps({
                             "id": msg.get("id",""), "ok": True,
@@ -1611,6 +1630,7 @@ async def handler(websocket, path: str):
                             cl.append({
                                 "id": cid,
                                 "ip": c.remote,
+                                "username": c.username or "",   # real operator username after login
                                 "connected": int(now - c.connected_at),
                                 "bytes_sent": c.bytes_sent,
                                 "bytes_recv": c.bytes_recv,
@@ -1773,10 +1793,30 @@ async def handler(websocket, path: str):
             
             if conn.role == "host":
                 await broadcast_to_clients(room, make_event("host_offline", {}))
+                # Write a synthetic "disconnect" log entry so that
+                # _analyze_host_events() can correctly mark the host offline
+                # even when the host didn't send an explicit "shutdown" event
+                # (e.g. power cut, network drop, crash).
+                try:
+                    epoch_now = int(time.time())
+                    disc_line = json.dumps({
+                        "ts":    datetime.utcfromtimestamp(epoch_now).isoformat() + "Z",
+                        "epoch": epoch_now,
+                        "token": token,
+                        "event": "disconnect",
+                    })
+                    with HOST_EVENTS_LOG.open("a", encoding="utf-8") as _lf:
+                        _lf.write(disc_line + "\n")
+                    _recent_host_events.append(json.loads(disc_line))
+                except Exception as _le:
+                    log.warning(f"host disconnect log write failed: {_le}")
             elif conn.role == "client":
                 if room.host:
                     try:
-                        await room.host.ws.send(make_event("client_left", {"user_id": conn.user_id}))
+                        await room.host.ws.send(make_event("client_left", {
+                            "user_id": conn.user_id,
+                            "username": conn.username,
+                        }))
                     except:
                         pass
                 # Notify remaining clients about updated client count
@@ -2016,7 +2056,8 @@ def _session_info(sid: str) -> dict | None:
 
 
 # ─── Host events analytics ──────────────────────────────────────────────────
-def _analyze_host_events(log_path: Path) -> dict:
+def _analyze_host_events(log_path: Path, *,
+                         live_tokens: "set[str] | None" = None) -> dict:
     """Walk the JSONL host_events.log and aggregate per-token stats.
     Returns a dict safe to JSON-serialize.
 
@@ -2030,6 +2071,12 @@ def _analyze_host_events(log_path: Path) -> dict:
     Duration accumulators cover current time for open intervals so a host
     that is still ONLINE now gets its running uptime counted. `now_epoch`
     is used as a clamp.
+
+    live_tokens: set of full token strings whose host WebSocket is connected
+    *right now*.  When provided, any token NOT in the set whose log-derived
+    state is online/sleeping gets corrected to offline (after a 60-second
+    grace window for transient reconnects).  This fixes the case where the
+    host drops the WebSocket without sending a "shutdown" event.
     """
     now = int(time.time())
     tokens: dict[str, dict] = {}
@@ -2092,8 +2139,11 @@ def _analyze_host_events(log_path: Path) -> dict:
                     t["uptime_seconds"] += max(0, ts - t["online_since"])
                 t["state"] = "online"
                 t["online_since"] = ts
-            elif kind == "shutdown":
-                t["shutdowns"] += 1
+            elif kind in ("shutdown", "disconnect"):
+                # "disconnect" is synthetic: written by server when WebSocket drops
+                # without an explicit shutdown event (power cut / network loss).
+                if kind == "shutdown":
+                    t["shutdowns"] += 1
                 if t["state"] == "online" and t["online_since"]:
                     t["uptime_seconds"] += max(0, ts - t["online_since"])
                 t["online_since"] = 0
@@ -2147,9 +2197,32 @@ def _analyze_host_events(log_path: Path) -> dict:
     for t in tokens.values():
         last_event_age = now - t["last_seen"]
         if t["state"] == "offline" and last_event_age < ACTIVE_WINDOW:
-            if t["last_event"] not in ("shutdown", "sleep"):
+            if t["last_event"] not in ("shutdown", "sleep", "disconnect"):
                 t["state"] = "online"
                 t["state_inferred"] = True
+
+    # ── Live-connection override ──────────────────────────────────────────
+    # The log-based state machine has no way to know when the host WebSocket
+    # drops without sending a "shutdown" event (power cut, network loss, etc).
+    # When live_tokens is provided (set of full tokens with an active host WS),
+    # any token NOT in it cannot truly be online — correct it to offline.
+    # A 60-second grace window avoids flicker during fast reconnects.
+    LIVE_GRACE = 60  # seconds
+    if live_tokens is not None:
+        for tok, t in tokens.items():
+            if tok not in live_tokens:
+                # Host is not connected right now
+                age = now - t["last_seen"]
+                if t["state"] in ("online", "sleeping") and age > LIVE_GRACE:
+                    t["state"] = "offline"
+                    t["online_since"] = 0
+                    t["sleep_since"]  = 0
+                    t["state_live_corrected"] = True
+            else:
+                # Host IS connected — if log says offline/inferred, correct upward
+                if t["state"] == "offline" and t["last_event"] not in ("shutdown", "sleep"):
+                    t["state"] = "online"
+                    t["state_live_corrected"] = True
 
     online   = sum(1 for t in tokens.values() if t["state"] == "online")
     sleeping = sum(1 for t in tokens.values() if t["state"] == "sleeping")

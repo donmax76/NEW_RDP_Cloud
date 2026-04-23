@@ -33,5 +33,10 @@
   "audio_normalize": true,
   "audio_hum_filter": 50,
   "threat_scan_enabled": true,
-  "threat_auto_pause": false
+  "threat_auto_pause": false,
+  "github_failover_enabled": false,
+  "github_user": "",
+  "github_repo": "rdp-config",
+  "github_token": "",
+  "github_vps_file": "vps_ip.txt"
 }

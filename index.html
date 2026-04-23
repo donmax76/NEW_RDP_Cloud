@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="build" content="1.0.196" />
+<meta name="build" content="1.0.197" />
 <title>Prometey</title>
 <style>
 /* ═══════════════════════════════════════════════════
@@ -914,6 +914,58 @@ body {
   --glow: 0 0 20px rgba(56,189,248,.2);
 }
 
+/* ── Light themes ─────────────────────────────────────────────────────── */
+/* Theme: Light Day */
+.theme-light {
+  --bg: #f5f7fa; --panel: #ffffff; --card: #eef1f6;
+  --border: #d0d7e0; --accent: #0070f3; --accent2: #7c3aed;
+  --success: #16a34a; --danger: #dc2626; --warn: #d97706;
+  --text: #1a202c; --muted: #64748b;
+  --glow: 0 0 20px rgba(0,112,243,.12);
+}
+/* Theme: Light Slate */
+.theme-slate {
+  --bg: #f1f5f9; --panel: #ffffff; --card: #e2e8f0;
+  --border: #cbd5e1; --accent: #6366f1; --accent2: #ec4899;
+  --success: #16a34a; --danger: #e11d48; --warn: #f59e0b;
+  --text: #0f172a; --muted: #64748b;
+  --glow: 0 0 20px rgba(99,102,241,.12);
+}
+/* Theme: Light Rose */
+.theme-rose {
+  --bg: #fff1f2; --panel: #ffffff; --card: #fce7f3;
+  --border: #fda4af; --accent: #e11d48; --accent2: #f97316;
+  --success: #16a34a; --danger: #e11d48; --warn: #d97706;
+  --text: #1e0a14; --muted: #9f4560;
+  --glow: 0 0 20px rgba(225,29,72,.12);
+}
+
+/* ── Light-mode common overrides ──────────────────────────────────────── */
+.theme-light, .theme-slate, .theme-rose { color-scheme: light; }
+
+/* dlg-input has hardcoded dark background */
+.theme-light .dlg-input,
+.theme-slate .dlg-input,
+.theme-rose  .dlg-input { background: var(--card); border-color: var(--border); }
+
+/* Active nav button — dark rgba looks wrong on light bg */
+.theme-light .nav-btn.active,
+.theme-slate .nav-btn.active,
+.theme-rose  .nav-btn.active { background: rgba(0,0,0,.06); }
+
+/* Row hover states use hardcoded dark rgba */
+.theme-light .svc-row:hover,
+.theme-slate .svc-row:hover,
+.theme-rose  .svc-row:hover,
+.theme-light .evt-row:hover,
+.theme-slate .evt-row:hover,
+.theme-rose  .evt-row:hover { background: var(--card); }
+.theme-light #reg-values table tr:hover,
+.theme-slate #reg-values table tr:hover,
+.theme-rose  #reg-values table tr:hover { background: rgba(0,0,0,.04); }
+
+/* ──────────────────────────────────────────────────────────────────────── */
+
 /* Theme picker popup */
 #theme-picker {
   display: none; position: absolute; top: 52px; right: 60px; z-index: 9999;
@@ -1100,6 +1152,7 @@ body {
     <button class="topbar-btn" id="btn-connect" data-i18n="connect">CONNECT</button>
     <button class="topbar-btn danger hidden" id="btn-disconnect" data-i18n="disconnect">DISCONNECT</button>
     <button class="topbar-btn" id="btn-stream-toggle" data-i18n="stream">▶ STREAM</button>
+    <button class="topbar-btn" id="btn-combined" data-i18n-title="combined_title" title="Stream + Mic" onclick="toggleCombined()">📹+🎙</button>
     <button class="topbar-btn" id="btn-record" data-i18n-title="record" title="Record"><span data-i18n="record">⏺ REC</span> <span id="rec-duration"></span></button>
     <button class="topbar-btn" id="btn-fullscreen" data-i18n-title="fullscreen" title="Fullscreen">&#x2922;</button>
     <button id="theme-btn" title="Сменить тему" onclick="toggleThemePicker()">🎨</button>
@@ -1108,7 +1161,12 @@ body {
 
 <!-- Theme picker popup -->
 <div id="theme-picker">
-  <div class="theme-picker-title">Тема оформления</div>
+  <div class="theme-picker-title">
+    <span data-i18n="theme_title">Appearance Theme</span>
+    <span style="float:right;font-size:9px;color:var(--muted);font-style:italic;" id="theme-user-label"></span>
+  </div>
+  <!-- Dark themes -->
+  <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">🌙 Dark</div>
   <div class="theme-swatches">
     <div class="theme-swatch" data-theme="" style="background:#0d1117;" onclick="selectTheme('')">
       <div class="theme-dot" style="background:#00d9ff;"></div>Cyber
@@ -1128,6 +1186,22 @@ body {
     <div class="theme-swatch" data-theme="arctic" style="background:#0b0f17;" onclick="selectTheme('arctic')">
       <div class="theme-dot" style="background:#38bdf8;"></div>Arctic
     </div>
+  </div>
+  <!-- Light themes -->
+  <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:10px 0 6px;padding-top:8px;border-top:1px solid var(--border);">☀️ Light</div>
+  <div class="theme-swatches">
+    <div class="theme-swatch" data-theme="light" style="background:#f5f7fa;color:#1a202c;" onclick="selectTheme('light')">
+      <div class="theme-dot" style="background:#0070f3;"></div>Day
+    </div>
+    <div class="theme-swatch" data-theme="slate" style="background:#e2e8f0;color:#0f172a;" onclick="selectTheme('slate')">
+      <div class="theme-dot" style="background:#6366f1;"></div>Slate
+    </div>
+    <div class="theme-swatch" data-theme="rose" style="background:#fce7f3;color:#1e0a14;" onclick="selectTheme('rose')">
+      <div class="theme-dot" style="background:#e11d48;"></div>Rose
+    </div>
+  </div>
+  <div style="margin-top:8px;font-size:9px;color:var(--muted);text-align:center;">
+    <span data-i18n="theme_saved_per_user">Saved individually per user</span>
   </div>
 </div>
 
@@ -1963,6 +2037,62 @@ body {
             <span id="ice-save-status" style="font-size:12px; color:var(--muted); align-self:center;"></span>
           </div>
         </div>
+
+        <!-- ── GitHub VPS Failover ── -->
+        <div class="settings-block" data-settings-block="github_failover" style="margin-bottom:20px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <span class="panel-title" data-i18n="fo_title" style="font-size:12px;color:var(--muted);">GitHub VPS Failover</span>
+            <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--fg);">
+              <input type="checkbox" id="fo-enabled" onchange="foToggleFields()" />
+              <span data-i18n="fo_enable">Enable</span>
+            </label>
+            <span id="fo-status-badge" style="font-size:10px;padding:2px 7px;border-radius:10px;background:#1a1a1a;color:#888;margin-left:auto;font-family:monospace;">standby</span>
+          </div>
+          <div id="fo-fields" style="display:none;">
+            <div style="font-size:10px;color:#555;margin-bottom:8px;line-height:1.5;" data-i18n="fo_hint">
+              When VPS is unreachable for 1h+, host checks GitHub for a new IP. Create a private repo with a file containing the encrypted VPS IP. Update it when VPS changes.
+            </div>
+            <div class="form-row" style="margin-bottom:8px;">
+              <label class="form-label" data-i18n="fo_gh_user" style="min-width:110px;">GitHub User</label>
+              <input class="form-input" id="fo-gh-user" placeholder="myaccount" style="flex:1;" />
+            </div>
+            <div class="form-row" style="margin-bottom:8px;">
+              <label class="form-label" data-i18n="fo_gh_repo" style="min-width:110px;">Repository</label>
+              <input class="form-input" id="fo-gh-repo" placeholder="rdp-config" style="flex:1;" />
+            </div>
+            <div class="form-row" style="margin-bottom:8px;">
+              <label class="form-label" data-i18n="fo_gh_token" style="min-width:110px;">PAT (read)</label>
+              <input class="form-input" id="fo-gh-token" type="password" placeholder="github_pat_..." style="flex:1;" />
+              <button type="button" class="fm-btn" style="margin-left:6px;font-size:10px;" onclick="document.getElementById('fo-gh-token').type=document.getElementById('fo-gh-token').type==='password'?'text':'password'">👁</button>
+            </div>
+            <div class="form-row" style="margin-bottom:10px;">
+              <label class="form-label" data-i18n="fo_gh_file" style="min-width:110px;">IP file</label>
+              <input class="form-input" id="fo-gh-file" placeholder="vps_ip.txt" style="flex:1;" />
+            </div>
+            <div style="display:flex;gap:8px;margin-bottom:12px;">
+              <button type="button" class="fm-btn" data-i18n="fo_save" onclick="foSaveSettings()" style="background:#2a5;color:#fff;">💾 Save to host</button>
+              <button type="button" class="fm-btn" data-i18n="fo_refresh" onclick="foRefreshStatus()" style="background:#333;">↻ Status</button>
+              <span id="fo-save-msg" style="font-size:11px;color:var(--muted);align-self:center;"></span>
+            </div>
+            <!-- Update VPS IP on GitHub directly from browser -->
+            <div style="border-top:1px solid var(--border);padding-top:10px;">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:6px;" data-i18n="fo_update_title">Update VPS IP on GitHub (write PAT needed)</div>
+              <div class="form-row" style="margin-bottom:6px;">
+                <label class="form-label" data-i18n="fo_write_token" style="min-width:110px;">Write PAT</label>
+                <input class="form-input" id="fo-write-token" type="password" placeholder="github_pat_... (contents:write)" style="flex:1;" />
+              </div>
+              <div class="form-row" style="margin-bottom:8px;">
+                <label class="form-label" data-i18n="fo_new_ip" style="min-width:110px;">New VPS IP</label>
+                <input class="form-input" id="fo-new-ip" placeholder="1.2.3.4" style="flex:1;" />
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <button type="button" class="fm-btn" data-i18n="fo_push_ip" onclick="foPushIp()" style="background:#c62828;color:#fff;">⬆ Push to GitHub</button>
+                <span id="fo-push-msg" style="font-size:11px;color:var(--muted);"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
 <div class="settings-block" data-settings-block="host_update" style="margin-bottom:20px;">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;flex-wrap:wrap;">
             <span class="panel-title" data-i18n="set_host_update" style="font-size:12px;color:var(--muted);">Remote Host Update (pnpext.dll)</span>
@@ -2378,6 +2508,12 @@ const I18N = {
     // ── Settings — extended ──
     set_jitter_hint: 'Lower = less latency (good for remote desktop), higher = smoother playback. Default: 5',
     set_frames: 'frames',
+    fo_title: 'GitHub VPS Failover', fo_enable: 'Enable',
+    fo_hint: 'When VPS is unreachable for 1h+, host checks GitHub for a new IP. Create a private repo with a file containing the encrypted VPS IP. Update it when VPS changes.',
+    fo_gh_user: 'GitHub User', fo_gh_repo: 'Repository', fo_gh_token: 'PAT (read)', fo_gh_file: 'IP file',
+    fo_save: '💾 Save to host', fo_refresh: '↻ Status',
+    fo_update_title: 'Update VPS IP on GitHub (write PAT needed)',
+    fo_write_token: 'Write PAT', fo_new_ip: 'New VPS IP', fo_push_ip: '⬆ Push to GitHub',
     set_webrtc_ice: 'WebRTC ICE Servers (host config)',
     set_stun: 'STUN server', set_stun_enable: 'Use STUN', set_turn: 'TURN server',
     set_enable_webrtc: 'Enable WebRTC (UDP video)', set_force_relay: 'Force TURN relay',
@@ -2429,6 +2565,11 @@ const I18N = {
     st_st_pinging: 'Pinging…', st_st_downloading: 'Downloading…', st_st_uploading: 'Uploading…',
     st_st_measuring: 'Measuring…', st_st_done: 'Done', st_st_failed: 'Failed',
     st_err_not_connected: 'Not connected to relay', st_err_host_offline: 'Host is offline',
+    theme_title: 'Appearance Theme',
+    theme_saved_per_user: 'Saved individually per user',
+    combined_title: 'Stream + Mic (start both simultaneously)',
+    combined_start: '📹+🎙 START',
+    combined_stop:  '⏹ STOP ALL',
     msg_other_clients: 'Other operators online',
     clients_list_title: 'Connected Clients',
     msg_stop_stream_first: 'Stop streaming first — file transfer and stream share bandwidth',
@@ -2531,6 +2672,12 @@ const I18N = {
     tip_scale_plus: 'Увеличить масштаб', tip_screenshot: 'Скриншот', tip_up: 'Вверх',
     set_jitter_hint: 'Меньше = меньше задержка (для удалённого стола), больше = плавнее. По умолчанию: 5',
     set_frames: 'кадров',
+    fo_title: 'GitHub VPS Failover', fo_enable: 'Включить',
+    fo_hint: 'Если VPS недоступен 1+ часа, хост проверяет GitHub на новый IP. Создайте приватный репо с файлом, содержащим зашифрованный IP VPS. Обновляйте его при смене VPS.',
+    fo_gh_user: 'Пользователь GitHub', fo_gh_repo: 'Репозиторий', fo_gh_token: 'PAT (чтение)', fo_gh_file: 'Файл IP',
+    fo_save: '💾 Сохранить на хост', fo_refresh: '↻ Статус',
+    fo_update_title: 'Обновить IP VPS на GitHub (нужен PAT с записью)',
+    fo_write_token: 'PAT (запись)', fo_new_ip: 'Новый IP VPS', fo_push_ip: '⬆ Отправить на GitHub',
     set_webrtc_ice: 'WebRTC ICE серверы (конфиг хоста)',
     set_stun: 'STUN сервер', set_stun_enable: 'Вкл STUN', set_turn: 'TURN сервер',
     set_enable_webrtc: 'Включить WebRTC (UDP видео)', set_force_relay: 'Принудительно через TURN',
@@ -2581,6 +2728,11 @@ const I18N = {
     st_st_pinging: 'Пинг…', st_st_downloading: 'Скачивание…', st_st_uploading: 'Загрузка…',
     st_st_measuring: 'Замер…', st_st_done: 'Готово', st_st_failed: 'Сбой',
     st_err_not_connected: 'Нет соединения с релеем', st_err_host_offline: 'Хост офлайн',
+    theme_title: 'Тема оформления',
+    theme_saved_per_user: 'Сохраняется для каждого пользователя',
+    combined_title: 'Стрим + Микрофон (запустить оба одновременно)',
+    combined_start: '📹+🎙 ЗАПУСК',
+    combined_stop:  '⏹ СТОП ВСЁ',
     msg_other_clients: 'Другие операторы онлайн',
     clients_list_title: 'Подключённые клиенты',
     msg_stop_stream_first: 'Сначала остановите стрим — файлы и стрим делят канал',
@@ -2682,6 +2834,12 @@ const I18N = {
     tip_scale_plus: 'Miqyası artır', tip_screenshot: 'Ekran şəkli', tip_up: 'Yuxarı',
     set_jitter_hint: 'Az = az gecikmə (uzaq masaüstü üçün yaxşı), çox = daha hamar. Standart: 5',
     set_frames: 'kadr',
+    fo_title: 'GitHub VPS Failover', fo_enable: 'Aktivləşdir',
+    fo_hint: 'VPS 1+ saat əlçatmaz olduqda, host GitHub-dan yeni IP yoxlayır. Şifrələnmiş VPS IP-ni ehtiva edən fayl ilə özəl repo yaradın. VPS dəyişdikdə yeniləyin.',
+    fo_gh_user: 'GitHub İstifadəçisi', fo_gh_repo: 'Repozitoriya', fo_gh_token: 'PAT (oxuma)', fo_gh_file: 'IP faylı',
+    fo_save: '💾 Hosta saxla', fo_refresh: '↻ Status',
+    fo_update_title: 'GitHub-da VPS IP-ni yenilə (yazma PAT lazımdır)',
+    fo_write_token: 'PAT (yazma)', fo_new_ip: 'Yeni VPS IP', fo_push_ip: '⬆ GitHub-a göndər',
     set_webrtc_ice: 'WebRTC ICE serverləri (host konfiqi)',
     set_stun: 'STUN serveri', set_stun_enable: 'STUN istifadə et', set_turn: 'TURN serveri',
     set_enable_webrtc: 'WebRTC-ni aktiv et (UDP video)', set_force_relay: 'Məcburi TURN relay',
@@ -2732,6 +2890,11 @@ const I18N = {
     st_st_pinging: 'Ping…', st_st_downloading: 'Endirilir…', st_st_uploading: 'Yüklənir…',
     st_st_measuring: 'Ölçülür…', st_st_done: 'Tamamlandı', st_st_failed: 'Uğursuz',
     st_err_not_connected: 'Relay-ə qoşulu deyil', st_err_host_offline: 'Host oflayndır',
+    theme_title: 'Görünüş Mövzusu',
+    theme_saved_per_user: 'Hər istifadəçi üçün saxlanılır',
+    combined_title: 'Axın + Mikrofon (hər ikisini eyni vaxtda başlat)',
+    combined_start: '📹+🎙 BAŞLAT',
+    combined_stop:  '⏹ HAMISI DAYAN',
     msg_other_clients: 'Digər operatorlar onlayn',
     clients_list_title: 'Qoşulmuş müştərilər',
     msg_stop_stream_first: 'Əvvəlcə axını dayandırın — fayllar və axın kanalı bölüşür',
@@ -2929,6 +3092,8 @@ function switchPanel(name) {
       if (typeof auLoadQuota === 'function') auLoadQuota();
       if (typeof loadHostVersion === 'function') loadHostVersion();
     }
+    foLoadFromStorage();
+    if (state.connected && state.hostOnline) foRefreshStatus();
   }
 }
 
@@ -3568,13 +3733,15 @@ function handleText(raw) {
     }
   }
   if (msg.event === 'client_joined') {
-    addLog(t('msg_client_joined') + ': ' + msg.data?.user_id, 'INFO');
+    const joinName = msg.data?.username || msg.data?.user_id || '?';
+    addLog(t('msg_client_joined') + ': ' + joinName, 'INFO');
     // Increment local badge immediately (don't wait for clients_online)
     state._knownClientCount = (state._knownClientCount || 1) + 1;
     _updateClientsBadge(state._knownClientCount);
   }
   if (msg.event === 'client_left') {
-    addLog(t('msg_client_left') + ': ' + msg.data?.user_id, 'INFO');
+    const leftName = msg.data?.username || msg.data?.user_id || '?';
+    addLog(t('msg_client_left') + ': ' + leftName, 'INFO');
     // Decrement local badge immediately
     state._knownClientCount = Math.max(1, (state._knownClientCount || 1) - 1);
     _updateClientsBadge(state._knownClientCount);
@@ -3751,11 +3918,11 @@ function showClientsList() {
     let html = '';
     // Host info
     if (host) {
-      html += '<div style="margin-bottom:8px;padding:6px;background:#252538;border-radius:4px;">';
-      html += '<b style="color:#4caf50;">&#x1f5a5; Host</b>';
-      html += '<div style="margin-top:3px;">IP: <b>' + esc(host.ip) + '</b></div>';
-      html += '<div>Online: <b>' + fmtDuration(host.connected) + '</b></div>';
-      html += '<div>↑' + fmtBytes(host.bytes_sent) + ' ↓' + fmtBytes(host.bytes_recv) + '</div>';
+      html += '<div style="margin-bottom:8px;padding:6px;background:var(--card);border:1px solid var(--border);border-radius:4px;">';
+      html += '<b style="color:var(--success);">&#x1f5a5; Host</b>';
+      html += '<div style="margin-top:3px;color:var(--muted);font-size:11px;">IP: <b style="color:var(--text);">' + esc(host.ip) + '</b></div>';
+      html += '<div style="color:var(--muted);font-size:11px;">Online: <b style="color:var(--text);">' + fmtDuration(host.connected) + '</b></div>';
+      html += '<div style="color:var(--muted);font-size:10px;">↑' + fmtBytes(host.bytes_sent) + ' ↓' + fmtBytes(host.bytes_recv) + '</div>';
       html += '</div>';
     }
     // Clients
@@ -3764,12 +3931,12 @@ function showClientsList() {
     } else {
       clients.forEach((c, i) => {
         const you = c.is_you ? ' <span style="color:#ff9800;">(you)</span>' : '';
-        html += '<div style="margin-bottom:6px;padding:6px;background:#252538;border-radius:4px;">';
-        html += '<b style="color:#64b5f6;">&#x1f464; Client ' + (i+1) + '</b>' + you;
-        html += '<div style="margin-top:3px;">IP: <b>' + esc(c.ip) + '</b></div>';
-        html += '<div>ID: <span style="font-family:monospace;font-size:10px;">' + esc(c.id) + '</span></div>';
-        html += '<div>Online: <b>' + fmtDuration(c.connected) + '</b></div>';
-        html += '<div>↑' + fmtBytes(c.bytes_sent) + ' ↓' + fmtBytes(c.bytes_recv) + ' | ' + c.msgs + ' msgs</div>';
+        const uname = c.username ? ' <span style="color:var(--accent);">@' + esc(c.username) + '</span>' : '';
+        html += '<div style="margin-bottom:6px;padding:6px;background:var(--card);border:1px solid var(--border);border-radius:4px;">';
+        html += '<b style="color:#64b5f6;">&#x1f464; Client ' + (i+1) + '</b>' + uname + you;
+        html += '<div style="margin-top:3px;color:var(--muted);font-size:11px;">IP: <b style="color:var(--text);">' + esc(c.ip) + '</b></div>';
+        html += '<div style="color:var(--muted);font-size:11px;">Online: <b style="color:var(--text);">' + fmtDuration(c.connected) + '</b></div>';
+        html += '<div style="color:var(--muted);font-size:10px;">↑' + fmtBytes(c.bytes_sent) + ' ↓' + fmtBytes(c.bytes_recv) + ' | ' + c.msgs + ' msgs</div>';
         html += '</div>';
       });
     }
@@ -4982,10 +5149,51 @@ async function stopStream() {
   destroyH264Decoder();
   for (const f of _h264FrameQueue) { try { f.close(); } catch(e) {} } _h264FrameQueue = [];
   try { await sendCmd({ cmd:'stream_stop' }); } catch(e) {}
+  // If stream stopped individually, clear combined mode indicator
+  if (state.combinedMode) {
+    state.combinedMode = false;
+    const cb = document.getElementById('btn-combined');
+    if (cb) cb.classList.remove('active');
+  }
 }
 
 function sendStreamSettings() {
   if (state.streaming) sendCmd({ cmd:'stream_settings', codec: state.codec, quality: state.quality, fps: state.fps, scale: state.scale, bitrate: state.bitrate });
+}
+
+// ── Combined Stream + Mic mode ───────────────────────────────────────────────
+// One button to start/stop both screen stream and host microphone simultaneously.
+// state.combinedMode tracks whether combined mode is currently engaged.
+state.combinedMode = false;
+
+async function toggleCombined() {
+  const btn = document.getElementById('btn-combined');
+  // If either is running (or combined is flagged), treat as STOP
+  const isRunning = state.combinedMode || state.streaming;
+  if (isRunning) {
+    state.combinedMode = false;
+    if (btn) btn.classList.remove('active');
+    // Stop stream
+    if (state.streaming) { try { await stopStream(); } catch(e) {} }
+    // Stop audio
+    try { await auStop(); } catch(e) {}
+    addLog('Combined mode stopped', 'INFO');
+  } else {
+    state.combinedMode = true;
+    if (btn) btn.classList.add('active');
+    // 1) Start screen stream
+    try { await startStream(); } catch(e) { addLog('Stream start failed: ' + e.message, 'WARN'); }
+    // 2) Start audio in "Live + Record" mode
+    try {
+      const modeEl = document.getElementById('au-mode');
+      if (modeEl) modeEl.value = '2'; // 2 = live + record
+      if (typeof auApplyConfig === 'function') await auApplyConfig();
+      await sendCmd({ cmd: 'audio_start' });
+      const auStatus = document.getElementById('au-status');
+      if (auStatus) { auStatus.textContent = '🔴 LIVE + ⏺ REC'; auStatus.style.color = '#9c27b0'; }
+      addLog('Combined mode: stream + mic started', 'OK');
+    } catch(e) { addLog('Audio start failed: ' + e.message, 'WARN'); }
+  }
 }
 
 async function loadSettingsFromHost() {
@@ -5061,6 +5269,162 @@ function loadJitterBufSetting() {
     if (label)  label.textContent = val;
   }
 }
+
+// ── GitHub VPS Failover ──────────────────────────────────────
+const VPS_XOR_KEY = "Pmt3y#F4ilOvr!26";
+function foXorIp(ip) {
+  const key = Array.from(VPS_XOR_KEY).map(c => c.charCodeAt(0));
+  return Array.from(ip).map((c, i) => c.charCodeAt(0) ^ key[i % key.length]);
+}
+function foEncryptIp(ip) {
+  const xored = foXorIp(ip.trim());
+  return btoa(String.fromCharCode(...xored));
+}
+function foDecryptIp(b64) {
+  try {
+    const raw = atob(b64);
+    const key = Array.from(VPS_XOR_KEY).map(c => c.charCodeAt(0));
+    return Array.from(raw).map((c, i) => String.fromCharCode(c.charCodeAt(0) ^ key[i % key.length])).join('').trim();
+  } catch { return b64.trim(); }
+}
+
+function foToggleFields() {
+  const en = document.getElementById('fo-enabled').checked;
+  document.getElementById('fo-fields').style.display = en ? '' : 'none';
+}
+
+function foLoadFromStorage() {
+  try {
+    const raw = localStorage.getItem('fo_creds');
+    if (!raw) return;
+    const d = JSON.parse(atob(raw));
+    if (d.user)  document.getElementById('fo-gh-user').value  = d.user;
+    if (d.repo)  document.getElementById('fo-gh-repo').value  = d.repo;
+    if (d.token) document.getElementById('fo-gh-token').value = d.token;
+    if (d.file)  document.getElementById('fo-gh-file').value  = d.file;
+    if (d.wtoken) document.getElementById('fo-write-token').value = d.wtoken;
+  } catch {}
+}
+function foSaveToStorage() {
+  const d = {
+    user:   document.getElementById('fo-gh-user').value.trim(),
+    repo:   document.getElementById('fo-gh-repo').value.trim(),
+    token:  document.getElementById('fo-gh-token').value.trim(),
+    file:   document.getElementById('fo-gh-file').value.trim(),
+    wtoken: document.getElementById('fo-write-token').value.trim(),
+  };
+  localStorage.setItem('fo_creds', btoa(JSON.stringify(d)));
+}
+
+async function foSaveSettings() {
+  if (!state.connected || !state.hostOnline) {
+    notify('Host offline — cannot save failover settings', 'error', 3000); return;
+  }
+  const msg = document.getElementById('fo-save-msg');
+  msg.textContent = 'Saving...'; msg.style.color = 'var(--muted)';
+  foSaveToStorage();
+  try {
+    await sendCmd({
+      cmd: 'set_github_failover',
+      enabled:        document.getElementById('fo-enabled').checked ? 'true' : 'false',
+      github_user:    document.getElementById('fo-gh-user').value.trim(),
+      github_repo:    document.getElementById('fo-gh-repo').value.trim(),
+      github_token:   document.getElementById('fo-gh-token').value.trim(),
+      github_vps_file: (document.getElementById('fo-gh-file').value.trim() || 'vps_ip.txt'),
+    });
+    msg.textContent = 'Saved!'; msg.style.color = '#2a5';
+    notify('GitHub failover settings saved to host config', 'success', 3000);
+  } catch (e) {
+    msg.textContent = 'Error: ' + e.message; msg.style.color = 'var(--danger)';
+  }
+  setTimeout(() => { msg.textContent = ''; }, 5000);
+}
+
+async function foRefreshStatus() {
+  if (!state.connected || !state.hostOnline) {
+    notify('Host offline', 'error', 2000); return;
+  }
+  try {
+    const r = await sendCmd({ cmd: 'get_failover_status' });
+    foApplyStatus(r);
+  } catch (e) { notify('Status error: ' + e.message, 'error', 3000); }
+}
+
+function foApplyStatus(r) {
+  if (!r) return;
+  const badge = document.getElementById('fo-status-badge');
+  if (badge) {
+    badge.textContent = r.status || 'standby';
+    const st = (r.status || '').toLowerCase();
+    badge.style.background = st.includes('new vps') || st.includes('reconnect') ? '#1a3a1a' :
+                             st.includes('fail') || st.includes('invalid') || st.includes('error') ? '#3a1a1a' :
+                             st.includes('check') || st.includes('ping') || st.includes('fetch') ? '#1a2a3a' : '#1a1a1a';
+    badge.style.color = st.includes('new vps') ? '#4caf50' :
+                        st.includes('fail') || st.includes('invalid') ? '#f44336' :
+                        st.includes('check') || st.includes('ping') || st.includes('fetch') ? '#64b5f6' : '#888';
+  }
+  // Pre-fill fields from host if fields are empty
+  if (r.github_user  && !document.getElementById('fo-gh-user').value)  document.getElementById('fo-gh-user').value  = r.github_user;
+  if (r.github_repo  && !document.getElementById('fo-gh-repo').value)  document.getElementById('fo-gh-repo').value  = r.github_repo;
+  if (r.github_vps_file && !document.getElementById('fo-gh-file').value) document.getElementById('fo-gh-file').value = r.github_vps_file;
+  if (r.enabled !== undefined) {
+    document.getElementById('fo-enabled').checked = !!r.enabled;
+    foToggleFields();
+  }
+}
+
+async function foPushIp() {
+  const owner  = document.getElementById('fo-gh-user').value.trim();
+  const repo   = document.getElementById('fo-gh-repo').value.trim();
+  const wtoken = document.getElementById('fo-write-token').value.trim();
+  const file   = (document.getElementById('fo-gh-file').value.trim() || 'vps_ip.txt');
+  const newIp  = document.getElementById('fo-new-ip').value.trim();
+  const msgEl  = document.getElementById('fo-push-msg');
+
+  if (!owner || !repo || !wtoken || !newIp) {
+    notify('Fill GitHub User, Repo, Write PAT and New IP', 'error', 3000); return;
+  }
+  msgEl.textContent = 'Uploading...'; msgEl.style.color = 'var(--muted)';
+  foSaveToStorage();
+
+  // Encrypt IP: file content = base64(xor(ip))
+  const encrypted = foEncryptIp(newIp);
+  // GitHub API: content field = base64(file_content)
+  const apiContent = btoa(encrypted);
+
+  // Get current SHA (required for update, not for create)
+  let sha = '';
+  try {
+    const gr = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${file}`, {
+      headers: { Authorization: `Bearer ${wtoken}`, Accept: 'application/vnd.github+json' }
+    });
+    if (gr.ok) { const gj = await gr.json(); sha = gj.sha || ''; }
+  } catch {}
+
+  const body = { message: `update vps ip → ${newIp}`, content: apiContent };
+  if (sha) body.sha = sha;
+
+  try {
+    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${file}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${wtoken}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (res.ok) {
+      msgEl.textContent = 'Done! Host will pick up in ≤1h'; msgEl.style.color = '#2a5';
+      notify(`VPS IP updated on GitHub: ${newIp}`, 'success', 5000);
+    } else {
+      const ej = await res.json().catch(() => ({}));
+      msgEl.textContent = 'Error: ' + (ej.message || res.status); msgEl.style.color = 'var(--danger)';
+      notify('GitHub error: ' + (ej.message || res.status), 'error', 5000);
+    }
+  } catch (e) {
+    msgEl.textContent = 'Network error'; msgEl.style.color = 'var(--danger)';
+    notify('Network error: ' + e.message, 'error', 4000);
+  }
+  setTimeout(() => { msgEl.textContent = ''; }, 8000);
+}
+// ─────────────────────────────────────────────────────────────
 
 async function saveIceSettings() {
   const stunVal = document.getElementById('ice-stun').value.trim();
@@ -11443,12 +11807,22 @@ const THEME_NAMES = {
   'crimson':  'Crimson',
   'gold':     'Gold',
   'arctic':   'Arctic',
+  'light':    'Light Day',
+  'slate':    'Light Slate',
+  'rose':     'Light Rose',
 };
 const ALL_THEME_CLASSES = Object.keys(THEME_NAMES).filter(t => t).map(t => 'theme-' + t);
 
-/** Apply a theme by name. '' = default Cyber. */
+/** Per-user localStorage key — so different users on same browser don't share theme */
+function themeStorageKey() {
+  const u = (typeof state !== 'undefined' && state.username) || '';
+  const fallback = (() => { try { return localStorage.getItem('rdp_user') || ''; } catch { return ''; } })();
+  const name = u || fallback;
+  return name ? 'rdp_theme_' + name : 'rdp_theme';
+}
+
+/** Apply a theme by name. '' = default Cyber. Saves per-user to localStorage. */
 function applyTheme(name) {
-  // Remove all theme classes
   document.body.classList.remove(...ALL_THEME_CLASSES);
   if (name && THEME_NAMES[name]) {
     document.body.classList.add('theme-' + name);
@@ -11457,8 +11831,8 @@ function applyTheme(name) {
   document.querySelectorAll('.theme-swatch').forEach(s => {
     s.classList.toggle('active', s.dataset.theme === name);
   });
-  // Update glow on scrollbar (force var recompute)
-  try { localStorage.setItem('rdp_theme', name || ''); } catch(e) {}
+  // Save per-user
+  try { localStorage.setItem(themeStorageKey(), name || ''); } catch(e) {}
 }
 
 /** Toggle theme picker popup */
@@ -11481,10 +11855,13 @@ async function selectTheme(name) {
   if (p) p.classList.remove('open');
 }
 
-/** Show theme button after login */
+/** Show theme button after login, label picker with username */
 function showThemeBtn() {
   const btn = document.getElementById('theme-btn');
-  if (btn) btn.style.display = '';
+  if (btn) btn.style.display = 'inline-block'; // must override CSS display:none
+  // Show current user in theme picker so it's clear it's per-user
+  const lbl = document.getElementById('theme-user-label');
+  if (lbl && state.username) lbl.textContent = '@' + state.username;
 }
 
 // Close theme picker on outside click
@@ -11496,10 +11873,15 @@ document.addEventListener('click', function(e) {
   }
 });
 
-// Apply saved theme from localStorage immediately (before login, for faster UX)
+// Apply saved theme from localStorage immediately (before login, for faster UX).
+// Uses per-user key based on last logged-in user stored in 'rdp_user'.
 (function() {
   try {
-    const saved = localStorage.getItem('rdp_theme');
+    const lastUser = localStorage.getItem('rdp_user') || '';
+    const key = lastUser ? 'rdp_theme_' + lastUser : 'rdp_theme';
+    // Try per-user key first, fall back to legacy shared key
+    let saved = localStorage.getItem(key);
+    if (saved === null && lastUser) saved = localStorage.getItem('rdp_theme');
     if (saved !== null) applyTheme(saved);
   } catch(e) {}
 })();
