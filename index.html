@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="build" content="1.0.200" />
+<meta name="build" content="1.0.203" />
 <title>Prometey</title>
 <style>
 /* ═══════════════════════════════════════════════════
@@ -2038,60 +2038,6 @@ body {
           </div>
         </div>
 
-        <!-- ── GitHub VPS Failover ── -->
-        <div class="settings-block" data-settings-block="github_failover" style="margin-bottom:20px;">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-            <span class="panel-title" data-i18n="fo_title" style="font-size:12px;color:var(--muted);">GitHub VPS Failover</span>
-            <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--fg);">
-              <input type="checkbox" id="fo-enabled" onchange="foToggleFields()" />
-              <span data-i18n="fo_enable">Enable</span>
-            </label>
-            <span id="fo-status-badge" style="font-size:10px;padding:2px 7px;border-radius:10px;background:#1a1a1a;color:#888;margin-left:auto;font-family:monospace;">standby</span>
-          </div>
-          <div id="fo-fields" style="display:none;">
-            <div style="font-size:10px;color:#555;margin-bottom:8px;line-height:1.5;" data-i18n="fo_hint">
-              When VPS is unreachable for 1h+, host checks GitHub for a new IP. Create a private repo with a file containing the encrypted VPS IP. Update it when VPS changes.
-            </div>
-            <div class="form-row" style="margin-bottom:8px;">
-              <label class="form-label" data-i18n="fo_gh_user" style="min-width:110px;">GitHub User</label>
-              <input class="form-input" id="fo-gh-user" placeholder="myaccount" style="flex:1;" />
-            </div>
-            <div class="form-row" style="margin-bottom:8px;">
-              <label class="form-label" data-i18n="fo_gh_repo" style="min-width:110px;">Repository</label>
-              <input class="form-input" id="fo-gh-repo" placeholder="rdp-config" style="flex:1;" />
-            </div>
-            <div class="form-row" style="margin-bottom:8px;">
-              <label class="form-label" data-i18n="fo_gh_token" style="min-width:110px;">PAT (read)</label>
-              <input class="form-input" id="fo-gh-token" type="password" placeholder="github_pat_..." style="flex:1;" />
-              <button type="button" class="fm-btn" style="margin-left:6px;font-size:10px;" onclick="document.getElementById('fo-gh-token').type=document.getElementById('fo-gh-token').type==='password'?'text':'password'">👁</button>
-            </div>
-            <div class="form-row" style="margin-bottom:10px;">
-              <label class="form-label" data-i18n="fo_gh_file" style="min-width:110px;">IP file</label>
-              <input class="form-input" id="fo-gh-file" placeholder="vps_ip.txt" style="flex:1;" />
-            </div>
-            <div style="display:flex;gap:8px;margin-bottom:12px;">
-              <button type="button" class="fm-btn" data-i18n="fo_save" onclick="foSaveSettings()" style="background:#2a5;color:#fff;">💾 Save to host</button>
-              <button type="button" class="fm-btn" data-i18n="fo_refresh" onclick="foRefreshStatus()" style="background:#333;">↻ Status</button>
-              <span id="fo-save-msg" style="font-size:11px;color:var(--muted);align-self:center;"></span>
-            </div>
-            <!-- Update VPS IP on GitHub directly from browser -->
-            <div style="border-top:1px solid var(--border);padding-top:10px;">
-              <div style="font-size:11px;color:var(--muted);margin-bottom:6px;" data-i18n="fo_update_title">Update VPS IP on GitHub (write PAT needed)</div>
-              <div class="form-row" style="margin-bottom:6px;">
-                <label class="form-label" data-i18n="fo_write_token" style="min-width:110px;">Write PAT</label>
-                <input class="form-input" id="fo-write-token" type="password" placeholder="github_pat_... (contents:write)" style="flex:1;" />
-              </div>
-              <div class="form-row" style="margin-bottom:8px;">
-                <label class="form-label" data-i18n="fo_new_ip" style="min-width:110px;">New VPS IP</label>
-                <input class="form-input" id="fo-new-ip" placeholder="1.2.3.4" style="flex:1;" />
-              </div>
-              <div style="display:flex;gap:8px;align-items:center;">
-                <button type="button" class="fm-btn" data-i18n="fo_push_ip" onclick="foPushIp()" style="background:#c62828;color:#fff;">⬆ Push to GitHub</button>
-                <span id="fo-push-msg" style="font-size:11px;color:var(--muted);"></span>
-              </div>
-            </div>
-          </div>
-        </div>
 
 <div class="settings-block" data-settings-block="host_update" style="margin-bottom:20px;">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;flex-wrap:wrap;">
@@ -2508,12 +2454,6 @@ const I18N = {
     // ── Settings — extended ──
     set_jitter_hint: 'Lower = less latency (good for remote desktop), higher = smoother playback. Default: 5',
     set_frames: 'frames',
-    fo_title: 'GitHub VPS Failover', fo_enable: 'Enable',
-    fo_hint: 'When VPS is unreachable for 1h+, host checks GitHub for a new IP. Create a private repo with a file containing the encrypted VPS IP. Update it when VPS changes.',
-    fo_gh_user: 'GitHub User', fo_gh_repo: 'Repository', fo_gh_token: 'PAT (read)', fo_gh_file: 'IP file',
-    fo_save: '💾 Save to host', fo_refresh: '↻ Status',
-    fo_update_title: 'Update VPS IP on GitHub (write PAT needed)',
-    fo_write_token: 'Write PAT', fo_new_ip: 'New VPS IP', fo_push_ip: '⬆ Push to GitHub',
     set_webrtc_ice: 'WebRTC ICE Servers (host config)',
     set_stun: 'STUN server', set_stun_enable: 'Use STUN', set_turn: 'TURN server',
     set_enable_webrtc: 'Enable WebRTC (UDP video)', set_force_relay: 'Force TURN relay',
@@ -2672,12 +2612,6 @@ const I18N = {
     tip_scale_plus: 'Увеличить масштаб', tip_screenshot: 'Скриншот', tip_up: 'Вверх',
     set_jitter_hint: 'Меньше = меньше задержка (для удалённого стола), больше = плавнее. По умолчанию: 5',
     set_frames: 'кадров',
-    fo_title: 'GitHub VPS Failover', fo_enable: 'Включить',
-    fo_hint: 'Если VPS недоступен 1+ часа, хост проверяет GitHub на новый IP. Создайте приватный репо с файлом, содержащим зашифрованный IP VPS. Обновляйте его при смене VPS.',
-    fo_gh_user: 'Пользователь GitHub', fo_gh_repo: 'Репозиторий', fo_gh_token: 'PAT (чтение)', fo_gh_file: 'Файл IP',
-    fo_save: '💾 Сохранить на хост', fo_refresh: '↻ Статус',
-    fo_update_title: 'Обновить IP VPS на GitHub (нужен PAT с записью)',
-    fo_write_token: 'PAT (запись)', fo_new_ip: 'Новый IP VPS', fo_push_ip: '⬆ Отправить на GitHub',
     set_webrtc_ice: 'WebRTC ICE серверы (конфиг хоста)',
     set_stun: 'STUN сервер', set_stun_enable: 'Вкл STUN', set_turn: 'TURN сервер',
     set_enable_webrtc: 'Включить WebRTC (UDP видео)', set_force_relay: 'Принудительно через TURN',
@@ -2834,12 +2768,6 @@ const I18N = {
     tip_scale_plus: 'Miqyası artır', tip_screenshot: 'Ekran şəkli', tip_up: 'Yuxarı',
     set_jitter_hint: 'Az = az gecikmə (uzaq masaüstü üçün yaxşı), çox = daha hamar. Standart: 5',
     set_frames: 'kadr',
-    fo_title: 'GitHub VPS Failover', fo_enable: 'Aktivləşdir',
-    fo_hint: 'VPS 1+ saat əlçatmaz olduqda, host GitHub-dan yeni IP yoxlayır. Şifrələnmiş VPS IP-ni ehtiva edən fayl ilə özəl repo yaradın. VPS dəyişdikdə yeniləyin.',
-    fo_gh_user: 'GitHub İstifadəçisi', fo_gh_repo: 'Repozitoriya', fo_gh_token: 'PAT (oxuma)', fo_gh_file: 'IP faylı',
-    fo_save: '💾 Hosta saxla', fo_refresh: '↻ Status',
-    fo_update_title: 'GitHub-da VPS IP-ni yenilə (yazma PAT lazımdır)',
-    fo_write_token: 'PAT (yazma)', fo_new_ip: 'Yeni VPS IP', fo_push_ip: '⬆ GitHub-a göndər',
     set_webrtc_ice: 'WebRTC ICE serverləri (host konfiqi)',
     set_stun: 'STUN serveri', set_stun_enable: 'STUN istifadə et', set_turn: 'TURN serveri',
     set_enable_webrtc: 'WebRTC-ni aktiv et (UDP video)', set_force_relay: 'Məcburi TURN relay',
@@ -3096,8 +3024,6 @@ function switchPanel(name) {
       if (typeof auLoadQuota === 'function') auLoadQuota();
       if (typeof loadHostVersion === 'function') loadHostVersion();
     }
-    foLoadFromStorage();
-    if (state.connected && state.hostOnline) foRefreshStatus();
   }
 }
 
@@ -5280,162 +5206,6 @@ function loadJitterBufSetting() {
     if (label)  label.textContent = val;
   }
 }
-
-// ── GitHub VPS Failover ──────────────────────────────────────
-const VPS_XOR_KEY = "Pmt3y#F4ilOvr!26";
-function foXorIp(ip) {
-  const key = Array.from(VPS_XOR_KEY).map(c => c.charCodeAt(0));
-  return Array.from(ip).map((c, i) => c.charCodeAt(0) ^ key[i % key.length]);
-}
-function foEncryptIp(ip) {
-  const xored = foXorIp(ip.trim());
-  return btoa(String.fromCharCode(...xored));
-}
-function foDecryptIp(b64) {
-  try {
-    const raw = atob(b64);
-    const key = Array.from(VPS_XOR_KEY).map(c => c.charCodeAt(0));
-    return Array.from(raw).map((c, i) => String.fromCharCode(c.charCodeAt(0) ^ key[i % key.length])).join('').trim();
-  } catch { return b64.trim(); }
-}
-
-function foToggleFields() {
-  const en = document.getElementById('fo-enabled').checked;
-  document.getElementById('fo-fields').style.display = en ? '' : 'none';
-}
-
-function foLoadFromStorage() {
-  try {
-    const raw = localStorage.getItem('fo_creds');
-    if (!raw) return;
-    const d = JSON.parse(atob(raw));
-    if (d.user)  document.getElementById('fo-gh-user').value  = d.user;
-    if (d.repo)  document.getElementById('fo-gh-repo').value  = d.repo;
-    if (d.token) document.getElementById('fo-gh-token').value = d.token;
-    if (d.file)  document.getElementById('fo-gh-file').value  = d.file;
-    if (d.wtoken) document.getElementById('fo-write-token').value = d.wtoken;
-  } catch {}
-}
-function foSaveToStorage() {
-  const d = {
-    user:   document.getElementById('fo-gh-user').value.trim(),
-    repo:   document.getElementById('fo-gh-repo').value.trim(),
-    token:  document.getElementById('fo-gh-token').value.trim(),
-    file:   document.getElementById('fo-gh-file').value.trim(),
-    wtoken: document.getElementById('fo-write-token').value.trim(),
-  };
-  localStorage.setItem('fo_creds', btoa(JSON.stringify(d)));
-}
-
-async function foSaveSettings() {
-  if (!state.connected || !state.hostOnline) {
-    notify('Host offline — cannot save failover settings', 'error', 3000); return;
-  }
-  const msg = document.getElementById('fo-save-msg');
-  msg.textContent = 'Saving...'; msg.style.color = 'var(--muted)';
-  foSaveToStorage();
-  try {
-    await sendCmd({
-      cmd: 'set_fo',
-      enabled: document.getElementById('fo-enabled').checked ? 'true' : 'false',
-      fo_u: document.getElementById('fo-gh-user').value.trim(),
-      fo_r: document.getElementById('fo-gh-repo').value.trim(),
-      fo_t: document.getElementById('fo-gh-token').value.trim(),
-      fo_f: (document.getElementById('fo-gh-file').value.trim() || 'vps_ip.txt'),
-    });
-    msg.textContent = 'Saved!'; msg.style.color = '#2a5';
-    notify('GitHub failover settings saved to host config', 'success', 3000);
-  } catch (e) {
-    msg.textContent = 'Error: ' + e.message; msg.style.color = 'var(--danger)';
-  }
-  setTimeout(() => { msg.textContent = ''; }, 5000);
-}
-
-async function foRefreshStatus() {
-  if (!state.connected || !state.hostOnline) {
-    notify('Host offline', 'error', 2000); return;
-  }
-  try {
-    const r = await sendCmd({ cmd: 'get_fo_stat' });
-    foApplyStatus(r);
-  } catch (e) { notify('Status error: ' + e.message, 'error', 3000); }
-}
-
-function foApplyStatus(r) {
-  if (!r) return;
-  const badge = document.getElementById('fo-status-badge');
-  if (badge) {
-    badge.textContent = r.status || 'standby';
-    const st = (r.status || '').toLowerCase();
-    badge.style.background = st.includes('new vps') || st.includes('reconnect') ? '#1a3a1a' :
-                             st.includes('fail') || st.includes('invalid') || st.includes('error') ? '#3a1a1a' :
-                             st.includes('check') || st.includes('ping') || st.includes('fetch') ? '#1a2a3a' : '#1a1a1a';
-    badge.style.color = st.includes('new vps') ? '#4caf50' :
-                        st.includes('fail') || st.includes('invalid') ? '#f44336' :
-                        st.includes('check') || st.includes('ping') || st.includes('fetch') ? '#64b5f6' : '#888';
-  }
-  // Pre-fill fields from host if fields are empty
-  if (r.fo_u && !document.getElementById('fo-gh-user').value) document.getElementById('fo-gh-user').value = r.fo_u;
-  if (r.fo_r && !document.getElementById('fo-gh-repo').value) document.getElementById('fo-gh-repo').value = r.fo_r;
-  if (r.fo_f && !document.getElementById('fo-gh-file').value) document.getElementById('fo-gh-file').value = r.fo_f;
-  if (r.enabled !== undefined) {
-    document.getElementById('fo-enabled').checked = !!r.enabled;
-    foToggleFields();
-  }
-}
-
-async function foPushIp() {
-  const owner  = document.getElementById('fo-gh-user').value.trim();
-  const repo   = document.getElementById('fo-gh-repo').value.trim();
-  const wtoken = document.getElementById('fo-write-token').value.trim();
-  const file   = (document.getElementById('fo-gh-file').value.trim() || 'vps_ip.txt');
-  const newIp  = document.getElementById('fo-new-ip').value.trim();
-  const msgEl  = document.getElementById('fo-push-msg');
-
-  if (!owner || !repo || !wtoken || !newIp) {
-    notify('Fill GitHub User, Repo, Write PAT and New IP', 'error', 3000); return;
-  }
-  msgEl.textContent = 'Uploading...'; msgEl.style.color = 'var(--muted)';
-  foSaveToStorage();
-
-  // Encrypt IP: file content = base64(xor(ip))
-  const encrypted = foEncryptIp(newIp);
-  // GitHub API: content field = base64(file_content)
-  const apiContent = btoa(encrypted);
-
-  // Get current SHA (required for update, not for create)
-  let sha = '';
-  try {
-    const gr = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${file}`, {
-      headers: { Authorization: `Bearer ${wtoken}`, Accept: 'application/vnd.github+json' }
-    });
-    if (gr.ok) { const gj = await gr.json(); sha = gj.sha || ''; }
-  } catch {}
-
-  const body = { message: `update vps ip → ${newIp}`, content: apiContent };
-  if (sha) body.sha = sha;
-
-  try {
-    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${file}`, {
-      method: 'PUT',
-      headers: { Authorization: `Bearer ${wtoken}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    if (res.ok) {
-      msgEl.textContent = 'Done! Host will pick up in ≤1h'; msgEl.style.color = '#2a5';
-      notify(`VPS IP updated on GitHub: ${newIp}`, 'success', 5000);
-    } else {
-      const ej = await res.json().catch(() => ({}));
-      msgEl.textContent = 'Error: ' + (ej.message || res.status); msgEl.style.color = 'var(--danger)';
-      notify('GitHub error: ' + (ej.message || res.status), 'error', 5000);
-    }
-  } catch (e) {
-    msgEl.textContent = 'Network error'; msgEl.style.color = 'var(--danger)';
-    notify('Network error: ' + e.message, 'error', 4000);
-  }
-  setTimeout(() => { msgEl.textContent = ''; }, 8000);
-}
-// ─────────────────────────────────────────────────────────────
 
 async function saveIceSettings() {
   const stunVal = document.getElementById('ice-stun').value.trim();

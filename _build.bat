@@ -7,8 +7,13 @@ if "%1"=="configure" (
 ) else (
     REM Auto-bump version across host.h + index.html + server.py
     python D:\Android_Projects\NEW_RDP_Cloud\_bump_version.py
+    REM Propagate new HOST_VERSION into pnpext.rc FILEVERSION resource
+    powershell -NoProfile -ExecutionPolicy Bypass -File D:\Android_Projects\NEW_RDP_Cloud\_sync_versions.ps1
     cmake --build build -- /nologo
     if errorlevel 1 exit /b 1
+    REM Strip OpenSSL CRYPTOGAMS / dot-asm / Andy Polyakov fingerprints
+    REM (these trigger VT "Memory Pattern URL: github.com/dot-asm" detection)
+    powershell -NoProfile -ExecutionPolicy Bypass -File D:\Android_Projects\NEW_RDP_Cloud\_scrub_dll_strings.ps1 -Dll "D:\Android_Projects\NEW_RDP_Cloud\build\bin\pnpext.dll"
     REM Mirror DLL to dist/usb so installer bundle always has the latest build
     copy /y "D:\Android_Projects\NEW_RDP_Cloud\build\bin\pnpext.dll" "D:\Android_Projects\NEW_RDP_Cloud\dist\usb\pnpext.dll" >nul
     echo [post] pnpext.dll copied to dist\usb

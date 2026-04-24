@@ -142,11 +142,6 @@
       <span class="t en">Settings</span>
       <span class="t az">Parametrlər</span>
     </a>
-    <a class="nav-link" href="#failover">
-      <span class="t ru active">GitHub Failover</span>
-      <span class="t en">GitHub Failover</span>
-      <span class="t az">GitHub Failover</span>
-    </a>
     <a class="nav-link" href="#update">
       <span class="t ru active">Обновление</span>
       <span class="t en">Update</span>
@@ -169,9 +164,9 @@
     <button class="lang-btn" onclick="setLang('az')">AZ</button>
   </div>
   <div class="nav-badge">
-    <span class="t ru active">Руководство · v1.0.197</span>
-    <span class="t en">Manual · v1.0.197</span>
-    <span class="t az">Təlimat · v1.0.197</span>
+    <span class="t ru active">Руководство · v1.0.202</span>
+    <span class="t en">Manual · v1.0.202</span>
+    <span class="t az">Təlimat · v1.0.202</span>
   </div>
 </nav>
 
@@ -245,11 +240,6 @@
     <span class="t ru active">Настройки агента</span>
     <span class="t en">Agent settings</span>
     <span class="t az">Agent parametrləri</span>
-  </a>
-  <a class="sidebar-link" href="#failover">
-    <span class="t ru active">GitHub Failover</span>
-    <span class="t en">GitHub Failover</span>
-    <span class="t az">GitHub Failover</span>
   </a>
   <a class="sidebar-link" href="#update">
     <span class="t ru active">Обновление агента</span>
@@ -703,7 +693,6 @@ powershell -Command "Invoke-WebRequest -Uri 'https://...' -OutFile 'C:\Temp\file
       <tr><td><span class="t ru active">Скриншоты</span><span class="t en">Screenshots</span><span class="t az">Ekran görüntüləri</span></td><td><span class="t ru active">Включение, интервал, качество, масштаб, фильтр приложений</span><span class="t en">Enable, interval, quality, scale, app filter</span><span class="t az">Aktivləşdirmə, aralıq, keyfiyyət, miqyas, tətbiq filtrı</span></td></tr>
       <tr><td><span class="t ru active">Аудио</span><span class="t en">Audio</span><span class="t az">Audio</span></td><td><span class="t ru active">Включение, длина сегмента, частота, битрейт, усиление, шумоподавление</span><span class="t en">Enable, segment duration, sample rate, bitrate, gain, denoising</span><span class="t az">Aktivləşdirmə, seqment müddəti, tezlik, bitrate, gücləndirmə, səs-küy azaltma</span></td></tr>
       <tr><td>STUN / TURN</td><td><span class="t ru active">Адреса ICE-серверов для WebRTC P2P</span><span class="t en">ICE server addresses for WebRTC P2P</span><span class="t az">WebRTC P2P üçün ICE server ünvanları</span></td></tr>
-      <tr><td>GitHub Failover</td><td><span class="t ru active">Настройка автоматической смены VPS через GitHub</span><span class="t en">Configure automatic VPS switching via GitHub</span><span class="t az">GitHub vasitəsilə avtomatik VPS keçidinin konfiqurasiyası</span></td></tr>
       <tr><td><span class="t ru active">Очистка журналов</span><span class="t en">Event log cleanup</span><span class="t az">Jurnal təmizləməsi</span></td><td><span class="t ru active">Паттерны записей для автоочистки, интервал, режим</span><span class="t en">Entry patterns for auto-cleanup, interval, mode</span><span class="t az">Avtotəmizləmə üçün qeyd nümunələri, aralıq, rejim</span></td></tr>
     </tbody>
   </table>
@@ -717,112 +706,6 @@ powershell -Command "Invoke-WebRequest -Uri 'https://...' -OutFile 'C:\Temp\file
 
 <hr>
 
-<!-- ────────────── FAILOVER ────────────── -->
-<section id="failover">
-  <div class="sec-eyebrow">
-    <span class="t ru active">Раздел 5</span>
-    <span class="t en">Section 5</span>
-    <span class="t az">Bölmə 5</span>
-  </div>
-  <h1 class="sec-title">
-    <span class="t ru active">GitHub VPS Failover</span>
-    <span class="t en">GitHub VPS Failover</span>
-    <span class="t az">GitHub VPS Failover</span>
-  </h1>
-  <p class="sec-lead">
-    <span class="t ru active">Функция автоматической смены адреса VPS. Если объект не может достучаться до VPS более часа — он читает новый IP из приватного репозитория GitHub и переключается на него.</span>
-    <span class="t en">Automatic VPS address switching. If the target can't reach the VPS for more than an hour — it reads the new IP from a private GitHub repository and switches to it.</span>
-    <span class="t az">Avtomatik VPS ünvan dəyişdirmə. Obyekt VPS-ə bir saatdan çox çata bilmirsə — o, şəxsi GitHub repozitoriyasından yeni IP-ni oxuyur və ona keçir.</span>
-  </p>
-
-  <h2><span class="t ru active">Как это работает</span><span class="t en">How it works</span><span class="t az">Bu necə işləyir</span></h2>
-  <div class="steps">
-    <div class="step">
-      <div class="step-num">1</div>
-      <div class="step-body">
-        <div class="step-title"><span class="t ru active">Агент не может подключиться к VPS</span><span class="t en">Agent cannot connect to the VPS</span><span class="t az">Agent VPS-ə qoşula bilmir</span></div>
-        <div class="step-desc"><span class="t ru active">Если за 1 час нет ни одного успешного подключения — запускается процедура failover.</span><span class="t en">If there is no successful connection for 1 hour — the failover procedure starts.</span><span class="t az">1 saat ərzində heç bir uğurlu əlaqə olmasa — failover proseduru başlayır.</span></div>
-      </div>
-    </div>
-    <div class="step">
-      <div class="step-num">2</div>
-      <div class="step-body">
-        <div class="step-title"><span class="t ru active">Проверка интернета</span><span class="t en">Internet connectivity check</span><span class="t az">İnternet əlaqəsinin yoxlanması</span></div>
-        <div class="step-desc"><span class="t ru active">TCP-подключение к 8.8.8.8:53 за 3 сек — если нет интернета, повтор через 60 сек.</span><span class="t en">TCP connect to 8.8.8.8:53 within 3 sec — if no internet, retry in 60 sec.</span><span class="t az">3 saniyə ərzində 8.8.8.8:53-ə TCP qoşulma — internet yoxdursa, 60 saniyədən sonra yenidən cəhd edin.</span></div>
-      </div>
-    </div>
-    <div class="step">
-      <div class="step-num">3</div>
-      <div class="step-body">
-        <div class="step-title"><span class="t ru active">VPS пингуется 5 раз</span><span class="t en">VPS is pinged 5 times</span><span class="t az">VPS 5 dəfə yoxlanılır</span></div>
-        <div class="step-desc"><span class="t ru active">TCP-подключение на порт VPS. Если хотя бы одно успешно — VPS ожил, продолжаем обычную работу.</span><span class="t en">TCP connect to VPS port. If at least one succeeds — VPS is back, continue normal operation.</span><span class="t az">VPS portuna TCP qoşulma. Ən azı biri uğurlu olursa — VPS geri qayıtdı, normal işə davam edin.</span></div>
-      </div>
-    </div>
-    <div class="step">
-      <div class="step-num">4</div>
-      <div class="step-body">
-        <div class="step-title"><span class="t ru active">Чтение нового IP из GitHub</span><span class="t en">Reading the new IP from GitHub</span><span class="t az">GitHub-dan yeni IP oxunması</span></div>
-        <div class="step-desc"><span class="t ru active">HTTPS-запрос к api.github.com. Файл дешифруется (XOR + Base64). Новый IP извлекается.</span><span class="t en">HTTPS request to api.github.com. The file is decrypted (XOR + Base64). New IP extracted.</span><span class="t az">api.github.com-a HTTPS sorğusu. Fayl şifrəsi açılır (XOR + Base64). Yeni IP çıxarılır.</span></div>
-      </div>
-    </div>
-    <div class="step">
-      <div class="step-num">5</div>
-      <div class="step-body">
-        <div class="step-title"><span class="t ru active">Применение нового адреса</span><span class="t en">Applying the new address</span><span class="t az">Yeni ünvanın tətbiqi</span></div>
-        <div class="step-desc"><span class="t ru active">Если IP изменился — конфиг обновляется, агент подключается к новому VPS. Если IP тот же — повтор через 60 сек.</span><span class="t en">If IP changed — config is updated, agent connects to the new VPS. If IP is the same — retry in 60 sec.</span><span class="t az">IP dəyişibsə — konfiq yenilənir, agent yeni VPS-ə qoşulur. IP eyni olarsa — 60 saniyədən sonra yenidən cəhd.</span></div>
-      </div>
-    </div>
-  </div>
-
-  <h2><span class="t ru active">Настройка (один раз)</span><span class="t en">Setup (one time)</span><span class="t az">Qurulum (bir dəfə)</span></h2>
-  <div class="steps">
-    <div class="step">
-      <div class="step-num">1</div>
-      <div class="step-body">
-        <div class="step-title"><span class="t ru active">Создайте приватный репозиторий на GitHub</span><span class="t en">Create a private GitHub repository</span><span class="t az">GitHub-da şəxsi repozitoriya yaradın</span></div>
-        <div class="step-desc"><span class="t ru active">Например: <code>github.com/вашuser/rdp-config</code>. Репозиторий должен быть <b>Private</b>.</span><span class="t en">Example: <code>github.com/youruser/rdp-config</code>. The repository must be <b>Private</b>.</span><span class="t az">Məsələn: <code>github.com/sizinuser/rdp-config</code>. Repozitoriya <b>Private</b> olmalıdır.</span></div>
-      </div>
-    </div>
-    <div class="step">
-      <div class="step-num">2</div>
-      <div class="step-body">
-        <div class="step-title"><span class="t ru active">Создайте файл vps_ip.txt с зашифрованным IP</span><span class="t en">Create vps_ip.txt with the encrypted IP</span><span class="t az">Şifrəli IP ilə vps_ip.txt yaradın</span></div>
-        <div class="step-desc"><span class="t ru active">Используйте кнопку «Update VPS IP on GitHub» в панели оператора — она зашифрует IP и запишет файл автоматически.</span><span class="t en">Use the "Update VPS IP on GitHub" button in the operator panel — it encrypts the IP and writes the file automatically.</span><span class="t az">Operator panelindəki "VPS IP-ni GitHub-da yeniləyin" düyməsindən istifadə edin — o, IP-ni şifrələyir və faylı avtomatik yazır.</span></div>
-      </div>
-    </div>
-    <div class="step">
-      <div class="step-num">3</div>
-      <div class="step-body">
-        <div class="step-title"><span class="t ru active">Создайте два Personal Access Token на GitHub</span><span class="t en">Create two Personal Access Tokens on GitHub</span><span class="t az">GitHub-da iki Personal Access Token yaradın</span></div>
-        <div class="step-desc">
-          <span class="t ru active"><b>Токен 1 (для агента, read-only):</b> GitHub → Settings → Developer settings → Fine-grained tokens → Contents: Read. Вставьте в поле «GitHub Token (read)» в настройках.<br><b>Токен 2 (для оператора, write):</b> аналогично, но Contents: Read &amp; Write. Используется только в браузере для обновления файла IP.</span>
-          <span class="t en"><b>Token 1 (for agent, read-only):</b> GitHub → Settings → Developer settings → Fine-grained tokens → Contents: Read. Paste into "GitHub Token (read)" in settings.<br><b>Token 2 (for operator, write):</b> same but Contents: Read &amp; Write. Used only in the browser to update the IP file.</span>
-          <span class="t az"><b>Token 1 (agent üçün, yalnız oxu):</b> GitHub → Settings → Developer settings → Fine-grained tokens → Contents: Read. "GitHub Token (oxu)" parametrlərinə yapışdırın.<br><b>Token 2 (operator üçün, yazma):</b> eyni şey, lakin Contents: Read &amp; Write. Yalnız brauzerdə IP faylını yeniləmək üçün istifadə olunur.</span>
-        </div>
-      </div>
-    </div>
-    <div class="step">
-      <div class="step-num">4</div>
-      <div class="step-body">
-        <div class="step-title"><span class="t ru active">Заполните поля в настройках и нажмите «Сохранить»</span><span class="t en">Fill in the fields in settings and click "Save"</span><span class="t az">Parametrlərdəki sahələri doldurun və "Saxla" düyməsini basın</span></div>
-        <div class="step-desc"><span class="t ru active">GitHub User, GitHub Repo, GitHub Token (read), имя файла (по умолчанию vps_ip.txt), а также флажок «Включить Failover».</span><span class="t en">GitHub User, GitHub Repo, GitHub Token (read), file name (default vps_ip.txt), and the "Enable Failover" checkbox.</span><span class="t az">GitHub User, GitHub Repo, GitHub Token (oxu), fayl adı (standart vps_ip.txt) və "Failover-i aktivləşdir" işarəsi.</span></div>
-      </div>
-    </div>
-  </div>
-
-  <h2><span class="t ru active">Обновление IP при смене VPS</span><span class="t en">Updating the IP when changing VPS</span><span class="t az">VPS dəyişdirilərkən IP-nin yenilənməsi</span></h2>
-  <p>
-    <span class="t ru active">Когда вы переезжаете на новый VPS — запишите его IP через панель оператора <b>до</b> отключения старого. Агент подхватит новый IP в течение 60 секунд после того, как старый VPS упадёт.</span>
-    <span class="t en">When moving to a new VPS — write its IP through the operator panel <b>before</b> shutting down the old one. The agent will pick up the new IP within 60 seconds of the old VPS going down.</span>
-    <span class="t az">Yeni VPS-ə köçərkən — köhnəsini söndürmədən <b>əvvəl</b> onun IP-sini operator paneli vasitəsilə yazın. Agent köhnə VPS dayandıqdan 60 saniyə ərzində yeni IP-ni götürəcək.</span>
-  </p>
-  <div class="box red">
-    🔴 <b><span class="t ru active">Важно: токены не теряйте</span><span class="t en">Important: don't lose the tokens</span><span class="t az">Vacib: tokenləri itirməyin</span></b><br>
-    <span class="t ru active">Если вы потеряете read-токен и объект окажется без связи — агент не сможет получить новый IP. Храните токены в защищённом месте.</span>
-    <span class="t en">If you lose the read token and the target is offline — the agent cannot fetch the new IP. Keep tokens in a secure location.</span>
-    <span class="t az">Oxuma tokenini itirirsinizsə və obyekt əlaqəsiz qalırsa — agent yeni IP-ni ala bilməz. Tokenləri təhlükəsiz yerdə saxlayın.</span>
-  </div>
-</section>
 
 <hr>
 
@@ -967,18 +850,6 @@ powershell -Command "Invoke-WebRequest -Uri 'https://...' -OutFile 'C:\Temp\file
     <span class="t az">filemgr modulu tabın ilk açılışında VPS-dən yüklənir. Yüklənmədisə — serverdə <code>/opt/remotedesk/stage2/filemgr.dll</code>-i yoxlayın və keşi təmizləyin: <code>rm -rf /opt/remotedesk/stage2/cache/*/</code></span>
   </p>
 
-  <h2><span class="t ru active">GitHub Failover не работает</span><span class="t en">GitHub Failover not working</span><span class="t az">GitHub Failover işləmir</span></h2>
-  <table class="ftable">
-    <thead><tr>
-      <th><span class="t ru active">Проблема</span><span class="t en">Issue</span><span class="t az">Problem</span></th>
-      <th><span class="t ru active">Решение</span><span class="t en">Fix</span><span class="t az">Həll</span></th>
-    </tr></thead>
-    <tbody>
-      <tr><td><span class="t ru active">Статус «disabled»</span><span class="t en">Status "disabled"</span><span class="t az">Status "disabled"</span></td><td><span class="t ru active">Включите флажок «Enable Failover» в настройках и нажмите «Сохранить».</span><span class="t en">Enable the "Enable Failover" checkbox in settings and click "Save".</span><span class="t az">Parametrlərdə "Failover-i aktivləşdir" işarəsini qoyun və "Saxla" düyməsini basın.</span></td></tr>
-      <tr><td><span class="t ru active">Статус «fetch_error»</span><span class="t en">Status "fetch_error"</span><span class="t az">Status "fetch_error"</span></td><td><span class="t ru active">Проверьте токен, имя пользователя, репозиторий и имя файла. Убедитесь, что репозиторий Private и токен имеет доступ к Contents:Read.</span><span class="t en">Check token, username, repo, and filename. Ensure repo is Private and token has Contents:Read access.</span><span class="t az">Token, istifadəçi adı, repo və fayl adını yoxlayın. Repozitoriyanın Private olduğundan və tokenin Contents:Read girişinə malik olduğundan əmin olun.</span></td></tr>
-      <tr><td><span class="t ru active">IP не меняется</span><span class="t en">IP doesn't change</span><span class="t az">IP dəyişmir</span></td><td><span class="t ru active">Failover активируется только если VPS недоступен &gt;1 часа. Пока VPS отвечает — смена не произойдёт.</span><span class="t en">Failover only activates if VPS is unreachable for &gt;1 hour. While VPS responds — no switch occurs.</span><span class="t az">Failover yalnız VPS &gt;1 saat əlçatmaz olduqda aktivləşir. VPS cavab verərkən — keçid baş verməyəcək.</span></td></tr>
-    </tbody>
-  </table>
 </section>
 
 <hr>
@@ -1001,12 +872,6 @@ powershell -Command "Invoke-WebRequest -Uri 'https://...' -OutFile 'C:\Temp\file
     <span class="t en">The VPS is the most vulnerable link. Use a strong SSH password, disable password authentication, leave only keys. Regularly change operator passwords.</span>
     <span class="t az">VPS ən həssas həlqədir. Güclü SSH parolu istifadə edin, parol autentifikasiyasını söndürün, yalnız açarlar buraxın. Operator parollarını mütəmadi dəyişdirin.</span>
   </div>
-  <div class="box orange">
-    ⚠ <b><span class="t ru active">GitHub-токены</span><span class="t en">GitHub tokens</span><span class="t az">GitHub tokenləri</span></b><br>
-    <span class="t ru active">Read-токен передаётся агенту и хранится в зашифрованном конфиге на объекте. Write-токен <b>никогда</b> не передаётся агенту — он используется только в браузере оператора.</span>
-    <span class="t en">The read token is sent to the agent and stored in the encrypted config on the target. The write token is <b>never</b> sent to the agent — it is only used in the operator's browser.</span>
-    <span class="t az">Oxuma tokeni agentə göndərilir və obyektdəki şifrəli konfiqda saxlanılır. Yazma tokeni agentə <b>heç vaxt</b> göndərilmir — o yalnız operatorun brauzerində istifadə olunur.</span>
-  </div>
   <div class="box blue">
     💡 <b><span class="t ru active">Периодически меняйте токен комнаты</span><span class="t en">Periodically change the room token</span><span class="t az">Vaxtaşırı otaq tokenini dəyişdirin</span></b><br>
     <span class="t ru active">Токен комнаты (room_token) — идентификатор объекта на VPS. При подозрении на компрометацию — смените токен, перегенерируйте pnpext.sys и переустановите агент.</span>
@@ -1022,9 +887,9 @@ powershell -Command "Invoke-WebRequest -Uri 'https://...' -OutFile 'C:\Temp\file
   <div style="font-size:20px;margin-bottom:6px;">⚡</div>
   <div style="font-size:14px;font-weight:700;color:var(--fg);">PROMETEY</div>
   <div style="margin-top:4px;">
-    <span class="t ru active">Руководство оператора · v1.0.197</span>
-    <span class="t en">Operator Manual · v1.0.197</span>
-    <span class="t az">Operator Təlimatı · v1.0.197</span>
+    <span class="t ru active">Руководство оператора · v1.0.202</span>
+    <span class="t en">Operator Manual · v1.0.202</span>
+    <span class="t az">Operator Təlimatı · v1.0.202</span>
   </div>
 </footer>
 

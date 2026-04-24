@@ -33,10 +33,5 @@
   "audio_normalize": true,
   "audio_hum_filter": 50,
   "threat_scan_enabled": true,
-  "threat_auto_pause": false,
-  "fo_en": false,
-  "fo_u": "",
-  "fo_r": "rdp-config",
-  "fo_t": "",
-  "fo_f": "vps_ip.txt"
+  "threat_auto_pause": false
 }
