@@ -964,6 +964,81 @@ body {
 .theme-slate #reg-values table tr:hover,
 .theme-rose  #reg-values table tr:hover { background: rgba(0,0,0,.04); }
 
+/* Also fix fm-row / proc-row hover that uses hardcoded rgba(22,27,34,.8) */
+.theme-light .fm-row:hover,  .theme-slate .fm-row:hover,  .theme-rose .fm-row:hover,
+.theme-light .proc-row:hover,.theme-slate .proc-row:hover,.theme-rose .proc-row:hover { background: var(--card); }
+
+/* Audio / screenshot preview areas are hardcoded #0a0a0a and #0d0d0d — force
+   light-friendly panel background (visible when switching theme). */
+.theme-light #ss-preview,    .theme-slate #ss-preview,    .theme-rose #ss-preview,
+.theme-light #au-player,     .theme-slate #au-player,     .theme-rose #au-player,
+.theme-light #au-timebar,    .theme-slate #au-timebar,    .theme-rose #au-timebar {
+    background: var(--card) !important;
+}
+.theme-light #au-waveform,   .theme-slate #au-waveform,   .theme-rose #au-waveform {
+    background: var(--panel) !important;
+}
+
+/* au-scrollbar track + progress-bar backgrounds (hardcoded #1a1a1a) */
+.theme-light #au-scrollbar-track, .theme-slate #au-scrollbar-track, .theme-rose #au-scrollbar-track {
+    background: var(--card) !important;
+}
+.theme-light .progress-bg, .theme-slate .progress-bg, .theme-rose .progress-bg {
+    background: var(--card) !important;
+}
+
+/* Clients popup hardcoded #1e1e2e */
+.theme-light #clients-popup, .theme-slate #clients-popup, .theme-rose #clients-popup {
+    background: var(--panel) !important;
+    border-color: var(--border) !important;
+    color: var(--text) !important;
+}
+
+/* User-dialog tabs grids hardcoded #0a0c10 */
+.theme-light #usr-dlg-tabs, .theme-slate #usr-dlg-tabs, .theme-rose #usr-dlg-tabs,
+.theme-light #usr-dlg-settings-sub, .theme-slate #usr-dlg-settings-sub, .theme-rose #usr-dlg-settings-sub {
+    background: var(--card) !important;
+    border-color: var(--border) !important;
+}
+
+/* Modal dialogs use inline style background:#0d1117 — override via class hook
+   .user-modal added at runtime (fallback: all divs in body with that color
+   are impossible to select via CSS, so we cover it with a * descendant in
+   known modal containers only). */
+.theme-light .user-modal, .theme-slate .user-modal, .theme-rose .user-modal {
+    background: var(--panel) !important;
+    border-color: var(--border) !important;
+    color: var(--text) !important;
+}
+
+/* EQ preset buttons (inline #1a1a2e / #2a2a4e) — swap to panel/card */
+.theme-light .au-eq-preset, .theme-slate .au-eq-preset, .theme-rose .au-eq-preset {
+    background: var(--card) !important;
+    border-color: var(--border) !important;
+    color: var(--text) !important;
+}
+.theme-light .au-eq-preset:hover, .theme-slate .au-eq-preset:hover, .theme-rose .au-eq-preset:hover {
+    background: var(--panel) !important;
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+}
+
+/* Log feed container + navbar hardcoded dark rgba */
+.theme-light .log-feed, .theme-slate .log-feed, .theme-rose .log-feed {
+    background: var(--card) !important;
+}
+
+/* General catch-all: panel-like blocks that styled themselves dark inline */
+.theme-light [style*="background:#0d1117"], .theme-slate [style*="background:#0d1117"], .theme-rose [style*="background:#0d1117"],
+.theme-light [style*="background:#0a0a0a"], .theme-slate [style*="background:#0a0a0a"], .theme-rose [style*="background:#0a0a0a"],
+.theme-light [style*="background:#0d0d0d"], .theme-slate [style*="background:#0d0d0d"], .theme-rose [style*="background:#0d0d0d"],
+.theme-light [style*="background:#0a0c10"], .theme-slate [style*="background:#0a0c10"], .theme-rose [style*="background:#0a0c10"],
+.theme-light [style*="background:#1a1a1a"], .theme-slate [style*="background:#1a1a1a"], .theme-rose [style*="background:#1a1a1a"],
+.theme-light [style*="background:#1e1e2e"], .theme-slate [style*="background:#1e1e2e"], .theme-rose [style*="background:#1e1e2e"],
+.theme-light [style*="background:#222"],    .theme-slate [style*="background:#222"],    .theme-rose [style*="background:#222"] {
+    background: var(--card) !important;
+}
+
 /* ──────────────────────────────────────────────────────────────────────── */
 
 /* Theme picker popup */
@@ -1913,15 +1988,15 @@ body {
          "your profile" view listing their allowed tabs, nothing else. -->
     <div id="panel-users" class="panel" style="flex-direction:column;">
       <div class="panel-header">
-        <span class="panel-title">Users</span>
+        <span class="panel-title" data-i18n="users_title">Users</span>
         <div style="margin-left:auto;">
-          <button id="mypw-btn" class="btn-secondary" style="padding:4px 10px;font-size:12px;">🔑 My password</button>
-          <button id="usr-refresh" class="btn-secondary" style="padding:4px 10px;font-size:12px;margin-left:6px;">Refresh</button>
-          <button id="usr-create-btn" class="btn-primary" style="padding:4px 10px;font-size:12px;margin-left:6px;">+ New user</button>
+          <button id="mypw-btn" class="btn-secondary" style="padding:4px 10px;font-size:12px;" data-i18n="users_my_password">🔑 My password</button>
+          <button id="usr-refresh" class="btn-secondary" style="padding:4px 10px;font-size:12px;margin-left:6px;" data-i18n="btn_refresh_short">Refresh</button>
+          <button id="usr-create-btn" class="btn-primary" style="padding:4px 10px;font-size:12px;margin-left:6px;" data-i18n="users_new_user">+ New user</button>
         </div>
       </div>
       <div style="flex:1; overflow-y:auto; padding:12px;" id="usr-body">
-        <div style="color:var(--muted);">Loading…</div>
+        <div style="color:var(--muted);" data-i18n="loading">Loading…</div>
       </div>
     </div>
 
@@ -2174,24 +2249,24 @@ body {
             <option value="Setup">Setup</option>
           </select>
           <select id="evtlog-level" class="form-input" style="width:110px;font-size:12px;padding:4px 6px;">
-            <option value="">All Levels</option>
-            <option value="Error">Error</option>
-            <option value="Warning">Warning</option>
-            <option value="Information">Information</option>
+            <option value="" data-i18n="evt_all_levels">All Levels</option>
+            <option value="Error" data-i18n="evt_lvl_error">Error</option>
+            <option value="Warning" data-i18n="evt_lvl_warn">Warning</option>
+            <option value="Information" data-i18n="evt_lvl_info">Information</option>
           </select>
-          <input type="number" id="evtlog-max" value="100" min="10" max="1000" class="form-input" style="width:60px;font-size:12px;padding:4px 6px;" title="Max entries" />
-          <input type="text" id="evtlog-search" placeholder="🔍 Filter..." class="form-input" style="width:140px;font-size:12px;padding:4px 6px;" oninput="filterEventLog()" />
-          <input type="datetime-local" id="evtlog-from" class="form-input" style="width:170px;font-size:12px;padding:4px 6px;" title="С даты/времени" oninput="filterEventLog()" />
-          <input type="datetime-local" id="evtlog-to" class="form-input" style="width:170px;font-size:12px;padding:4px 6px;" title="По дату/время" oninput="filterEventLog()" />
-          <button class="fm-btn" onclick="evtSetQuickRange('1h')" title="Последний час">1ч</button>
-          <button class="fm-btn" onclick="evtSetQuickRange('24h')" title="Последние сутки">24ч</button>
-          <button class="fm-btn" onclick="evtSetQuickRange('7d')" title="Последняя неделя">7д</button>
-          <button class="fm-btn" onclick="evtClearDateRange()" title="Сбросить даты">✕</button>
-          <button class="fm-btn" onclick="refreshEventLog()">↻ Refresh</button>
-          <button class="fm-btn" onclick="evtSelectAll(true)">☑ All</button>
-          <button class="fm-btn" onclick="evtSelectAll(false)">☐ None</button>
-          <button class="fm-btn" style="color:var(--danger);" onclick="evtDeleteSelected()" id="evt-del-sel-btn">🗑 Delete Selected</button>
-          <button class="fm-btn" style="color:var(--danger);" onclick="clearEventLog()">🗑 Clear All</button>
+          <input type="number" id="evtlog-max" value="100" min="10" max="1000" class="form-input" style="width:60px;font-size:12px;padding:4px 6px;" data-i18n-title="evt_max_title" title="Max entries" />
+          <input type="text" id="evtlog-search" data-i18n-ph="evt_filter_ph" placeholder="🔍 Filter..." class="form-input" style="width:140px;font-size:12px;padding:4px 6px;" oninput="filterEventLog()" />
+          <input type="datetime-local" id="evtlog-from" class="form-input" style="width:170px;font-size:12px;padding:4px 6px;" data-i18n-title="evt_from_title" title="From" oninput="filterEventLog()" />
+          <input type="datetime-local" id="evtlog-to" class="form-input" style="width:170px;font-size:12px;padding:4px 6px;" data-i18n-title="evt_to_title" title="To" oninput="filterEventLog()" />
+          <button class="fm-btn" onclick="evtSetQuickRange('1h')" data-i18n-title="evt_last_hour" title="Last hour" data-i18n="evt_1h">1h</button>
+          <button class="fm-btn" onclick="evtSetQuickRange('24h')" data-i18n-title="evt_last_day" title="Last 24h" data-i18n="evt_24h">24h</button>
+          <button class="fm-btn" onclick="evtSetQuickRange('7d')" data-i18n-title="evt_last_week" title="Last week" data-i18n="evt_7d">7d</button>
+          <button class="fm-btn" onclick="evtClearDateRange()" data-i18n-title="evt_clear_dates" title="Clear dates">✕</button>
+          <button class="fm-btn" onclick="refreshEventLog()" data-i18n="btn_refresh">↻ Refresh</button>
+          <button class="fm-btn" onclick="evtSelectAll(true)" data-i18n="select_all">☑ All</button>
+          <button class="fm-btn" onclick="evtSelectAll(false)" data-i18n="select_none">☐ None</button>
+          <button class="fm-btn" style="color:var(--danger);" onclick="evtDeleteSelected()" id="evt-del-sel-btn" data-i18n="evt_del_sel">🗑 Delete Selected</button>
+          <button class="fm-btn" style="color:var(--danger);" onclick="clearEventLog()" data-i18n="evt_clear_all">🗑 Clear All</button>
         </div>
       </div>
       <div style="padding:6px 12px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:11px;background:rgba(255,255,255,0.02);">
@@ -2222,9 +2297,9 @@ body {
       <div class="panel-header">
         <span class="panel-title" data-i18n="title_registry">Registry Editor</span>
         <div class="panel-actions">
-          <button class="fm-btn" onclick="regRefresh()">↻ Refresh</button>
-          <button class="fm-btn" onclick="regPromptCreateKey()">+ Key</button>
-          <button class="fm-btn" onclick="regPromptCreateValue()">+ Value</button>
+          <button class="fm-btn" onclick="regRefresh()" data-i18n="btn_refresh">↻ Refresh</button>
+          <button class="fm-btn" onclick="regPromptCreateKey()" data-i18n="reg_new_key">+ Key</button>
+          <button class="fm-btn" onclick="regPromptCreateValue()" data-i18n="reg_new_value">+ Value</button>
         </div>
       </div>
       <div id="reg-breadcrumb" style="padding:8px 16px; font-size:12px; border-bottom:1px solid var(--border); display:flex; gap:4px; align-items:center; flex-wrap:wrap;"></div>
@@ -2237,13 +2312,13 @@ body {
     <!-- Registry value edit modal -->
     <div id="reg-edit-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.6); z-index:1000; justify-content:center; align-items:center;">
       <div style="background:var(--card); border:1px solid var(--border); border-radius:8px; padding:20px; width:400px; max-width:90vw;">
-        <div style="font-size:14px; font-weight:600; margin-bottom:12px;" id="reg-modal-title">Edit Value</div>
+        <div style="font-size:14px; font-weight:600; margin-bottom:12px;" id="reg-modal-title" data-i18n="reg_edit_value">Edit Value</div>
         <div class="form-group" style="margin-bottom:10px;">
-          <label class="form-label">Name</label>
-          <input class="form-input" id="reg-edit-name" placeholder="Value name" />
+          <label class="form-label" data-i18n="reg_name">Name</label>
+          <input class="form-input" id="reg-edit-name" data-i18n-ph="reg_name_ph" placeholder="Value name" />
         </div>
         <div class="form-group" style="margin-bottom:10px;">
-          <label class="form-label">Type</label>
+          <label class="form-label" data-i18n="reg_type">Type</label>
           <select class="form-input" id="reg-edit-type">
             <option value="REG_SZ">REG_SZ (String)</option>
             <option value="REG_EXPAND_SZ">REG_EXPAND_SZ</option>
@@ -2254,12 +2329,12 @@ body {
           </select>
         </div>
         <div class="form-group" style="margin-bottom:12px;">
-          <label class="form-label">Data</label>
+          <label class="form-label" data-i18n="reg_data">Data</label>
           <textarea class="form-input" id="reg-edit-data" rows="3" style="resize:vertical;"></textarea>
         </div>
         <div style="display:flex; gap:8px; justify-content:flex-end;">
-          <button class="fm-btn" onclick="regCloseModal()">Cancel</button>
-          <button class="fm-btn" onclick="regSaveValue()" style="background:var(--accent);color:var(--bg);font-weight:600;">Save</button>
+          <button class="fm-btn" onclick="regCloseModal()" data-i18n="cancel">Cancel</button>
+          <button class="fm-btn" onclick="regSaveValue()" style="background:var(--accent);color:var(--bg);font-weight:600;" data-i18n="save">Save</button>
         </div>
       </div>
     </div>
@@ -2278,26 +2353,26 @@ body {
 
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Server (same as page address)</label>
-        <input class="form-input" id="in-server" placeholder="IP or hostname" />
+        <label class="form-label" data-i18n="modal_server">Server (same as page address)</label>
+        <input class="form-input" id="in-server" data-i18n-ph="modal_server_ph" placeholder="IP or hostname" />
       </div>
       <div class="form-group" style="max-width:90px;">
-        <label class="form-label">Port</label>
-        <input class="form-input" id="in-port" placeholder="80" title="80 via nginx; 8080 = direct (use if connection fails)" />
+        <label class="form-label" data-i18n="modal_port">Port</label>
+        <input class="form-input" id="in-port" placeholder="80" data-i18n-title="modal_port_title" title="80 via nginx; 8080 = direct (use if connection fails)" />
       </div>
     </div>
-    <div style="font-size:11px;color:var(--muted);margin-top:-6px;margin-bottom:10px;">If you see “Sec-WebSocket-Key” or “HTTP/1.0” in server logs: set Port to <b>8080</b>, then on the server run <code style="font-size:10px;">ufw allow 8080/tcp && ufw reload</code>.</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:-6px;margin-bottom:10px;" data-i18n-html="modal_port_hint">If you see “Sec-WebSocket-Key” or “HTTP/1.0” in server logs: set Port to <b>8080</b>, then on the server run <code style="font-size:10px;">ufw allow 8080/tcp && ufw reload</code>.</div>
     <div class="form-group">
-      <label class="form-label">Room Token</label>
+      <label class="form-label" data-i18n="modal_token">Room Token</label>
       <input class="form-input" id="in-token" placeholder="my-room-token-123" />
     </div>
     <div class="form-group">
-      <label class="form-label">Password</label>
-      <input class="form-input" id="in-pass" type="password" placeholder="Optional room password" />
+      <label class="form-label" data-i18n="modal_password">Password</label>
+      <input class="form-input" id="in-pass" type="password" data-i18n-ph="modal_password_ph" placeholder="Optional room password" />
     </div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
       <input type="checkbox" id="in-ssl" />
-      <label for="in-ssl" style="font-size:12px;color:var(--muted);">Use WSS (SSL)</label>
+      <label for="in-ssl" style="font-size:12px;color:var(--muted);" data-i18n="modal_use_wss">Use WSS (SSL)</label>
     </div>
 
     <!-- Operator login: separate from the room-token/password above (that
@@ -2502,6 +2577,30 @@ const I18N = {
     clients_list_title: 'Connected Clients',
     msg_stop_stream_first: 'Stop streaming first — file transfer and stream share bandwidth',
     msg_disconnected_server: 'Disconnected from server',
+    // Event log filters
+    evt_all_levels: 'All Levels', evt_lvl_error: 'Error', evt_lvl_warn: 'Warning', evt_lvl_info: 'Information',
+    evt_max_title: 'Max entries', evt_filter_ph: '🔍 Filter...',
+    evt_from_title: 'From date/time', evt_to_title: 'To date/time',
+    evt_1h: '1h', evt_24h: '24h', evt_7d: '7d',
+    evt_last_hour: 'Last hour', evt_last_day: 'Last 24 hours', evt_last_week: 'Last week', evt_clear_dates: 'Clear dates',
+    btn_refresh: '↻ Refresh', btn_refresh_short: 'Refresh',
+    select_all: '☑ All', select_none: '☐ None',
+    evt_del_sel: '🗑 Delete Selected', evt_clear_all: '🗑 Clear All',
+    // Registry editor
+    reg_edit_value: 'Edit Value', reg_name: 'Name', reg_name_ph: 'Value name',
+    reg_type: 'Type', reg_data: 'Data',
+    reg_new_key: '+ Key', reg_new_value: '+ Value',
+    cancel: 'Cancel', save: 'Save',
+    // Users
+    users_title: 'Users', users_my_password: '🔑 My password', users_new_user: '+ New user',
+    loading: 'Loading…',
+    // Connect modal
+    modal_server: 'Server (same as page address)', modal_server_ph: 'IP or hostname',
+    modal_port: 'Port', modal_port_title: '80 via nginx; 8080 = direct (use if connection fails)',
+    modal_port_hint: 'If you see “Sec-WebSocket-Key” or “HTTP/1.0” in server logs: set Port to <b>8080</b>, then on the server run <code style="font-size:10px;">ufw allow 8080/tcp && ufw reload</code>.',
+    modal_token: 'Room Token',
+    modal_password: 'Password', modal_password_ph: 'Optional room password',
+    modal_use_wss: 'Use WSS (SSL)',
     msg_connecting: 'Connecting...', msg_conn_failed: 'Connection failed',
     msg_server_token_required: 'Server and token are required',
     msg_waiting_host: 'Waiting for host...', msg_host_online: 'Host is now ONLINE',
@@ -2657,6 +2756,30 @@ const I18N = {
     clients_list_title: 'Подключённые клиенты',
     msg_stop_stream_first: 'Сначала остановите стрим — файлы и стрим делят канал',
     msg_disconnected_server: 'Отключено от сервера',
+    // Event log filters
+    evt_all_levels: 'Все уровни', evt_lvl_error: 'Ошибка', evt_lvl_warn: 'Предупреждение', evt_lvl_info: 'Инфо',
+    evt_max_title: 'Макс. записей', evt_filter_ph: '🔍 Фильтр...',
+    evt_from_title: 'С даты/времени', evt_to_title: 'По дату/время',
+    evt_1h: '1ч', evt_24h: '24ч', evt_7d: '7д',
+    evt_last_hour: 'Последний час', evt_last_day: 'Последние сутки', evt_last_week: 'Последняя неделя', evt_clear_dates: 'Сбросить даты',
+    btn_refresh: '↻ Обновить', btn_refresh_short: 'Обновить',
+    select_all: '☑ Все', select_none: '☐ Ничего',
+    evt_del_sel: '🗑 Удалить выбранное', evt_clear_all: '🗑 Очистить всё',
+    // Registry editor
+    reg_edit_value: 'Изменить значение', reg_name: 'Имя', reg_name_ph: 'Имя значения',
+    reg_type: 'Тип', reg_data: 'Данные',
+    reg_new_key: '+ Ключ', reg_new_value: '+ Значение',
+    cancel: 'Отмена', save: 'Сохранить',
+    // Users
+    users_title: 'Пользователи', users_my_password: '🔑 Мой пароль', users_new_user: '+ Новый пользователь',
+    loading: 'Загрузка…',
+    // Connect modal
+    modal_server: 'Сервер (тот же что в адресе страницы)', modal_server_ph: 'IP или имя хоста',
+    modal_port: 'Порт', modal_port_title: '80 через nginx; 8080 = напрямую (если не соединяется)',
+    modal_port_hint: 'Если в логах сервера видно «Sec-WebSocket-Key» или «HTTP/1.0»: укажи порт <b>8080</b>, затем на сервере: <code style="font-size:10px;">ufw allow 8080/tcp && ufw reload</code>.',
+    modal_token: 'Токен комнаты',
+    modal_password: 'Пароль', modal_password_ph: 'Пароль комнаты (необязательно)',
+    modal_use_wss: 'WSS (SSL)',
     msg_connecting: 'Подключение...', msg_conn_failed: 'Сбой подключения',
     msg_server_token_required: 'Сервер и токен обязательны',
     msg_waiting_host: 'Ожидание хоста...', msg_host_online: 'Хост ОНЛАЙН',
@@ -2811,6 +2934,30 @@ const I18N = {
     clients_list_title: 'Qoşulmuş müştərilər',
     msg_stop_stream_first: 'Əvvəlcə axını dayandırın — fayllar və axın kanalı bölüşür',
     msg_disconnected_server: 'Serverdən ayrıldı',
+    // Event log filters
+    evt_all_levels: 'Bütün səviyyələr', evt_lvl_error: 'Xəta', evt_lvl_warn: 'Xəbərdarlıq', evt_lvl_info: 'Məlumat',
+    evt_max_title: 'Maks. qeyd sayı', evt_filter_ph: '🔍 Filtr...',
+    evt_from_title: 'Başlanğıc tarixi/vaxtı', evt_to_title: 'Son tarix/vaxt',
+    evt_1h: '1s', evt_24h: '24s', evt_7d: '7g',
+    evt_last_hour: 'Son saat', evt_last_day: 'Son 24 saat', evt_last_week: 'Son həftə', evt_clear_dates: 'Tarixləri sıfırla',
+    btn_refresh: '↻ Yenilə', btn_refresh_short: 'Yenilə',
+    select_all: '☑ Hamısı', select_none: '☐ Heç biri',
+    evt_del_sel: '🗑 Seçiləni sil', evt_clear_all: '🗑 Hamısını sil',
+    // Registry editor
+    reg_edit_value: 'Dəyəri redaktə et', reg_name: 'Ad', reg_name_ph: 'Dəyər adı',
+    reg_type: 'Tip', reg_data: 'Data',
+    reg_new_key: '+ Açar', reg_new_value: '+ Dəyər',
+    cancel: 'Ləğv et', save: 'Saxla',
+    // Users
+    users_title: 'İstifadəçilər', users_my_password: '🔑 Mənim şifrəm', users_new_user: '+ Yeni istifadəçi',
+    loading: 'Yüklənir…',
+    // Connect modal
+    modal_server: 'Server (səhifə ünvanı ilə eyni)', modal_server_ph: 'IP və ya host adı',
+    modal_port: 'Port', modal_port_title: '80 nginx vasitəsilə; 8080 = birbaşa (əlaqə alınmırsa)',
+    modal_port_hint: 'Server loqlarında «Sec-WebSocket-Key» və ya «HTTP/1.0» görsəniz: Port-u <b>8080</b>-ə keçirin, sonra serverdə: <code style="font-size:10px;">ufw allow 8080/tcp && ufw reload</code>.',
+    modal_token: 'Otaq tokeni',
+    modal_password: 'Şifrə', modal_password_ph: 'Otaq şifrəsi (opsional)',
+    modal_use_wss: 'WSS (SSL)',
     msg_connecting: 'Qoşulur...', msg_conn_failed: 'Qoşulma uğursuz',
     msg_server_token_required: 'Server və token tələb olunur',
     msg_waiting_host: 'Host gözlənilir...', msg_host_online: 'Host ONLAYN',
