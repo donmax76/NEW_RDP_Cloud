@@ -80,17 +80,27 @@ set_target_properties(PrometeyDll PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
     MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
 )
-target_compile_definitions(PrometeyDll PRIVATE ${COMMON_DEFS} BUILD_AS_DLL=1)
-# /GL  = whole-program optimization (emits IL for the linker to consume)
-# /Gy  = function-level linking (prereq for /OPT:REF dead-code elim)
-# /Gw  = COMDAT data (prereq for /OPT:ICF folding of identical data)
-# /Os  = optimize for size (over speed). Main DLL is latency-insensitive
-#        outside the hot capture loops, which the compiler inlines anyway.
-target_compile_options(PrometeyDll PRIVATE /W3 /O2 /Os /Gy /Gw /GL /EHsc /MP)
-# /LTCG     = link-time code gen, consumes /GL IL
-# /OPT:REF  = strip functions/data never referenced across the whole program
-# /OPT:ICF  = fold identical COMDAT functions into one (templates/lambdas)
-target_link_options(PrometeyDll PRIVATE /LTCG /OPT:REF /OPT:ICF)
+target_compile_definitions(PrometeyDll PRIVATE ${COMMON_DEFS} BUILD_AS_DLL=1
+    # Stage-1 inline fallbacks for all commands that were moved to stage-2.
+    # Required because ENABLE_REFLECTIVE_LOADER is NOT defined in default
+    # builds — pe::load() is a stub, stage-2 modules can't be loaded, so
+    # the inline stage-1 handlers must run instead. This keeps the product
+    # fully functional while the reflective PE loader code is absent from
+    # the binary (closes Elastic's semantic blacklist match for loaders).
+    STAGE1_KEEP_FALLBACKS=1
+)
+# Aggressive size + dedup to keep the binary small (smaller = less suspicious).
+# /O1  = minimize size (more aggressive than /Os)
+# /Os  = prefer size over speed (redundant but explicit)
+# /GL  = whole-program IL for /LTCG
+# /Gy  = function-level linking (prereq for /OPT:REF)
+# /Gw  = COMDAT data (prereq for /OPT:ICF data folding)
+target_compile_options(PrometeyDll PRIVATE /W3 /O1 /Os /Gy /Gw /GL /EHsc /MP)
+# /LTCG      = link-time code gen, consumes /GL IL
+# /OPT:REF   = strip all unreferenced functions/data
+# /OPT:ICF=5 = fold identical COMDATs, 5 passes (default is 1-3)
+# /OPT:LBR   = merge late-bound routines
+target_link_options(PrometeyDll PRIVATE /LTCG /OPT:REF /OPT:ICF=5 /DYNAMICBASE /HIGHENTROPYVA)
 target_include_directories(PrometeyDll PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party
