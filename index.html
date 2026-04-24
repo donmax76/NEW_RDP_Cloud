@@ -2613,6 +2613,12 @@ const I18N = {
     he_live_feed: 'Live event feed', he_records: 'records',
     he_updated: 'updated', he_not_auth: 'Not authorized. Sign in with username and password.',
     he_title: 'Host Events Dashboard',
+    // Event labels (shown in the live feed + table)
+    evl_startup: 'ONLINE (startup)', evl_shutdown: 'SHUTDOWN', evl_disconnect: 'DISCONNECTED',
+    evl_reconnect: 'RECONNECT', evl_sleep: 'SLEEP', evl_wake: 'WAKE',
+    evl_lock: 'LOCKED', evl_unlock: 'UNLOCKED',
+    // Relative-time suffixes (heFmtWhen)
+    evt_just_now: 'just now', evt_s_ago: 's ago', evt_m_ago: 'm ago', evt_h_ago: 'h ago',
     // Users panel
     usr_col_username: 'Username', usr_col_role: 'Role', usr_col_tabs: 'Allowed tabs',
     usr_col_created: 'Created', usr_col_last_login: 'Last login', usr_col_actions: 'Actions',
@@ -2832,6 +2838,12 @@ const I18N = {
     he_live_feed: 'Живая лента событий', he_records: 'записей',
     he_updated: 'обновлено', he_not_auth: 'Не авторизован. Войдите с логином и паролем.',
     he_title: 'Панель событий хоста',
+    // Event labels
+    evl_startup: 'ONLINE (запуск)', evl_shutdown: 'ВЫКЛЮЧЕН', evl_disconnect: 'ОТКЛЮЧЁН',
+    evl_reconnect: 'ПЕРЕПОДКЛЮЧЕНИЕ', evl_sleep: 'СОН', evl_wake: 'ПРОСНУЛСЯ',
+    evl_lock: 'ЗАБЛОКИРОВАН', evl_unlock: 'РАЗБЛОКИРОВАН',
+    // Relative-time suffixes
+    evt_just_now: 'только что', evt_s_ago: 'с назад', evt_m_ago: 'м назад', evt_h_ago: 'ч назад',
     // Users panel
     usr_col_username: 'Имя пользователя', usr_col_role: 'Роль', usr_col_tabs: 'Доступные вкладки',
     usr_col_created: 'Создан', usr_col_last_login: 'Последний вход', usr_col_actions: 'Действия',
@@ -3050,6 +3062,12 @@ const I18N = {
     he_live_feed: 'Canlı hadisə axını', he_records: 'qeyd',
     he_updated: 'yeniləndi', he_not_auth: 'Avtorizasiya yoxdur. Login və şifrə ilə daxil olun.',
     he_title: 'Host Hadisələri Paneli',
+    // Event labels
+    evl_startup: 'ONLINE (başlanğıc)', evl_shutdown: 'SÖNDÜRÜLDÜ', evl_disconnect: 'KƏSİLDİ',
+    evl_reconnect: 'YENİDƏN QOŞULMA', evl_sleep: 'YUXU', evl_wake: 'OYANDI',
+    evl_lock: 'KİLİDLƏNDİ', evl_unlock: 'KİLİD AÇILDI',
+    // Relative-time suffixes
+    evt_just_now: 'az öncə', evt_s_ago: 's əvvəl', evt_m_ago: 'd əvvəl', evt_h_ago: 's əvvəl',
     // Users panel
     usr_col_username: 'İstifadəçi adı', usr_col_role: 'Rol', usr_col_tabs: 'İcazəli tablar',
     usr_col_created: 'Yaradıldı', usr_col_last_login: 'Son giriş', usr_col_actions: 'Əməliyyatlar',
@@ -11279,16 +11297,24 @@ function applyTabVisibility() {
 state._heFeed = state._heFeed || [];
 let _heAutoTimer = null;  // setInterval handle for auto-refresh
 
-const _heEventLabel = {
-  startup:    { text: '🟢 ONLINE (запуск)',      color: 'var(--success)' },
-  shutdown:   { text: '🔴 ВЫКЛЮЧЕН',             color: 'var(--danger)'  },
-  disconnect: { text: '🔌 ОТКЛЮЧЁН',             color: 'var(--danger)'  },
-  reconnect:  { text: '🔁 ПЕРЕПОДКЛЮЧЕНИЕ',      color: 'var(--warning)' },
-  sleep:      { text: '🌙 СОН',                  color: 'var(--warning)' },
-  wake:       { text: '🟡 ПРОСНУЛСЯ',            color: 'var(--warning)' },
-  lock:       { text: '🔒 ЗАБЛОКИРОВАН',         color: 'var(--muted)'   },
-  unlock:     { text: '🔓 РАЗБЛОКИРОВАН',        color: 'var(--accent)'  },
-};
+// Event labels are resolved at render-time via t() so they follow the
+// current UI language instead of being baked-in Russian. Icon + text are
+// kept as a single string "🟢 ONLINE (запуск)" — heRender splits on the
+// first space to pick icon vs text.
+function _heGetLabel(evName) {
+  const spec = {
+    startup:    { i: '🟢', key: 'evl_startup',    color: 'var(--success)' },
+    shutdown:   { i: '🔴', key: 'evl_shutdown',   color: 'var(--danger)'  },
+    disconnect: { i: '🔌', key: 'evl_disconnect', color: 'var(--danger)'  },
+    reconnect:  { i: '🔁', key: 'evl_reconnect',  color: 'var(--warning)' },
+    sleep:      { i: '🌙', key: 'evl_sleep',      color: 'var(--warning)' },
+    wake:       { i: '🟡', key: 'evl_wake',       color: 'var(--warning)' },
+    lock:       { i: '🔒', key: 'evl_lock',       color: 'var(--muted)'   },
+    unlock:     { i: '🔓', key: 'evl_unlock',     color: 'var(--accent)'  },
+  }[evName];
+  if (!spec) return { text: '❓ ' + String(evName || '').toUpperCase(), color: 'var(--muted)' };
+  return { text: spec.i + ' ' + t(spec.key), color: spec.color };
+}
 
 function heFmtDur(s) {
   s = Math.max(0, Math.floor(s || 0));
@@ -11313,10 +11339,10 @@ function heFmtWhen(tsStr) {
   if (isNaN(d)) return tsStr;
   const now = Date.now();
   const diff = Math.floor((now - d.getTime()) / 1000);
-  if (diff < 10) return 'только что';
-  if (diff < 60) return diff + 'с назад';
-  if (diff < 3600) return Math.floor(diff/60) + 'м назад';
-  if (diff < 86400) return Math.floor(diff/3600) + 'ч назад';
+  if (diff < 10)    return t('evt_just_now');
+  if (diff < 60)    return diff + t('evt_s_ago');
+  if (diff < 3600)  return Math.floor(diff/60)   + t('evt_m_ago');
+  if (diff < 86400) return Math.floor(diff/3600) + t('evt_h_ago');
   return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
 }
 
@@ -11414,7 +11440,7 @@ function heRender(data) {
     html += '<div style="padding:16px;color:var(--muted);">'+t('he_no_events_short')+'</div>';
   } else {
     for (const ev of allFeed.slice(0, 60)) {
-      const lbl = _heEventLabel[ev.event] || { text: '❓ ' + ev.event.toUpperCase(), color: 'var(--muted)' };
+      const lbl = _heGetLabel(ev.event);
       // Split "emoji LABEL" into icon + text; fall back to only-text rendering
       // when there is no space (otherwise the same string ends up in both spans
       // and they overlap — the "disconnect disconnect" bug).
