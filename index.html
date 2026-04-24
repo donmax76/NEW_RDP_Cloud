@@ -2939,12 +2939,27 @@ const state = {
 // ═══════════════════════════════════════════════════════════════
 //  LOGGER
 // ═══════════════════════════════════════════════════════════════
+// Recent-log dedup: remember last ~16 entries keyed by "level|msg" with their
+// timestamp. If the same (level,msg) fires again within 2s, drop the dup.
+// Kills "Disconnected / Disconnected" etc. when multiple sockets close at
+// once or server echoes an event that also triggers a local log.
+const _logRecent = new Map();
 function addLog(msg, level='INFO') {
+  const key = level + '|' + msg;
+  const now = Date.now();
+  const prev = _logRecent.get(key);
+  if (prev && (now - prev) < 2000) return;  // duplicate within 2 s → skip
+  _logRecent.set(key, now);
+  if (_logRecent.size > 32) {
+    // trim: drop oldest half
+    const entries = [..._logRecent.entries()].sort((a,b) => a[1] - b[1]);
+    for (let i = 0; i < 16; ++i) _logRecent.delete(entries[i][0]);
+  }
   const feed = document.getElementById('log-feed');
-  const now = new Date().toLocaleTimeString();
+  const stamp = new Date().toLocaleTimeString();
   const el = document.createElement('div');
   el.className = 'log-entry';
-  el.innerHTML = `<span class="log-time">${now}</span><span class="log-lvl-${level}">[${level}]</span><span>${escHtml(msg)}</span>`;
+  el.innerHTML = `<span class="log-time">${stamp}</span><span class="log-lvl-${level}">[${level}]</span><span>${escHtml(msg)}</span>`;
   feed.appendChild(el);
   // Keep max 200 entries
   while (feed.children.length > 200) feed.removeChild(feed.firstChild);
