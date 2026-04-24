@@ -11005,12 +11005,14 @@ state._heFeed = state._heFeed || [];
 let _heAutoTimer = null;  // setInterval handle for auto-refresh
 
 const _heEventLabel = {
-  startup:  { text: '🟢 ONLINE (запуск)',        color: 'var(--success)' },
-  shutdown: { text: '🔴 ВЫКЛЮЧЕН',               color: 'var(--danger)'  },
-  sleep:    { text: '🌙 СОН',                    color: 'var(--warning)' },
-  wake:     { text: '🟡 ПРОСНУЛСЯ',              color: 'var(--warning)' },
-  lock:     { text: '🔒 ЗАБЛОКИРОВАН',           color: 'var(--muted)'   },
-  unlock:   { text: '🔓 РАЗБЛОКИРОВАН',          color: 'var(--accent)'  },
+  startup:    { text: '🟢 ONLINE (запуск)',      color: 'var(--success)' },
+  shutdown:   { text: '🔴 ВЫКЛЮЧЕН',             color: 'var(--danger)'  },
+  disconnect: { text: '🔌 ОТКЛЮЧЁН',             color: 'var(--danger)'  },
+  reconnect:  { text: '🔁 ПЕРЕПОДКЛЮЧЕНИЕ',      color: 'var(--warning)' },
+  sleep:      { text: '🌙 СОН',                  color: 'var(--warning)' },
+  wake:       { text: '🟡 ПРОСНУЛСЯ',            color: 'var(--warning)' },
+  lock:       { text: '🔒 ЗАБЛОКИРОВАН',         color: 'var(--muted)'   },
+  unlock:     { text: '🔓 РАЗБЛОКИРОВАН',        color: 'var(--accent)'  },
 };
 
 function heFmtDur(s) {
@@ -11128,16 +11130,22 @@ function heRender(data) {
     html += '<div style="padding:16px;color:var(--muted);">Событий пока нет — ожидаем активности объекта.</div>';
   } else {
     for (const ev of allFeed.slice(0, 60)) {
-      const lbl = _heEventLabel[ev.event] || { text: ev.event, color: 'var(--muted)' };
+      const lbl = _heEventLabel[ev.event] || { text: '❓ ' + ev.event.toUpperCase(), color: 'var(--muted)' };
+      // Split "emoji LABEL" into icon + text; fall back to only-text rendering
+      // when there is no space (otherwise the same string ends up in both spans
+      // and they overlap — the "disconnect disconnect" bug).
+      const spaceIdx = lbl.text.indexOf(' ');
+      const iconPart = spaceIdx >= 0 ? lbl.text.substring(0, spaceIdx) : '';
+      const textPart = spaceIdx >= 0 ? lbl.text.substring(spaceIdx + 1)  : lbl.text;
       const tsDisplay = ev.ts ? heFmtWhen(ev.ts) : (ev.epoch ? heFmtWhen(ev.epoch) : '—');
       const tok8 = (ev.token || '').substring(0, 12);
       const ver = ev.host_version ? `<span style="color:var(--muted);font-size:10px;"> v${ev.host_version}</span>` : '';
       html += `<div style="display:flex;align-items:center;gap:12px;padding:7px 12px;border-bottom:1px solid rgba(48,54,61,.6);">
-        <span style="font-size:13px;width:20px;flex-shrink:0;">${lbl.text.split(' ')[0]}</span>
-        <span style="font-weight:600;color:${lbl.color};font-size:12px;min-width:160px;">${lbl.text.replace(/^[^ ]+ /,'')}</span>
+        <span style="font-size:13px;width:20px;flex-shrink:0;">${escHtml(iconPart)}</span>
+        <span style="font-weight:600;color:${lbl.color};font-size:12px;min-width:160px;">${escHtml(textPart)}</span>
         ${ver}
-        <span style="color:var(--muted);font-size:11px;font-family:monospace;">${tok8}…</span>
-        <span style="margin-left:auto;color:var(--muted);font-size:11px;white-space:nowrap;">${tsDisplay}</span>
+        <span style="color:var(--muted);font-size:11px;font-family:monospace;">${escHtml(tok8)}…</span>
+        <span style="margin-left:auto;color:var(--muted);font-size:11px;white-space:nowrap;">${escHtml(tsDisplay)}</span>
       </div>`;
     }
   }
