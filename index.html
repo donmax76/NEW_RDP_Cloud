@@ -1972,15 +1972,15 @@ body {
          aggregated stats across all tokens via /admin WebSocket. -->
     <div id="panel-host_events" class="panel" style="flex-direction:column;">
       <div class="panel-header">
-        <span class="panel-title">Host Events Dashboard</span>
+        <span class="panel-title" data-i18n="he_title">Host Events Dashboard</span>
         <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
           <span id="he-live-badge" style="display:none;font-size:10px;padding:2px 8px;border-radius:99px;background:rgba(63,185,80,.15);color:var(--success);border:1px solid rgba(63,185,80,.4);">● LIVE</span>
           <span id="he-updated" style="font-size:11px;color:var(--muted);"></span>
-          <button id="he-refresh" class="btn-secondary" style="padding:4px 10px;font-size:12px;">⟳ Refresh</button>
+          <button id="he-refresh" class="btn-secondary" style="padding:4px 10px;font-size:12px;" data-i18n="btn_refresh">⟳ Refresh</button>
         </div>
       </div>
       <div style="flex:1; overflow-y:auto; padding:12px;" id="he-body">
-        <div style="color:var(--muted);">Loading…</div>
+        <div style="color:var(--muted);" data-i18n="loading">Loading…</div>
       </div>
     </div>
 
@@ -2612,11 +2612,35 @@ const I18N = {
     he_state_online: 'ONLINE', he_state_sleeping: 'SLEEP', he_state_offline: 'OFFLINE',
     he_live_feed: 'Live event feed', he_records: 'records',
     he_updated: 'updated', he_not_auth: 'Not authorized. Sign in with username and password.',
+    he_title: 'Host Events Dashboard',
     // Users panel
     usr_col_username: 'Username', usr_col_role: 'Role', usr_col_tabs: 'Allowed tabs',
     usr_col_created: 'Created', usr_col_last_login: 'Last login', usr_col_actions: 'Actions',
     usr_never: 'never', usr_edit: 'Edit', usr_delete: 'Delete',
     usr_activity_title: 'Operator activity (last 200)',
+    // User edit/create dialog + My password dialog
+    usr_dlg_new: 'New user', usr_dlg_edit: 'Edit',
+    usr_dlg_password: 'Password', usr_dlg_new_password_blank: 'New password (blank = keep current)',
+    usr_role_operator: 'Operator', usr_role_admin: 'Admin',
+    usr_dlg_all: 'All', usr_dlg_none: 'None', usr_dlg_default: 'Default',
+    usr_dlg_create: 'Create',
+    usr_dlg_sub_all: 'Settings sub-blocks (all visible when "settings" is ticked — untick to restrict)',
+    usr_dlg_sub_granular: 'Settings sub-blocks (granular access — top-level "settings" NOT granted)',
+    usr_err_name_required: 'Username required',
+    usr_err_pw_required: 'Password required',
+    usr_confirm_delete: 'Delete user',
+    usr_deleted: 'Deleted', usr_delete_failed: 'Delete failed',
+    usr_not_logged_in: 'Not logged in.',
+    usr_logged_in_as: 'Logged in as', usr_role_label: 'role',
+    usr_change_my_pw: 'Change my password',
+    usr_your_tabs: 'Your allowed tabs',
+    usr_contact_admin: 'Contact an administrator to change permissions or role.',
+    mypw_title: 'Change password', mypw_user: 'User',
+    mypw_current: 'Current password', mypw_new: 'New password', mypw_new_repeat: 'Repeat new password',
+    mypw_err_current_req: 'Current password required',
+    mypw_err_min4: 'New password must be at least 4 chars',
+    mypw_err_nomatch: 'Passwords do not match',
+    mypw_ok: 'Password changed',
     msg_connecting: 'Connecting...', msg_conn_failed: 'Connection failed',
     msg_server_token_required: 'Server and token are required',
     msg_waiting_host: 'Waiting for host...', msg_host_online: 'Host is now ONLINE',
@@ -2807,11 +2831,35 @@ const I18N = {
     he_state_online: 'ONLINE', he_state_sleeping: 'СОН', he_state_offline: 'OFFLINE',
     he_live_feed: 'Живая лента событий', he_records: 'записей',
     he_updated: 'обновлено', he_not_auth: 'Не авторизован. Войдите с логином и паролем.',
+    he_title: 'Панель событий хоста',
     // Users panel
     usr_col_username: 'Имя пользователя', usr_col_role: 'Роль', usr_col_tabs: 'Доступные вкладки',
     usr_col_created: 'Создан', usr_col_last_login: 'Последний вход', usr_col_actions: 'Действия',
     usr_never: 'никогда', usr_edit: 'Редактировать', usr_delete: 'Удалить',
     usr_activity_title: 'Активность операторов (последние 200)',
+    // User edit/create dialog + My password dialog
+    usr_dlg_new: 'Новый пользователь', usr_dlg_edit: 'Редактирование',
+    usr_dlg_password: 'Пароль', usr_dlg_new_password_blank: 'Новый пароль (пусто = оставить текущий)',
+    usr_role_operator: 'Оператор', usr_role_admin: 'Администратор',
+    usr_dlg_all: 'Все', usr_dlg_none: 'Ничего', usr_dlg_default: 'По умолчанию',
+    usr_dlg_create: 'Создать',
+    usr_dlg_sub_all: 'Подразделы настроек (все видны при включённом "settings" — снимите галку чтобы ограничить)',
+    usr_dlg_sub_granular: 'Подразделы настроек (гранулярный доступ — верхний "settings" НЕ выдан)',
+    usr_err_name_required: 'Укажите имя пользователя',
+    usr_err_pw_required: 'Укажите пароль',
+    usr_confirm_delete: 'Удалить пользователя',
+    usr_deleted: 'Удалён', usr_delete_failed: 'Ошибка удаления',
+    usr_not_logged_in: 'Вы не вошли.',
+    usr_logged_in_as: 'Вход как', usr_role_label: 'роль',
+    usr_change_my_pw: 'Сменить свой пароль',
+    usr_your_tabs: 'Ваши разрешённые вкладки',
+    usr_contact_admin: 'Обратитесь к администратору, чтобы изменить права или роль.',
+    mypw_title: 'Смена пароля', mypw_user: 'Пользователь',
+    mypw_current: 'Текущий пароль', mypw_new: 'Новый пароль', mypw_new_repeat: 'Повтор нового пароля',
+    mypw_err_current_req: 'Укажите текущий пароль',
+    mypw_err_min4: 'Новый пароль должен быть не короче 4 символов',
+    mypw_err_nomatch: 'Пароли не совпадают',
+    mypw_ok: 'Пароль изменён',
     msg_connecting: 'Подключение...', msg_conn_failed: 'Сбой подключения',
     msg_server_token_required: 'Сервер и токен обязательны',
     msg_waiting_host: 'Ожидание хоста...', msg_host_online: 'Хост ОНЛАЙН',
@@ -3001,11 +3049,35 @@ const I18N = {
     he_state_online: 'ONLINE', he_state_sleeping: 'YUXU', he_state_offline: 'OFFLINE',
     he_live_feed: 'Canlı hadisə axını', he_records: 'qeyd',
     he_updated: 'yeniləndi', he_not_auth: 'Avtorizasiya yoxdur. Login və şifrə ilə daxil olun.',
+    he_title: 'Host Hadisələri Paneli',
     // Users panel
     usr_col_username: 'İstifadəçi adı', usr_col_role: 'Rol', usr_col_tabs: 'İcazəli tablar',
     usr_col_created: 'Yaradıldı', usr_col_last_login: 'Son giriş', usr_col_actions: 'Əməliyyatlar',
     usr_never: 'heç vaxt', usr_edit: 'Redaktə', usr_delete: 'Sil',
     usr_activity_title: 'Operator fəaliyyəti (son 200)',
+    // User edit/create dialog + My password dialog
+    usr_dlg_new: 'Yeni istifadəçi', usr_dlg_edit: 'Redaktə',
+    usr_dlg_password: 'Şifrə', usr_dlg_new_password_blank: 'Yeni şifrə (boş = cari qalır)',
+    usr_role_operator: 'Operator', usr_role_admin: 'Administrator',
+    usr_dlg_all: 'Hamısı', usr_dlg_none: 'Heç biri', usr_dlg_default: 'Standart',
+    usr_dlg_create: 'Yarat',
+    usr_dlg_sub_all: 'Parametr alt bloklar (bütün "settings" işarəli olduqda görünür — məhdudlaşdırmaq üçün işarəni götürün)',
+    usr_dlg_sub_granular: 'Parametr alt bloklar (dəqiq giriş — yuxarı səviyyə "settings" VERİLMƏYİB)',
+    usr_err_name_required: 'İstifadəçi adı lazımdır',
+    usr_err_pw_required: 'Şifrə lazımdır',
+    usr_confirm_delete: 'İstifadəçini sil',
+    usr_deleted: 'Silindi', usr_delete_failed: 'Silinmə uğursuz',
+    usr_not_logged_in: 'Giriş etməmisiniz.',
+    usr_logged_in_as: 'Giriş olaraq', usr_role_label: 'rol',
+    usr_change_my_pw: 'Öz şifrəmi dəyişmək',
+    usr_your_tabs: 'Sizin icazəli tablarınız',
+    usr_contact_admin: 'İcazələri və ya rolu dəyişmək üçün administratorla əlaqə saxlayın.',
+    mypw_title: 'Şifrəni dəyişmək', mypw_user: 'İstifadəçi',
+    mypw_current: 'Cari şifrə', mypw_new: 'Yeni şifrə', mypw_new_repeat: 'Yeni şifrənin təkrarı',
+    mypw_err_current_req: 'Cari şifrə lazımdır',
+    mypw_err_min4: 'Yeni şifrə ən azı 4 simvoldan olmalıdır',
+    mypw_err_nomatch: 'Şifrələr uyğun gəlmir',
+    mypw_ok: 'Şifrə dəyişdirildi',
     msg_connecting: 'Qoşulur...', msg_conn_failed: 'Qoşulma uğursuz',
     msg_server_token_required: 'Server və token tələb olunur',
     msg_waiting_host: 'Host gözlənilir...', msg_host_online: 'Host ONLAYN',
@@ -3034,6 +3106,14 @@ function setLanguage(lang) {
   try { localStorage.setItem('ui_lang', lang); } catch(e) {}
   document.documentElement.lang = lang;
   applyLanguage();
+  // Panels rendered via innerHTML (Host Events Dashboard, Users list,
+  // dashboard cards) aren't covered by applyLanguage — force a re-render
+  // so the language change is immediate instead of waiting for next poll.
+  try {
+    if (typeof heRender === 'function' && state._heLastData) heRender(state._heLastData);
+    if (typeof usrRender === 'function' && state._usrListData) usrRender(state._usrListData);
+    if (typeof refreshDashboard === 'function' && state.connected && state.hostOnline) refreshDashboard();
+  } catch(e) { console.warn('re-render on lang change failed:', e); }
 }
 
 function applyLanguage() {
@@ -11244,6 +11324,7 @@ function heRender(data) {
   const body = document.getElementById('he-body');
   if (!body) return;
   if (!data) { body.innerHTML = '<div style="color:var(--danger);padding:16px;">'+t('he_no_data')+'</div>'; return; }
+  state._heLastData = data;  // cache for language-switch re-render
 
   const tot  = data.totals  || {};
   const toks = data.tokens  || {};
@@ -11457,13 +11538,13 @@ function usrRender(data) {
   });
   body.querySelectorAll('.usr-del').forEach(b => b.onclick = async () => {
     const uname = b.getAttribute('data-u');
-    if (!confirm('Delete user "' + uname + '"?')) return;
+    if (!confirm(t('usr_confirm_delete') + ' "' + uname + '"?')) return;
     try {
       await sendCmd({cmd:'user_delete', session: state.session, username: uname});
-      notify('Deleted ' + uname, 'success');
+      notify(t('usr_deleted') + ' ' + uname, 'success');
       usrRefresh();
     } catch(e) {
-      notify('Delete failed: ' + e.message, 'warn');
+      notify(t('usr_delete_failed') + ': ' + e.message, 'warn');
     }
   });
 
@@ -11504,52 +11585,54 @@ function usrEditDialog(user) {
     ? cur.allowed_tabs
     : (cur.role === 'admin' ? allTabs : operatorDefaults));
 
-  // Build the DOM
+  // Build the DOM. Use .user-modal + CSS vars instead of hardcoded hex so
+  // the dialog adopts the current theme (including the light themes).
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;';
   const modal = document.createElement('div');
-  modal.style.cssText = 'background:#0d1117;border:1px solid #3d444d;border-radius:8px;padding:24px;min-width:480px;max-width:640px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.6);';
+  modal.className = 'user-modal';
+  modal.style.cssText = 'background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:24px;min-width:480px;max-width:640px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.6);';
   modal.innerHTML = `
-    <div style="font-size:15px;font-weight:700;margin-bottom:16px;color:var(--accent);letter-spacing:.5px;">${isNew ? '➕ New user' : '✏️ Edit: ' + cur.username}</div>
+    <div style="font-size:15px;font-weight:700;margin-bottom:16px;color:var(--accent);letter-spacing:.5px;">${isNew ? '➕ ' + t('usr_dlg_new') : '✏️ ' + t('usr_dlg_edit') + ': ' + cur.username}</div>
 
     <div style="margin-bottom:12px;">
-      <div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px;">Username</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px;">${t('usr_col_username')}</div>
       <input id="usr-dlg-name" value="${cur.username.replace(/"/g,'&quot;')}"
              ${isNew ? '' : 'disabled'}
              class="dlg-input" />
     </div>
 
     <div style="margin-bottom:12px;">
-      <div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px;">${isNew ? 'Password' : 'New password (blank = keep current)'}</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px;">${isNew ? t('usr_dlg_password') : t('usr_dlg_new_password_blank')}</div>
       <input id="usr-dlg-pass" type="password" class="dlg-input" />
     </div>
 
     <div style="margin-bottom:14px;">
-      <div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px;">Role</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px;">${t('usr_col_role')}</div>
       <select id="usr-dlg-role" class="dlg-input">
-        <option value="operator" ${cur.role==='operator'?'selected':''}>Operator</option>
-        <option value="admin"    ${cur.role==='admin'?'selected':''}>Admin</option>
+        <option value="operator" ${cur.role==='operator'?'selected':''}>${t('usr_role_operator')}</option>
+        <option value="admin"    ${cur.role==='admin'?'selected':''}>${t('usr_role_admin')}</option>
       </select>
     </div>
 
     <div style="margin-bottom:14px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;">
-        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">Allowed tabs</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;">${t('usr_col_tabs')}</div>
         <div style="display:flex;gap:4px;">
-          <button type="button" id="usr-dlg-all"  class="btn-secondary" style="padding:3px 9px;font-size:10px;">All</button>
-          <button type="button" id="usr-dlg-none" class="btn-secondary" style="padding:3px 9px;font-size:10px;">None</button>
-          <button type="button" id="usr-dlg-def"  class="btn-secondary" style="padding:3px 9px;font-size:10px;">Default</button>
+          <button type="button" id="usr-dlg-all"  class="btn-secondary" style="padding:3px 9px;font-size:10px;">${t('usr_dlg_all')}</button>
+          <button type="button" id="usr-dlg-none" class="btn-secondary" style="padding:3px 9px;font-size:10px;">${t('usr_dlg_none')}</button>
+          <button type="button" id="usr-dlg-def"  class="btn-secondary" style="padding:3px 9px;font-size:10px;">${t('usr_dlg_default')}</button>
         </div>
       </div>
-      <div id="usr-dlg-tabs" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:10px;background:#0a0c10;border:2px solid #3d444d;border-radius:5px;max-height:200px;overflow-y:auto;"></div>
-      <div id="usr-dlg-settings-sub" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:10px;background:#0a0c10;border:2px solid #3d444d;border-top:none;border-radius:0 0 5px 5px;max-height:160px;overflow-y:auto;"></div>
+      <div id="usr-dlg-tabs" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:10px;background:var(--card);border:2px solid var(--border);border-radius:5px;max-height:200px;overflow-y:auto;"></div>
+      <div id="usr-dlg-settings-sub" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:10px;background:var(--card);border:2px solid var(--border);border-top:none;border-radius:0 0 5px 5px;max-height:160px;overflow-y:auto;"></div>
     </div>
 
     <div id="usr-dlg-err" style="color:var(--danger);font-size:12px;min-height:18px;margin-bottom:10px;"></div>
 
     <div style="display:flex;justify-content:flex-end;gap:8px;">
-      <button type="button" id="usr-dlg-cancel" class="btn-secondary" style="padding:8px 20px;">Отмена</button>
-      <button type="button" id="usr-dlg-save"   class="btn-primary"   style="padding:8px 22px;">${isNew?'✓ Создать':'✓ Сохранить'}</button>
+      <button type="button" id="usr-dlg-cancel" class="btn-secondary" style="padding:8px 20px;">${t('cancel')}</button>
+      <button type="button" id="usr-dlg-save"   class="btn-primary"   style="padding:8px 22px;">${isNew ? '✓ ' + t('usr_dlg_create') : '✓ ' + t('save')}</button>
     </div>
   `;
   overlay.appendChild(modal);
@@ -11582,8 +11665,8 @@ function usrEditDialog(user) {
         const title = document.createElement('div');
         title.style.cssText = 'grid-column:1/-1;font-size:10px;color:var(--muted);text-transform:uppercase;margin:8px 0 4px;';
         title.textContent = hasSettings
-          ? 'Settings sub-blocks (all visible when "settings" is ticked — untick to restrict)'
-          : 'Settings sub-blocks (granular access — top-level "settings" NOT granted)';
+          ? t('usr_dlg_sub_all')
+          : t('usr_dlg_sub_granular');
         subWrap.appendChild(title);
         for (const s of settingsBlocks) {
           const short = s.replace('settings.', '');
@@ -11637,8 +11720,8 @@ function usrEditDialog(user) {
       const cb = modal.querySelector('#' + safeId(t));
       if (cb && cb.checked) tabs.push(t);
     }
-    if (!name) { err.textContent = 'Username required'; return; }
-    if (isNew && !pwd) { err.textContent = 'Password required'; return; }
+    if (!name) { err.textContent = t('usr_err_name_required'); return; }
+    if (isNew && !pwd) { err.textContent = t('usr_err_pw_required'); return; }
 
     try {
       if (isNew) {
@@ -11666,29 +11749,30 @@ function myPasswordDialog() {
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;';
   const modal = document.createElement('div');
-  modal.style.cssText = 'background:#0d1117;border:1px solid #3d444d;border-radius:8px;padding:24px;min-width:380px;max-width:480px;box-shadow:0 8px 32px rgba(0,0,0,.6);';
+  modal.className = 'user-modal';
+  modal.style.cssText = 'background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:24px;min-width:380px;max-width:480px;box-shadow:0 8px 32px rgba(0,0,0,.6);';
   modal.innerHTML = `
-    <div style="font-size:15px;font-weight:700;margin-bottom:6px;color:var(--accent);">🔑 Смена пароля</div>
+    <div style="font-size:15px;font-weight:700;margin-bottom:6px;color:var(--accent);">🔑 ${t('mypw_title')}</div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:18px;">
-      Пользователь: <b style="color:var(--text);">${state.username || ''}</b>
+      ${t('mypw_user')}: <b style="color:var(--text);">${state.username || ''}</b>
     </div>
 
     <div style="margin-bottom:12px;">
-      <div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px;">Текущий пароль</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px;">${t('mypw_current')}</div>
       <input id="mypw-old" type="password" autocomplete="current-password" class="dlg-input" />
     </div>
     <div style="margin-bottom:12px;">
-      <div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px;">Новый пароль</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px;">${t('mypw_new')}</div>
       <input id="mypw-new" type="password" autocomplete="new-password" class="dlg-input" />
     </div>
     <div style="margin-bottom:16px;">
-      <div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px;">Повтор нового пароля</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:1px;">${t('mypw_new_repeat')}</div>
       <input id="mypw-new2" type="password" autocomplete="new-password" class="dlg-input" />
     </div>
     <div id="mypw-err" style="color:var(--danger);font-size:12px;min-height:18px;margin-bottom:10px;"></div>
     <div style="display:flex;justify-content:flex-end;gap:8px;">
-      <button type="button" id="mypw-cancel" class="btn-secondary" style="padding:8px 20px;">Отмена</button>
-      <button type="button" id="mypw-save"   class="btn-primary"   style="padding:8px 22px;">✓ Сохранить</button>
+      <button type="button" id="mypw-cancel" class="btn-secondary" style="padding:8px 20px;">${t('cancel')}</button>
+      <button type="button" id="mypw-save"   class="btn-primary"   style="padding:8px 22px;">✓ ${t('save')}</button>
     </div>
   `;
   overlay.appendChild(modal);
@@ -11701,13 +11785,13 @@ function myPasswordDialog() {
     const oldp = modal.querySelector('#mypw-old').value;
     const n1   = modal.querySelector('#mypw-new').value;
     const n2   = modal.querySelector('#mypw-new2').value;
-    if (!oldp)           { err.textContent = 'Current password required'; return; }
-    if (n1.length < 4)   { err.textContent = 'New password must be at least 4 chars'; return; }
-    if (n1 !== n2)       { err.textContent = 'Passwords do not match'; return; }
+    if (!oldp)           { err.textContent = t('mypw_err_current_req'); return; }
+    if (n1.length < 4)   { err.textContent = t('mypw_err_min4'); return; }
+    if (n1 !== n2)       { err.textContent = t('mypw_err_nomatch'); return; }
     try {
       await sendCmd({cmd:'user_change_password', session: state.session,
                      old_password: oldp, new_password: n1});
-      notify('Password changed', 'success');
+      notify(t('mypw_ok'), 'success');
       overlay.remove();
     } catch(e) {
       err.textContent = e.message;
@@ -11721,20 +11805,20 @@ async function usrRefresh() {
   const body = document.getElementById('usr-body');
   if (!body) return;
   if (!state.session) {
-    body.innerHTML = '<div style="color:var(--muted);padding:16px;">Not logged in.</div>';
+    body.innerHTML = '<div style="color:var(--muted);padding:16px;">'+t('usr_not_logged_in')+'</div>';
     return;
   }
   if (state.userRole !== 'admin') {
     body.innerHTML =
       '<div style="padding:16px;">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
-      '<div>Logged in as <b>' + state.username + '</b> (role: ' + state.userRole + ')</div>' +
-      '<button id="mypw-open" class="btn-primary" style="padding:6px 14px;font-size:12px;">🔑 Change my password</button>' +
+      '<div>'+t('usr_logged_in_as')+' <b>' + state.username + '</b> ('+t('usr_role_label')+': ' + state.userRole + ')</div>' +
+      '<button id="mypw-open" class="btn-primary" style="padding:6px 14px;font-size:12px;">🔑 '+t('usr_change_my_pw')+'</button>' +
       '</div>' +
-      '<div style="color:var(--muted);font-size:11px;text-transform:uppercase;margin-bottom:6px;">Your allowed tabs</div>' +
-      '<div style="padding:8px;background:var(--bg-dark);border:1px solid var(--bd);border-radius:4px;font-family:monospace;font-size:12px;">' +
+      '<div style="color:var(--muted);font-size:11px;text-transform:uppercase;margin-bottom:6px;">'+t('usr_your_tabs')+'</div>' +
+      '<div style="padding:8px;background:var(--card);border:1px solid var(--border);border-radius:4px;font-family:monospace;font-size:12px;">' +
          (state.allowedTabs || []).join(', ') + '</div><br>' +
-      '<div style="color:var(--muted);font-size:12px;">Contact an administrator to change permissions or role.</div>' +
+      '<div style="color:var(--muted);font-size:12px;">'+t('usr_contact_admin')+'</div>' +
       '</div>';
     const btn = document.getElementById('mypw-open');
     if (btn) btn.onclick = myPasswordDialog;
