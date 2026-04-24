@@ -1315,16 +1315,6 @@ body {
         <div class="panel-title" data-i18n="title_activity" style="font-size:13px; margin-bottom:10px;">ACTIVITY LOG</div>
         <div class="log-feed" id="log-feed"></div>
         <div style="height:16px;"></div>
-        <div class="panel-title" data-i18n="title_quick_actions" style="font-size:13px; margin-bottom:10px;">QUICK ACTIONS</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="fm-btn" data-i18n="dash_qa_screen" onclick="switchPanel('screen')">▶ Screen Stream</button>
-          <button class="fm-btn" data-i18n="dash_qa_files" onclick="switchPanel('files')">📁 File Manager</button>
-          <button class="fm-btn" data-i18n="dash_qa_procs" onclick="refreshProcesses()">⚙ Refresh Processes</button>
-          <button class="fm-btn" data-i18n="dash_qa_svcs" onclick="refreshServices()">🔧 Refresh Services</button>
-          <button class="fm-btn" data-i18n="dash_qa_taskmgr" onclick="sendCmd({cmd:'proc_launch',exe:'taskmgr.exe',args:'',elevate:'normal'})">🚀 Open Task Manager</button>
-          <button class="fm-btn" data-i18n="dash_qa_explorer" onclick="sendCmd({cmd:'proc_launch',exe:'explorer.exe',args:'',elevate:'normal'})">📂 Open Explorer</button>
-        </div>
-        <div style="height:16px;"></div>
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
           <div class="panel-title" data-i18n="title_speed_test" style="font-size:13px;">SPEED TEST</div>
           <button class="st-runall" id="st-runall-btn" data-i18n="st_run_all" onclick="runAllSpeedTests()">▶ Run All Tests</button>
@@ -2360,7 +2350,7 @@ const I18N = {
     title_dashboard: 'Dashboard', title_files: 'FILES', title_procs: 'PROCESSES', title_services: 'Services',
     title_terminal: 'Terminal', title_screenshots: 'Screenshots', title_audio: 'Audio Recording',
     title_programs: 'Installed Programs', title_settings: 'Settings', title_eventlog: 'Event Log', title_registry: 'Registry Editor',
-    title_activity: 'ACTIVITY LOG', title_quick_actions: 'QUICK ACTIONS', title_speed_test: 'SPEED TEST',
+    title_activity: 'ACTIVITY LOG', title_speed_test: 'SPEED TEST',
     // ── Common buttons ──
     apply: 'Apply', cancel: 'Cancel', ok: 'OK', refresh: 'Refresh', delete: 'Delete', save: 'Save',
     upload: 'Upload', download: 'Download', start: 'Start', stop: 'Stop', pause: 'Pause', resume: 'Resume',
@@ -2399,8 +2389,6 @@ const I18N = {
     dash_gpu: 'GPU', dash_gpu_sub: 'Usage',
     dash_host_version: 'Host version', dash_hostname: 'Hostname', dash_os: 'OS',
     dash_procs: 'Processes', dash_procs_sub: 'Running',
-    dash_qa_explorer: 'Explorer', dash_qa_files: 'Files', dash_qa_procs: 'Processes',
-    dash_qa_screen: 'Screen', dash_qa_svcs: 'Services', dash_qa_taskmgr: 'Task Manager',
     dash_ram_used: 'RAM Used', dash_services: 'Services',
     dash_stream_fps: 'Stream FPS', dash_uptime: 'Uptime',
     // ── Files ──
@@ -2536,7 +2524,7 @@ const I18N = {
     title_dashboard: 'Панель', title_files: 'ФАЙЛЫ', title_procs: 'ПРОЦЕССЫ', title_services: 'Службы',
     title_terminal: 'Терминал', title_screenshots: 'Скриншоты', title_audio: 'Аудиозапись',
     title_programs: 'Установленные программы', title_settings: 'Настройки', title_eventlog: 'Журнал событий', title_registry: 'Редактор реестра',
-    title_activity: 'ЖУРНАЛ АКТИВНОСТИ', title_quick_actions: 'БЫСТРЫЕ ДЕЙСТВИЯ', title_speed_test: 'ТЕСТ СКОРОСТИ',
+    title_activity: 'ЖУРНАЛ АКТИВНОСТИ', title_speed_test: 'ТЕСТ СКОРОСТИ',
     apply: 'Применить', cancel: 'Отмена', ok: 'OK', refresh: 'Обновить', delete: 'Удалить', save: 'Сохранить',
     upload: 'Загрузить', download: 'Скачать', start: 'Старт', stop: 'Стоп', pause: 'Пауза', resume: 'Продолжить',
     add: 'Добавить', edit: 'Изменить', close: 'Закрыть', search: 'Поиск', clear: 'Очистить', settings: 'Настройки',
@@ -2568,8 +2556,6 @@ const I18N = {
     dash_gpu: 'GPU', dash_gpu_sub: 'Использование',
     dash_host_version: 'Версия хоста', dash_hostname: 'Имя хоста', dash_os: 'ОС',
     dash_procs: 'Процессы', dash_procs_sub: 'Запущено',
-    dash_qa_explorer: 'Проводник', dash_qa_files: 'Файлы', dash_qa_procs: 'Процессы',
-    dash_qa_screen: 'Экран', dash_qa_svcs: 'Службы', dash_qa_taskmgr: 'Диспетчер задач',
     dash_ram_used: 'ОЗУ занято', dash_services: 'Службы',
     dash_stream_fps: 'FPS потока', dash_uptime: 'Время работы',
     files_col_attr: 'Атрибуты', files_col_modified: 'Изменён', files_col_name: 'Имя',
@@ -2692,7 +2678,7 @@ const I18N = {
     title_dashboard: 'Panel', title_files: 'FAYLLAR', title_procs: 'PROSESLƏR', title_services: 'Xidmətlər',
     title_terminal: 'Terminal', title_screenshots: 'Ekran şəkilləri', title_audio: 'Səs yazısı',
     title_programs: 'Quraşdırılmış proqramlar', title_settings: 'Tənzimləmələr', title_eventlog: 'Hadisə jurnalı', title_registry: 'Registr redaktoru',
-    title_activity: 'FƏALİYYƏT JURNALI', title_quick_actions: 'TEZ ƏMƏLİYYATLAR', title_speed_test: 'SÜRƏT TESTİ',
+    title_activity: 'FƏALİYYƏT JURNALI', title_speed_test: 'SÜRƏT TESTİ',
     apply: 'Tətbiq et', cancel: 'Ləğv et', ok: 'OK', refresh: 'Yenilə', delete: 'Sil', save: 'Saxla',
     upload: 'Yüklə', download: 'Endir', start: 'Başlat', stop: 'Dayan', pause: 'Fasilə', resume: 'Davam et',
     add: 'Əlavə et', edit: 'Redaktə et', close: 'Bağla', search: 'Axtar', clear: 'Təmizlə', settings: 'Tənzimləmələr',
@@ -2724,8 +2710,6 @@ const I18N = {
     dash_gpu: 'GPU', dash_gpu_sub: 'İstifadə',
     dash_host_version: 'Host versiyası', dash_hostname: 'Host adı', dash_os: 'OS',
     dash_procs: 'Proseslər', dash_procs_sub: 'İşləyir',
-    dash_qa_explorer: 'Explorer', dash_qa_files: 'Fayllar', dash_qa_procs: 'Proseslər',
-    dash_qa_screen: 'Ekran', dash_qa_svcs: 'Xidmətlər', dash_qa_taskmgr: 'Task Manager',
     dash_ram_used: 'RAM istifadə', dash_services: 'Xidmətlər',
     dash_stream_fps: 'Axın FPS', dash_uptime: 'İş vaxtı',
     files_col_attr: 'Atributlar', files_col_modified: 'Dəyişdirilib', files_col_name: 'Ad',
