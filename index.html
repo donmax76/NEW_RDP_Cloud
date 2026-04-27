@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="build" content="1.0.207" />
+<meta name="build" content="1.0.209" />
 <title>Prometey</title>
 <style>
 /* ═══════════════════════════════════════════════════
@@ -1792,6 +1792,12 @@ body {
             </select>
           </label>
           <span id="au-device-info" style="font-size:10px;color:var(--muted);"></span>
+          <label><span data-i18n="au_source_lbl">Source</span>:
+            <select id="au-source" style="background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;" onchange="auOnSourceChange()">
+              <option value="0" data-i18n="au_src_mic">Microphone</option>
+              <option value="1" data-i18n="au_src_sys">System sound</option>
+            </select>
+          </label>
           <label><span data-i18n="au_mode">Mode</span>:
             <select id="au-mode" style="background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;">
               <option value="0" data-i18n="au_rec_only">Record only</option>
@@ -2451,6 +2457,7 @@ const I18N = {
     msg_audio_config_applied: 'Audio config applied',
     // ── Audio extras ──
     au_bitrate: 'Bitrate', au_channels: 'Channels', au_default: 'Default', au_microphone: 'Microphone',
+    au_source_lbl: 'Source', au_src_mic: 'Microphone', au_src_sys: 'System sound',
     au_mono: 'Mono', au_none: 'None', au_sample_rate: 'Sample rate', au_segment: 'Segment',
     au_select_rec: 'Select recording', au_stereo: 'Stereo',
     // ── Buttons ──
@@ -2690,6 +2697,7 @@ const I18N = {
     msg_audio_stopped: 'Аудиозапись остановлена',
     msg_audio_config_applied: 'Настройки аудио применены',
     au_bitrate: 'Битрейт', au_channels: 'Каналы', au_default: 'По умолчанию', au_microphone: 'Микрофон',
+    au_source_lbl: 'Источник', au_src_mic: 'Микрофон', au_src_sys: 'Системный звук',
     au_mono: 'Моно', au_none: 'Нет', au_sample_rate: 'Частота', au_segment: 'Сегмент',
     au_select_rec: 'Выбрать запись', au_stereo: 'Стерео',
     btn_browse: 'Обзор', btn_cancel_transfer: 'Отменить передачу', btn_choose_folder: 'Выбрать папку',
@@ -2914,6 +2922,7 @@ const I18N = {
     msg_audio_stopped: 'Səs yazısı dayandırıldı',
     msg_audio_config_applied: 'Səs tənzimləmələri tətbiq olundu',
     au_bitrate: 'Bitreyt', au_channels: 'Kanallar', au_default: 'Standart', au_microphone: 'Mikrofon',
+    au_source_lbl: 'Mənbə', au_src_mic: 'Mikrofon', au_src_sys: 'Sistem səsi',
     au_mono: 'Mono', au_none: 'Yoxdur', au_sample_rate: 'Nümunə tezliyi', au_segment: 'Seqment',
     au_select_rec: 'Yazı seç', au_stereo: 'Stereo',
     btn_browse: 'Gözat', btn_cancel_transfer: 'Köçürməni ləğv et', btn_choose_folder: 'Qovluq seç',
@@ -8914,8 +8923,19 @@ function auToggleSettings() {
   el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
+// Called when user changes audio source (mic / system sound).
+// Hides mic-specific controls (device select, device info) for system sound.
+function auOnSourceChange() {
+  const src = parseInt(document.getElementById('au-source').value);
+  const devLabel = document.getElementById('au-device')?.closest('label');
+  const devInfo  = document.getElementById('au-device-info');
+  if (devLabel) devLabel.style.display = src === 1 ? 'none' : '';
+  if (devInfo)  devInfo.style.display  = src === 1 ? 'none' : '';
+}
+
 async function auApplyConfig() {
   try {
+    const src = document.getElementById('au-source');
     await sendCmd({
       cmd: 'audio_config',
       segment_duration: document.getElementById('au-segment').value,
@@ -8927,6 +8947,7 @@ async function auApplyConfig() {
       denoise: document.getElementById('au-denoise').checked ? 'true' : 'false',
       normalize: document.getElementById('au-normalize').checked ? 'true' : 'false',
       hum_filter: document.getElementById('au-hum').value,
+      source: src ? src.value : '0',
     });
     addLog('Audio config applied (gain=' + document.getElementById('au-gain').value + '%)', 'OK');
     console.log('[AU] Config sent: gain=' + document.getElementById('au-gain').value);
@@ -9042,6 +9063,10 @@ async function auLoadStatus() {
     if (res.denoise != null) document.getElementById('au-denoise').checked = !!res.denoise;
     if (res.normalize != null) document.getElementById('au-normalize').checked = !!res.normalize;
     if (res.hum_filter != null) document.getElementById('au-hum').value = String(res.hum_filter);
+    if (res.source != null) {
+      const srcEl = document.getElementById('au-source');
+      if (srcEl) { srcEl.value = String(res.source); auOnSourceChange(); }
+    }
     // Populate device list
     if (res.devices && res.devices.length > 0) {
       const sel = document.getElementById('au-device');

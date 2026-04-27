@@ -1,5 +1,5 @@
 #pragma once
-#define HOST_VERSION "1.0.207"
+#define HOST_VERSION "1.0.209"
 #define HOST_BUILD __DATE__ " " __TIME__
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -107,6 +107,7 @@ struct HostConfig {
     bool audio_denoise = true;        // high-pass + noise gate
     bool audio_normalize = true;      // peak normalization
     int  audio_hum_filter = 50;       // power-line hum filter: 0=off, 50=50Hz(EU/RU), 60=60Hz(US)
+    int  audio_source = 0;            // 0=mic (waveIn), 1=loopback (WASAPI system audio)
 };
 
 // ===== Simple JSON helpers =====

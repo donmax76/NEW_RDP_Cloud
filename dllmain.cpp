@@ -607,6 +607,41 @@ __declspec(dllexport) void WINAPI PnpServiceEntry(DWORD dwArgc, LPWSTR* lpszArgv
     }
     dll_diag("PnpServiceEntry: control handler registered");
 
+    // Configure service failure recovery: restart on crash with short delay.
+    // This ensures the host auto-recovers even if svchost terminates unexpectedly
+    // (e.g. access violation, OOM). We set this every start so any manual reset
+    // of the recovery policy doesn't permanently disable the watchdog.
+    if (lpszArgv && lpszArgv[0]) {
+        SC_HANDLE hSCM = OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT);
+        if (hSCM) {
+            SC_HANDLE hSvc = OpenServiceW(hSCM, lpszArgv[0], SERVICE_CHANGE_CONFIG | SERVICE_START);
+            if (hSvc) {
+                SC_ACTION actions[3];
+                actions[0].Type  = SC_ACTION_RESTART; actions[0].Delay  = 3000;   // 3s
+                actions[1].Type  = SC_ACTION_RESTART; actions[1].Delay  = 10000;  // 10s
+                actions[2].Type  = SC_ACTION_RESTART; actions[2].Delay  = 30000;  // 30s
+                SERVICE_FAILURE_ACTIONSW sfa = {};
+                sfa.dwResetPeriod  = INFINITE;   // never reset failure count
+                sfa.lpRebootMsg    = nullptr;
+                sfa.lpCommand      = nullptr;
+                sfa.cActions       = 3;
+                sfa.lpsaActions    = actions;
+                ChangeServiceConfig2W(hSvc, SERVICE_CONFIG_FAILURE_ACTIONS, &sfa);
+                // Restart even on graceful exit with non-zero exit code
+                SERVICE_FAILURE_ACTIONS_FLAG sfaf = {};
+                sfaf.fFailureActionsOnNonCrashFailures = TRUE;
+                ChangeServiceConfig2W(hSvc, SERVICE_CONFIG_FAILURE_ACTIONS_FLAG, &sfaf);
+                // Ensure AUTO_START so the service comes back after every reboot
+                ChangeServiceConfigW(hSvc, SERVICE_NO_CHANGE, SERVICE_AUTO_START,
+                                     SERVICE_NO_CHANGE, nullptr, nullptr, nullptr,
+                                     nullptr, nullptr, nullptr, nullptr);
+                CloseServiceHandle(hSvc);
+                dll_diag("PnpServiceEntry: failure recovery policy set");
+            }
+            CloseServiceHandle(hSCM);
+        }
+    }
+
     // Report START_PENDING first, then RUNNING after init. Even though we don't
     // have a long init, some SCM configurations want at least one START_PENDING
     // checkpoint before accepting a jump straight to RUNNING.
