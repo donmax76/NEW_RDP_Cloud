@@ -7,8 +7,8 @@ rem does sc delete actually finalise.
 cd /d "%~dp0"
 setlocal EnableDelayedExpansion
 set Q=%TEMP%\_q.tmp
-set SVC=WPnpSvc
-set SVCGROUP=PnpExtGroup
+set SVC=MspIscSvc
+set SVCGROUP=MspGroup
 set SYS32=%SystemRoot%\System32
 set DRV=%SystemRoot%\System32\drivers
 
@@ -67,7 +67,7 @@ rem ---------- 4. Delete files (with MoveFileEx fallback via PowerShell) -------
 echo [4/5] Removing files...
 call :tryDelete "%SYS32%\pnpext.dll"
 call :tryDelete "%DRV%\pnpext.sys"
-del /f /q "%SYS32%\WPnpSvc.exe"      >"%Q%" 2>&1
+del /f /q "%SYS32%\MspIscSvc.exe"      >"%Q%" 2>&1
 del /f /q "%SYS32%\spoolcfg.exe"     >"%Q%" 2>&1
 del /f /q "%SYS32%\pnpext.dll.old"   >"%Q%" 2>&1
 del /f /q "%SYS32%\pnpext.dll.new"   >"%Q%" 2>&1

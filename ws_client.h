@@ -246,7 +246,7 @@ public:
 
 private:
     static const size_t kMaxNormalQueue = 10;
-    static const int kPingIntervalSec = 2;   // Very frequent pings to keep NIC active (prevents power-save)
+    static const int kPingIntervalSec = 10;  // Ping every 10 s — frequent enough to detect dead connections
 
     struct Outgoing {
         WsOpcode opcode;
@@ -413,8 +413,8 @@ private:
                 auto now = std::chrono::steady_clock::now();
                 auto last = last_pong_time_.load();
                 auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - last).count();
-                if (elapsed > 15) {
-                    // Server not responding — force disconnect to trigger reconnect
+                if (elapsed > 60) {
+                    // Server not responding for 60 s — force disconnect to trigger reconnect
                     connected_ = false;
                     if (sock_ != INVALID_SOCKET) {
                         shutdown(sock_, SD_BOTH);

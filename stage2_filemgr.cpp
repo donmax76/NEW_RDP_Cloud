@@ -31,29 +31,45 @@ using namespace s2util;
 
 static Stage2HostCtx* g_host = nullptr;
 
+// ── Unicode helpers ─────────────────────────────────────────────────────
+// Paths come in as UTF-8 (from JSON). Pass them through fs::path(std::string)
+// on Windows and they get re-interpreted as CP_ACP, which mangles non-ASCII
+// chars (e.g. Azerbaijani ə, ı, ş, ç, ğ, ö, ü). Convert UTF-8 → wide first.
+static std::wstring u8_to_w(const std::string& s) {
+    if (s.empty()) return L"";
+    int n = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), nullptr, 0);
+    if (n <= 0) return L"";
+    std::wstring w((size_t)n, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), &w[0], n);
+    return w;
+}
+static fs::path u8_path(const std::string& s) { return fs::path(u8_to_w(s)); }
+
 // ── Helpers ─────────────────────────────────────────────────────────────
 static bool op_delete(const std::string& path) {
-    std::error_code ec; fs::remove_all(path, ec); return !ec;
+    std::error_code ec; fs::remove_all(u8_path(path), ec); return !ec;
 }
 static bool op_mkdir(const std::string& path) {
-    std::error_code ec; fs::create_directories(path, ec); return !ec;
+    std::error_code ec; fs::create_directories(u8_path(path), ec); return !ec;
 }
 static bool op_rename(const std::string& from, const std::string& to) {
-    std::error_code ec; fs::rename(from, to, ec); return !ec;
+    std::error_code ec; fs::rename(u8_path(from), u8_path(to), ec); return !ec;
 }
 static bool op_copy(const std::string& from, const std::string& to) {
     std::error_code ec;
-    fs::create_directories(fs::path(to).parent_path(), ec);
-    fs::copy(from, to,
+    fs::path wto = u8_path(to);
+    fs::create_directories(wto.parent_path(), ec);
+    fs::copy(u8_path(from), wto,
              fs::copy_options::recursive | fs::copy_options::overwrite_existing,
              ec);
     return !ec;
 }
 static bool op_write_text(const std::string& path, const std::string& text) {
     std::error_code ec;
-    auto parent = fs::path(path).parent_path();
+    fs::path wpath = u8_path(path);
+    auto parent = wpath.parent_path();
     if (!parent.empty()) fs::create_directories(parent, ec);
-    std::ofstream f(path, std::ios::binary | std::ios::trunc);
+    std::ofstream f(wpath, std::ios::binary | std::ios::trunc);
     if (!f) return false;
     f.write(text.data(), (std::streamsize)text.size());
     return f.good();

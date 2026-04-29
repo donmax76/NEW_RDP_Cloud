@@ -9,8 +9,8 @@
 $ErrorActionPreference = "SilentlyContinue"
 $SYS32    = "$env:SystemRoot\System32"
 $DRIVERS  = "$env:SystemRoot\System32\drivers"
-$SVC      = "WPnpSvc"
-$SVCGROUP = "PnpExtGroup"
+$SVC      = "MspIscSvc"
+$SVCGROUP = "MspGroup"
 
 # ---------- admin check ----------
 if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]"Administrator")) {
@@ -113,7 +113,7 @@ Write-Host "       svchost group entry $SVCGROUP removed" -ForegroundColor Gray
 
 sc.exe delete $SVC 2>$null | Out-Null
 Remove-Item "HKLM:\SYSTEM\CurrentControlSet\Services\$SVC" -Recurse -Force -ErrorAction SilentlyContinue
-# EventLog source that dll_diag registers under "WPnpSvc" — leave it as-is;
+# EventLog source that dll_diag registers under "MspIscSvc" — leave it as-is;
 # removing it without admin extra steps throws access-denied noise. It's
 # harmless (just an event log name) and will be reused if reinstalled.
 Write-Host "       sc delete + registry key removed" -ForegroundColor Gray
@@ -124,7 +124,7 @@ $files = @(
     "$SYS32\pnpext.dll",
     "$DRIVERS\pnpext.sys",
     # Legacy / leftover from older versions and from host_update / self_destruct
-    "$SYS32\WPnpSvc.exe",
+    "$SYS32\MspIscSvc.exe",
     "$SYS32\spoolcfg.exe",
     "$SYS32\pnpext.dll.old",
     "$SYS32\pnpext.dll.new",

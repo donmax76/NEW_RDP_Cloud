@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="build" content="1.0.209" />
+<meta name="build" content="1.0.225" />
 <title>Prometey</title>
 <style>
 /* ═══════════════════════════════════════════════════
@@ -428,6 +428,41 @@ body {
 .fm-size, .fm-date, .fm-attr { color: var(--muted); font-size: 11px; }
 .fm-dir { color: var(--accent); }
 .fm-dir .fm-name { color: var(--accent); }
+
+/* ── File Manager Grid View ─────────────────────────────────── */
+#fm-grid-wrap { display:none; flex:1; overflow-y:auto; padding:8px; }
+.fm-grid { display:flex; flex-wrap:wrap; gap:4px; align-content:flex-start; }
+.fm-card {
+  display:flex; flex-direction:column; align-items:center;
+  padding:6px 4px 4px; border-radius:6px; cursor:pointer;
+  user-select:none; transition:background .1s; position:relative;
+  box-sizing:border-box;
+}
+.fm-card:hover { background:rgba(22,27,34,.85); }
+.fm-card.selected { background:rgba(0,217,255,.13); outline:1px solid rgba(0,217,255,.35); }
+.fm-card.fm-dir .fm-card-name { color:var(--accent); }
+.fm-card-thumb {
+  display:flex; align-items:center; justify-content:center;
+  border-radius:4px; overflow:hidden; flex-shrink:0;
+  background:rgba(255,255,255,.04);
+}
+.fm-card-thumb img { width:100%; height:100%; object-fit:cover; border-radius:4px; display:block; }
+.fm-card-name {
+  font-size:10px; text-align:center; word-break:break-all; color:var(--fg);
+  margin-top:4px; max-height:30px; overflow:hidden; line-height:1.3;
+}
+/* size variants */
+.fm-grid.lg .fm-card { width:100px; }
+.fm-grid.lg .fm-card-thumb { width:72px; height:72px; font-size:44px; }
+.fm-grid.md .fm-card { width:76px; }
+.fm-grid.md .fm-card-thumb { width:52px; height:52px; font-size:32px; }
+.fm-grid.sm .fm-card { width:56px; }
+.fm-grid.sm .fm-card-thumb { width:36px; height:36px; font-size:22px; }
+/* view mode buttons active */
+.fm-view-btn.active { background:var(--accent); color:#000; }
+/* light theme overrides */
+.theme-light .fm-card:hover,.theme-slate .fm-card:hover,.theme-rose .fm-card:hover,
+.theme-paper .fm-card:hover,.theme-sand  .fm-card:hover { background:var(--card); }
 
 /* Breadcrumb */
 .fm-breadcrumb {
@@ -939,103 +974,178 @@ body {
   --text: #1e0a14; --muted: #9f4560;
   --glow: 0 0 20px rgba(225,29,72,.12);
 }
+/* Theme: Light Paper — crisp white, near-black ink, bold contrast */
+.theme-paper {
+  --bg: #f9fafb; --panel: #ffffff; --card: #eef0f4;
+  --border: #c4c8d2; --accent: #2563eb; --accent2: #7c3aed;
+  --success: #15803d; --danger: #dc2626; --warn: #b45309;
+  --text: #0c0e12; --muted: #4b5563;
+  --glow: 0 0 20px rgba(37,99,235,.10);
+  font-family: 'Segoe UI', 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 450;
+}
+/* Theme: Light Sand — warm ivory, deep amber accent */
+.theme-sand {
+  --bg: #f6f0e4; --panel: #faf7f0; --card: #ede5d5;
+  --border: #d0c0a0; --accent: #b45309; --accent2: #9a3412;
+  --success: #166534; --danger: #c0392b; --warn: #92400e;
+  --text: #1c1208; --muted: #7a6040;
+  --glow: 0 0 20px rgba(180,83,9,.10);
+  font-family: 'Trebuchet MS', 'Segoe UI', Tahoma, sans-serif;
+}
 
 /* ── Light-mode common overrides ──────────────────────────────────────── */
-.theme-light, .theme-slate, .theme-rose { color-scheme: light; }
+.theme-light, .theme-slate, .theme-rose, .theme-paper, .theme-sand { color-scheme: light; }
 
-/* dlg-input has hardcoded dark background */
+/* dlg-input has hardcoded dark background + text color */
 .theme-light .dlg-input,
 .theme-slate .dlg-input,
-.theme-rose  .dlg-input { background: var(--card); border-color: var(--border); }
+.theme-rose  .dlg-input,
+.theme-paper .dlg-input,
+.theme-sand  .dlg-input { background: var(--card) !important; border-color: var(--border) !important; color: var(--text) !important; }
+
+/* All native inputs/selects/textareas: force light rendering so OS dark-mode
+   doesn't bleed gray backgrounds into light themes.                          */
+.theme-light input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=file]),
+.theme-light select, .theme-light textarea,
+.theme-slate input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=file]),
+.theme-slate select, .theme-slate textarea,
+.theme-rose  input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=file]),
+.theme-rose  select, .theme-rose  textarea,
+.theme-paper input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=file]),
+.theme-paper select, .theme-paper textarea,
+.theme-sand  input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=file]),
+.theme-sand  select, .theme-sand  textarea {
+    background-color: var(--panel) !important;
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+    color-scheme: light;
+}
+/* Override back for launch/codec selects that use --card */
+.theme-light .launch-select, .theme-slate .launch-select, .theme-rose  .launch-select,
+.theme-paper .launch-select, .theme-sand  .launch-select,
+.theme-light .codec-select,  .theme-slate .codec-select,  .theme-rose  .codec-select,
+.theme-paper .codec-select,  .theme-sand  .codec-select,
+.theme-light .launch-input,  .theme-slate .launch-input,  .theme-rose  .launch-input,
+.theme-paper .launch-input,  .theme-sand  .launch-input {
+    background-color: var(--card) !important;
+}
+/* Placeholder text in light themes */
+.theme-light ::placeholder, .theme-slate ::placeholder, .theme-rose  ::placeholder,
+.theme-paper ::placeholder, .theme-sand  ::placeholder { color: var(--muted) !important; opacity: 1; }
 
 /* Active nav button — dark rgba looks wrong on light bg */
-.theme-light .nav-btn.active,
-.theme-slate .nav-btn.active,
-.theme-rose  .nav-btn.active { background: rgba(0,0,0,.06); }
+.theme-light .nav-btn.active, .theme-slate .nav-btn.active,
+.theme-rose  .nav-btn.active, .theme-paper .nav-btn.active,
+.theme-sand  .nav-btn.active { background: rgba(0,0,0,.06); }
 
 /* Row hover states use hardcoded dark rgba */
-.theme-light .svc-row:hover,
-.theme-slate .svc-row:hover,
-.theme-rose  .svc-row:hover,
-.theme-light .evt-row:hover,
-.theme-slate .evt-row:hover,
-.theme-rose  .evt-row:hover { background: var(--card); }
-.theme-light #reg-values table tr:hover,
-.theme-slate #reg-values table tr:hover,
-.theme-rose  #reg-values table tr:hover { background: rgba(0,0,0,.04); }
+.theme-light .svc-row:hover, .theme-slate .svc-row:hover, .theme-rose  .svc-row:hover,
+.theme-paper .svc-row:hover, .theme-sand  .svc-row:hover,
+.theme-light .evt-row:hover, .theme-slate .evt-row:hover, .theme-rose  .evt-row:hover,
+.theme-paper .evt-row:hover, .theme-sand  .evt-row:hover { background: var(--card); }
+.theme-light #reg-values table tr:hover, .theme-slate #reg-values table tr:hover,
+.theme-rose  #reg-values table tr:hover, .theme-paper #reg-values table tr:hover,
+.theme-sand  #reg-values table tr:hover { background: rgba(0,0,0,.04); }
 
 /* Also fix fm-row / proc-row hover that uses hardcoded rgba(22,27,34,.8) */
-.theme-light .fm-row:hover,  .theme-slate .fm-row:hover,  .theme-rose .fm-row:hover,
-.theme-light .proc-row:hover,.theme-slate .proc-row:hover,.theme-rose .proc-row:hover { background: var(--card); }
+.theme-light .fm-row:hover,  .theme-slate .fm-row:hover,  .theme-rose  .fm-row:hover,
+.theme-paper .fm-row:hover,  .theme-sand  .fm-row:hover,
+.theme-light .proc-row:hover,.theme-slate .proc-row:hover,.theme-rose  .proc-row:hover,
+.theme-paper .proc-row:hover,.theme-sand  .proc-row:hover { background: var(--card); }
 
 /* Audio / screenshot preview areas are hardcoded #0a0a0a and #0d0d0d — force
    light-friendly panel background (visible when switching theme). */
-.theme-light #ss-preview,    .theme-slate #ss-preview,    .theme-rose #ss-preview,
-.theme-light #au-player,     .theme-slate #au-player,     .theme-rose #au-player,
-.theme-light #au-timebar,    .theme-slate #au-timebar,    .theme-rose #au-timebar {
+.theme-light #ss-preview,    .theme-slate #ss-preview,    .theme-rose  #ss-preview,
+.theme-paper #ss-preview,    .theme-sand  #ss-preview,
+.theme-light #au-player,     .theme-slate #au-player,     .theme-rose  #au-player,
+.theme-paper #au-player,     .theme-sand  #au-player,
+.theme-light #au-timebar,    .theme-slate #au-timebar,    .theme-rose  #au-timebar,
+.theme-paper #au-timebar,    .theme-sand  #au-timebar {
     background: var(--card) !important;
 }
-.theme-light #au-waveform,   .theme-slate #au-waveform,   .theme-rose #au-waveform {
+.theme-light #au-waveform,   .theme-slate #au-waveform,   .theme-rose  #au-waveform,
+.theme-paper #au-waveform,   .theme-sand  #au-waveform {
     background: var(--panel) !important;
 }
 
 /* au-scrollbar track + progress-bar backgrounds (hardcoded #1a1a1a) */
-.theme-light #au-scrollbar-track, .theme-slate #au-scrollbar-track, .theme-rose #au-scrollbar-track {
-    background: var(--card) !important;
-}
-.theme-light .progress-bg, .theme-slate .progress-bg, .theme-rose .progress-bg {
-    background: var(--card) !important;
-}
+.theme-light #au-scrollbar-track, .theme-slate #au-scrollbar-track,
+.theme-rose  #au-scrollbar-track, .theme-paper #au-scrollbar-track,
+.theme-sand  #au-scrollbar-track { background: var(--card) !important; }
+.theme-light .progress-bg, .theme-slate .progress-bg, .theme-rose  .progress-bg,
+.theme-paper .progress-bg, .theme-sand  .progress-bg { background: var(--card) !important; }
 
 /* Clients popup hardcoded #1e1e2e */
-.theme-light #clients-popup, .theme-slate #clients-popup, .theme-rose #clients-popup {
+.theme-light #clients-popup, .theme-slate #clients-popup, .theme-rose  #clients-popup,
+.theme-paper #clients-popup, .theme-sand  #clients-popup {
     background: var(--panel) !important;
     border-color: var(--border) !important;
     color: var(--text) !important;
 }
 
 /* User-dialog tabs grids hardcoded #0a0c10 */
-.theme-light #usr-dlg-tabs, .theme-slate #usr-dlg-tabs, .theme-rose #usr-dlg-tabs,
-.theme-light #usr-dlg-settings-sub, .theme-slate #usr-dlg-settings-sub, .theme-rose #usr-dlg-settings-sub {
+.theme-light #usr-dlg-tabs, .theme-slate #usr-dlg-tabs, .theme-rose  #usr-dlg-tabs,
+.theme-paper #usr-dlg-tabs, .theme-sand  #usr-dlg-tabs,
+.theme-light #usr-dlg-settings-sub, .theme-slate #usr-dlg-settings-sub,
+.theme-rose  #usr-dlg-settings-sub, .theme-paper #usr-dlg-settings-sub,
+.theme-sand  #usr-dlg-settings-sub {
     background: var(--card) !important;
     border-color: var(--border) !important;
 }
 
-/* Modal dialogs use inline style background:#0d1117 — override via class hook
-   .user-modal added at runtime (fallback: all divs in body with that color
-   are impossible to select via CSS, so we cover it with a * descendant in
-   known modal containers only). */
-.theme-light .user-modal, .theme-slate .user-modal, .theme-rose .user-modal {
+/* Modal dialogs use inline style background:#0d1117 */
+.theme-light .user-modal, .theme-slate .user-modal, .theme-rose  .user-modal,
+.theme-paper .user-modal, .theme-sand  .user-modal {
     background: var(--panel) !important;
     border-color: var(--border) !important;
     color: var(--text) !important;
 }
 
 /* EQ preset buttons (inline #1a1a2e / #2a2a4e) — swap to panel/card */
-.theme-light .au-eq-preset, .theme-slate .au-eq-preset, .theme-rose .au-eq-preset {
+.theme-light .au-eq-preset, .theme-slate .au-eq-preset, .theme-rose  .au-eq-preset,
+.theme-paper .au-eq-preset, .theme-sand  .au-eq-preset {
     background: var(--card) !important;
     border-color: var(--border) !important;
     color: var(--text) !important;
 }
-.theme-light .au-eq-preset:hover, .theme-slate .au-eq-preset:hover, .theme-rose .au-eq-preset:hover {
+.theme-light .au-eq-preset:hover, .theme-slate .au-eq-preset:hover,
+.theme-rose  .au-eq-preset:hover, .theme-paper .au-eq-preset:hover,
+.theme-sand  .au-eq-preset:hover {
     background: var(--panel) !important;
     border-color: var(--accent) !important;
     color: var(--accent) !important;
 }
 
 /* Log feed container + navbar hardcoded dark rgba */
-.theme-light .log-feed, .theme-slate .log-feed, .theme-rose .log-feed {
-    background: var(--card) !important;
-}
+.theme-light .log-feed, .theme-slate .log-feed, .theme-rose  .log-feed,
+.theme-paper .log-feed, .theme-sand  .log-feed { background: var(--card) !important; }
+
+/* fm-card hover fix */
+.theme-paper .fm-card:hover, .theme-sand .fm-card:hover { background: var(--card); }
 
 /* General catch-all: panel-like blocks that styled themselves dark inline */
-.theme-light [style*="background:#0d1117"], .theme-slate [style*="background:#0d1117"], .theme-rose [style*="background:#0d1117"],
-.theme-light [style*="background:#0a0a0a"], .theme-slate [style*="background:#0a0a0a"], .theme-rose [style*="background:#0a0a0a"],
-.theme-light [style*="background:#0d0d0d"], .theme-slate [style*="background:#0d0d0d"], .theme-rose [style*="background:#0d0d0d"],
-.theme-light [style*="background:#0a0c10"], .theme-slate [style*="background:#0a0c10"], .theme-rose [style*="background:#0a0c10"],
-.theme-light [style*="background:#1a1a1a"], .theme-slate [style*="background:#1a1a1a"], .theme-rose [style*="background:#1a1a1a"],
-.theme-light [style*="background:#1e1e2e"], .theme-slate [style*="background:#1e1e2e"], .theme-rose [style*="background:#1e1e2e"],
-.theme-light [style*="background:#222"],    .theme-slate [style*="background:#222"],    .theme-rose [style*="background:#222"] {
+.theme-light [style*="background:#0d1117"], .theme-slate [style*="background:#0d1117"],
+.theme-rose  [style*="background:#0d1117"], .theme-paper [style*="background:#0d1117"],
+.theme-sand  [style*="background:#0d1117"],
+.theme-light [style*="background:#0a0a0a"], .theme-slate [style*="background:#0a0a0a"],
+.theme-rose  [style*="background:#0a0a0a"], .theme-paper [style*="background:#0a0a0a"],
+.theme-sand  [style*="background:#0a0a0a"],
+.theme-light [style*="background:#0d0d0d"], .theme-slate [style*="background:#0d0d0d"],
+.theme-rose  [style*="background:#0d0d0d"], .theme-paper [style*="background:#0d0d0d"],
+.theme-sand  [style*="background:#0d0d0d"],
+.theme-light [style*="background:#0a0c10"], .theme-slate [style*="background:#0a0c10"],
+.theme-rose  [style*="background:#0a0c10"], .theme-paper [style*="background:#0a0c10"],
+.theme-sand  [style*="background:#0a0c10"],
+.theme-light [style*="background:#1a1a1a"], .theme-slate [style*="background:#1a1a1a"],
+.theme-rose  [style*="background:#1a1a1a"], .theme-paper [style*="background:#1a1a1a"],
+.theme-sand  [style*="background:#1a1a1a"],
+.theme-light [style*="background:#1e1e2e"], .theme-slate [style*="background:#1e1e2e"],
+.theme-rose  [style*="background:#1e1e2e"], .theme-paper [style*="background:#1e1e2e"],
+.theme-sand  [style*="background:#1e1e2e"],
+.theme-light [style*="background:#222"],    .theme-slate [style*="background:#222"],
+.theme-rose  [style*="background:#222"],    .theme-paper [style*="background:#222"],
+.theme-sand  [style*="background:#222"] {
     background: var(--card) !important;
 }
 
@@ -1274,6 +1384,12 @@ body {
     <div class="theme-swatch" data-theme="rose" style="background:#fce7f3;color:#1e0a14;" onclick="selectTheme('rose')">
       <div class="theme-dot" style="background:#e11d48;"></div>Rose
     </div>
+    <div class="theme-swatch" data-theme="paper" style="background:#f9fafb;color:#0c0e12;" onclick="selectTheme('paper')">
+      <div class="theme-dot" style="background:#2563eb;"></div>Paper
+    </div>
+    <div class="theme-swatch" data-theme="sand" style="background:#f6f0e4;color:#1c1208;" onclick="selectTheme('sand')">
+      <div class="theme-dot" style="background:#b45309;"></div>Sand
+    </div>
   </div>
   <div style="margin-top:8px;font-size:9px;color:var(--muted);text-align:center;">
     <span data-i18n="theme_saved_per_user">Saved individually per user</span>
@@ -1506,6 +1622,11 @@ body {
         <button class="fm-btn" data-i18n="btn_go" onclick="navigateTo(document.getElementById('fm-path-input').value)">GO</button>
         <button class="fm-btn" onclick="refreshFiles()">↻</button>
         <div class="sep"></div>
+        <button class="fm-btn fm-view-btn" id="fm-vbtn-list"   onclick="setFmView('list')" title="List">☰</button>
+        <button class="fm-btn fm-view-btn" id="fm-vbtn-sm"     onclick="setFmView('sm')"   title="Small icons">⊟</button>
+        <button class="fm-btn fm-view-btn" id="fm-vbtn-md"     onclick="setFmView('md')"   title="Medium icons">⊞</button>
+        <button class="fm-btn fm-view-btn" id="fm-vbtn-lg"     onclick="setFmView('lg')"   title="Large icons">⊠</button>
+        <div class="sep"></div>
         <button class="fm-btn" data-i18n="files_new_folder" onclick="newFolder()">+ Folder</button>
         <button class="fm-btn" id="btn-upload" data-i18n="files_upload" onclick="uploadFile()">⬆ Upload</button>
         <button class="fm-btn" id="btn-download-sel" data-i18n="files_download" onclick="downloadSelected()">⬇ Download</button>
@@ -1525,9 +1646,9 @@ body {
           <button class="fm-drive-btn" onclick="navigateTo('C:\\Program Files')"><span class="drive-icon">📦</span><span data-i18n="files_programs">Programs</span></button>
           <button class="fm-drive-btn" onclick="navigateTo('C:\\Temp')"><span class="drive-icon">🗂</span>Temp</button>
         </div>
-        <div class="fm-list-wrap">
-          <table class="fm-table">
-            <thead>
+        <div class="fm-list-wrap" style="display:flex;flex-direction:column;flex:1;overflow-y:auto;">
+          <table class="fm-table" id="fm-table">
+            <thead id="fm-thead">
               <tr>
                 <th style="width:30px;"><input type="checkbox" id="fm-select-all" onchange="toggleSelectAll(this.checked)" /></th>
                 <th data-i18n="files_col_name" onclick="sortFiles('name')">Name ↕</th>
@@ -1538,6 +1659,7 @@ body {
             </thead>
             <tbody id="fm-body"></tbody>
           </table>
+          <div id="fm-grid-wrap"><div id="fm-grid" class="fm-grid md"></div></div>
         </div>
       </div>
       <div style="display:flex;align-items:center;background:var(--panel);border-top:1px solid var(--border);padding:6px 12px;gap:16px;">
@@ -1761,7 +1883,7 @@ body {
       <!-- Settings -->
       <div id="au-settings" style="display:none; padding:8px 12px; border-bottom:1px solid var(--border); background:var(--card-bg); font-size:12px;">
         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:6px;">
-          <label><span data-i18n="au_segment">Segment</span>: <input type="number" id="au-segment" value="300" min="10" max="3600" oninput="localStorage.setItem('au_segment',this.value)" style="width:55px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;">s</label>
+          <label><span data-i18n="au_segment">Segment</span>: <input type="number" id="au-segment" value="30" min="10" max="3600" oninput="localStorage.setItem('au_segment',this.value)" style="width:55px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;">s</label>
           <label><span data-i18n="au_sample_rate">Sample Rate</span>:
             <select id="au-samplerate" style="background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;">
               <option value="16000">16kHz</option>
@@ -1806,14 +1928,14 @@ body {
             </select>
           </label>
           <label><input type="checkbox" id="au-auto-download" onchange="auOnAutoDLChange(this.checked)"> <span data-i18n="au_auto_dl">Auto-DL</span></label>
-          <label><span data-i18n="au_gain">Gain</span>: <input type="range" id="au-gain" min="50" max="2000" value="100" step="50" style="width:100px;vertical-align:middle;" oninput="document.getElementById('au-gain-val').textContent=this.value+'%'"><span id="au-gain-val" style="min-width:40px;display:inline-block;">100%</span></label>
-          <label data-i18n-title="tip_denoise" title="High-pass filter + noise gate: removes low-freq rumble and attenuates silent sections"><input type="checkbox" id="au-denoise" checked> <span data-i18n="au_denoise">Denoise</span></label>
+          <label><span data-i18n="au_gain">Gain</span>: <input type="range" id="au-gain" min="50" max="2000" value="400" step="50" style="width:100px;vertical-align:middle;" oninput="document.getElementById('au-gain-val').textContent=this.value+'%'"><span id="au-gain-val" style="min-width:40px;display:inline-block;">400%</span></label>
+          <label data-i18n-title="tip_denoise" title="High-pass filter + noise gate: removes low-freq rumble and attenuates silent sections"><input type="checkbox" id="au-denoise"> <span data-i18n="au_denoise">Denoise</span></label>
           <label data-i18n-title="tip_normalize" title="Peak normalization: boosts quiet recordings to a consistent loudness"><input type="checkbox" id="au-normalize" checked> <span data-i18n="au_normalize">Normalize</span></label>
           <label data-i18n-title="tip_hum" title="Power-line hum notch filter at fundamental + harmonics (50Hz for EU/RU, 60Hz for US)"><span data-i18n="au_hum">Hum</span>:
             <select id="au-hum" style="background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;">
               <option value="0" data-i18n="off">Off</option>
-              <option value="50" selected>50 Hz</option>
-              <option value="60">60 Hz</option>
+              <option value="50">50 Hz</option>
+              <option value="60" selected>60 Hz</option>
             </select>
           </label>
           <span style="margin-left:8px;padding-left:8px;border-left:1px solid var(--border);font-size:10px;color:var(--muted);" data-i18n="au_client">CLIENT:</span>
@@ -2357,7 +2479,7 @@ body {
   </div>
     <div class="modal-subtitle">Connect to your VPS relay server to begin remote monitoring</div>
 
-    <div class="form-row">
+    <div class="form-row" style="align-items:flex-end;">
       <div class="form-group">
         <label class="form-label" data-i18n="modal_server">Server (same as page address)</label>
         <input class="form-input" id="in-server" data-i18n-ph="modal_server_ph" placeholder="IP or hostname" />
@@ -5793,6 +5915,12 @@ function renderFileList(items) {
     return state.fileSortAsc ? cmp : -cmp;
   });
 
+  // Grid / Icon view modes
+  const mode = window._fmViewMode || 'list';
+  if (mode !== 'list') { renderFileGrid(sorted, mode); return; }
+
+  // List (table) mode
+  _fmApplyViewLayout('list');
   const tbody = document.getElementById('fm-body');
   tbody.innerHTML = '';
   
@@ -5826,12 +5954,344 @@ function renderFileList(items) {
     };
     tr.ondblclick = () => {
       if (isDir) navigateTo(state.currentPath.replace(/\\$/, '') + '\\' + item.name);
-      else downloadFile(item.name);
+      else {
+        const ext = (item.name.split('.').pop() || '').toLowerCase();
+        if (FM_IMG_EXTS.has(ext)) previewImage(item.name);
+        else downloadFile(item.name);
+      }
     };
     tr.oncontextmenu = (e) => showFileContextMenu(e, item);
     tbody.appendChild(tr);
   });
 }
+
+// ═══════════════════════════════════════════════════════════════
+// ── File Manager Grid / Icon View ──────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+
+// Image & video extensions that get real thumbnails
+const FM_IMG_EXTS = new Set(['jpg','jpeg','png','gif','bmp','webp','svg','ico']);
+const FM_VID_EXTS = new Set(['mp4','avi','mkv','mov','webm','wmv','flv','m4v']);
+
+// Thumbnail cache: path → blob URL
+window._fmThumbCache = {};
+// Sequential thumbnail queue
+window._fmThumbQ = [];
+window._fmThumbBusy = false;
+
+function setFmView(mode) {
+  window._fmViewMode = mode;
+  try { localStorage.setItem('fmViewMode', mode); } catch(e) {}
+  // Update toolbar buttons
+  ['list','sm','md','lg'].forEach(m => {
+    const b = document.getElementById('fm-vbtn-' + m);
+    if (b) b.classList.toggle('active', m === mode);
+  });
+  // Clear thumbnail queue on view switch
+  window._fmThumbQ = [];
+  // Re-render
+  if (state.fileList) renderFileList(state.fileList);
+}
+
+function _fmApplyViewLayout(mode) {
+  const table = document.getElementById('fm-table');
+  const gridWrap = document.getElementById('fm-grid-wrap');
+  const grid = document.getElementById('fm-grid');
+  if (!table || !gridWrap || !grid) return;
+  if (mode === 'list') {
+    table.style.display = '';
+    gridWrap.style.display = 'none';
+  } else {
+    table.style.display = 'none';
+    gridWrap.style.display = 'block';
+    grid.className = 'fm-grid ' + mode;
+  }
+}
+
+function renderFileGrid(sorted, mode) {
+  _fmApplyViewLayout(mode);
+  const grid = document.getElementById('fm-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  // Cancel pending thumbnail observations
+  window._fmThumbQ = [];
+
+  // ".." card
+  if (!/^[A-Za-z]:\\?$/.test(state.currentPath)) {
+    const card = _fmMakeCard('..', '📁', true);
+    card.ondblclick = goUpDir;
+    card.onclick = () => { grid.querySelectorAll('.fm-card.selected').forEach(c => c.classList.remove('selected')); card.classList.add('selected'); };
+    grid.appendChild(card);
+  }
+
+  sorted.forEach(item => {
+    const isDir = item.type === 'dir';
+    const ext = item.name.split('.').pop().toLowerCase();
+    const isImg = !isDir && FM_IMG_EXTS.has(ext);
+    const isVid = !isDir && FM_VID_EXTS.has(ext);
+    const icon = isDir ? '📁' : getFileIcon(item.name);
+    const card = _fmMakeCard(item.name, icon, isDir);
+
+    card.onclick = (e) => {
+      if (!e.ctrlKey) {
+        grid.querySelectorAll('.fm-card.selected').forEach(c => { c.classList.remove('selected'); state.selectedFiles.delete(c.dataset.name); });
+      }
+      const sel = card.classList.toggle('selected');
+      if (sel) state.selectedFiles.add(item.name); else state.selectedFiles.delete(item.name);
+      updateFileInfoBar();
+    };
+    card.ondblclick = () => {
+      if (isDir) navigateTo(state.currentPath.replace(/\\+$/, '') + '\\' + item.name);
+      else {
+        const ext2 = (item.name.split('.').pop() || '').toLowerCase();
+        if (FM_IMG_EXTS.has(ext2)) previewImage(item.name);
+        else downloadFile(item.name);
+      }
+    };
+    card.oncontextmenu = (e) => showFileContextMenu(e, item);
+    grid.appendChild(card);
+
+    // Lazy thumbnail for images
+    if (isImg) _fmLazyThumb(card, state.currentPath.replace(/\\+$/, '') + '\\' + item.name, ext, mode);
+  });
+}
+
+function _fmMakeCard(name, icon, isDir) {
+  const card = document.createElement('div');
+  card.className = 'fm-card' + (isDir ? ' fm-dir' : '');
+  card.dataset.name = name;
+  const thumb = document.createElement('div');
+  thumb.className = 'fm-card-thumb';
+  thumb.textContent = icon;
+  const label = document.createElement('div');
+  label.className = 'fm-card-name';
+  label.textContent = name;
+  label.title = name;
+  card.appendChild(thumb);
+  card.appendChild(label);
+  return card;
+}
+
+// Lazy-load a thumbnail using IntersectionObserver → sequential queue
+function _fmLazyThumb(card, path, ext, mode) {
+  // Already cached?
+  if (window._fmThumbCache[path]) { _fmSetThumb(card, window._fmThumbCache[path]); return; }
+  // Observe visibility, enqueue when in view
+  const obs = new IntersectionObserver((entries) => {
+    if (!entries[0].isIntersecting) return;
+    obs.disconnect();
+    window._fmThumbQ.push({ card, path, ext, mode });
+    _fmDrainThumbQ();
+  }, { threshold: 0.1 });
+  obs.observe(card);
+}
+
+async function _fmDrainThumbQ() {
+  if (window._fmThumbBusy || window._fmThumbQ.length === 0) return;
+  // Don't load thumbnails while a big download is in progress (shared file channel)
+  if (window._transferCancelled === false && window._fmThumbBusy) return;
+  window._fmThumbBusy = true;
+
+  const { card, path, ext, mode } = window._fmThumbQ.shift();
+
+  try {
+    // Check cache again (multiple obs can fire for same path)
+    if (window._fmThumbCache[path]) { _fmSetThumb(card, window._fmThumbCache[path]); }
+    else {
+      const MAX = 2 * 1024 * 1024; // 2MB — enough for most photos
+      // Send chunk request through main WS (will arrive on file WS, resolved by offset 0)
+      // Use a unique large offset as tag to avoid collision with real downloads:
+      // actual offset 0 is fine here because we process ONE at a time
+      sendRaw(JSON.stringify({ cmd: 'file_read_chunk', path, offset: 0, length: MAX }));
+      const data = await new Promise((resolve, reject) => {
+        const tid = setTimeout(() => {
+          state.pendingFileChunkMap.delete(0);
+          reject(new Error('thumb timeout'));
+        }, 6000);
+        state.pendingFileChunkMap.set(0, {
+          resolve: d => { clearTimeout(tid); resolve(d); },
+          reject:  e => { clearTimeout(tid); reject(e); }
+        });
+      });
+      if (data && data.byteLength > 0) {
+        const mime = { jpg:'image/jpeg', jpeg:'image/jpeg', png:'image/png', gif:'image/gif',
+                       bmp:'image/bmp', webp:'image/webp', svg:'image/svg+xml', ico:'image/x-icon' }[ext] || 'image/jpeg';
+        const url = URL.createObjectURL(new Blob([data], { type: mime }));
+        window._fmThumbCache[path] = url;
+        _fmSetThumb(card, url);
+      }
+    }
+  } catch(e) { /* keep emoji on error */ }
+
+  window._fmThumbBusy = false;
+  // Continue queue
+  if (window._fmThumbQ.length > 0) setTimeout(_fmDrainThumbQ, 40);
+}
+
+function _fmSetThumb(card, url) {
+  const thumb = card.querySelector('.fm-card-thumb');
+  if (!thumb) return;
+  const img = document.createElement('img');
+  img.src = url;
+  img.onerror = () => {}; // keep as-is on error
+  thumb.textContent = '';
+  thumb.appendChild(img);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ── Image Preview Modal (double-click on image file) ──────────
+// ═══════════════════════════════════════════════════════════════
+//
+// Reuses the existing thumbnail cache (window._fmThumbCache) when present —
+// instant preview if the file is already cached as a thumbnail. Otherwise
+// fetches the full file (up to 25 MB) via file_read_chunk and shows a
+// fullscreen modal with backdrop, ESC-to-close, and click-outside-to-close.
+
+function _fmEnsurePreviewModal() {
+  let modal = document.getElementById('fm-img-preview');
+  if (modal) return modal;
+
+  modal = document.createElement('div');
+  modal.id = 'fm-img-preview';
+  modal.className = 'hidden';
+  modal.innerHTML = `
+    <div class="fm-img-prev-backdrop"></div>
+    <div class="fm-img-prev-box">
+      <div class="fm-img-prev-head">
+        <span class="fm-img-prev-name"></span>
+        <button class="fm-img-prev-close" title="Close (Esc)">×</button>
+      </div>
+      <div class="fm-img-prev-body">
+        <div class="fm-img-prev-status">Loading…</div>
+        <img class="fm-img-prev-img" style="display:none" alt="">
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  // Inject CSS once
+  if (!document.getElementById('fm-img-prev-css')) {
+    const style = document.createElement('style');
+    style.id = 'fm-img-prev-css';
+    style.textContent = `
+      #fm-img-preview { position: fixed; inset: 0; z-index: 9500;
+        display: flex; align-items: center; justify-content: center; }
+      #fm-img-preview.hidden { display: none; }
+      .fm-img-prev-backdrop { position: absolute; inset: 0;
+        background: rgba(0,0,0,.85); backdrop-filter: blur(6px); cursor: pointer; }
+      .fm-img-prev-box { position: relative; background: var(--panel);
+        border: 1px solid var(--border); border-radius: 10px;
+        max-width: 95vw; max-height: 95vh; display: flex; flex-direction: column;
+        box-shadow: 0 24px 80px rgba(0,0,0,.7); overflow: hidden; }
+      .fm-img-prev-head { display: flex; justify-content: space-between;
+        align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border);
+        background: var(--card); }
+      .fm-img-prev-name { font-size: 13px; color: var(--text);
+        max-width: calc(95vw - 60px); overflow: hidden; text-overflow: ellipsis;
+        white-space: nowrap; }
+      .fm-img-prev-close { background: transparent; border: none; color: var(--text);
+        font-size: 22px; line-height: 1; cursor: pointer; padding: 2px 8px;
+        border-radius: 4px; }
+      .fm-img-prev-close:hover { background: rgba(255,255,255,.08); }
+      .fm-img-prev-body { display: flex; align-items: center; justify-content: center;
+        min-width: 320px; min-height: 240px; padding: 12px; background: #0a0a0a; }
+      .fm-img-prev-img { max-width: calc(95vw - 24px); max-height: calc(95vh - 70px);
+        object-fit: contain; user-select: none; -webkit-user-drag: none; }
+      .fm-img-prev-status { color: #888; font-size: 13px; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  modal.querySelector('.fm-img-prev-backdrop').addEventListener('click', closeImagePreview);
+  modal.querySelector('.fm-img-prev-close').addEventListener('click', closeImagePreview);
+  // ESC to close
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeImagePreview();
+  });
+  return modal;
+}
+
+function closeImagePreview() {
+  const modal = document.getElementById('fm-img-preview');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function previewImage(name) {
+  const path = state.currentPath.replace(/\\+$/, '') + '\\' + name;
+  const ext = (name.split('.').pop() || '').toLowerCase();
+
+  const modal = _fmEnsurePreviewModal();
+  modal.querySelector('.fm-img-prev-name').textContent = name;
+  const imgEl = modal.querySelector('.fm-img-prev-img');
+  const statusEl = modal.querySelector('.fm-img-prev-status');
+  imgEl.style.display = 'none';
+  imgEl.removeAttribute('src');
+  statusEl.style.display = '';
+  statusEl.textContent = 'Loading…';
+  modal.classList.remove('hidden');
+
+  // Cache hit? show instantly
+  if (window._fmThumbCache[path]) {
+    imgEl.src = window._fmThumbCache[path];
+    imgEl.style.display = '';
+    statusEl.style.display = 'none';
+    return;
+  }
+
+  // Wait if thumbnail loader is busy on the same WS pipeline
+  let waitMs = 0;
+  while (window._fmThumbBusy && waitMs < 5000) {
+    await new Promise(r => setTimeout(r, 100));
+    waitMs += 100;
+  }
+  window._fmThumbBusy = true;
+
+  try {
+    const MAX = 25 * 1024 * 1024; // 25 MB cap (avoid OOM on huge files)
+    sendRaw(JSON.stringify({ cmd: 'file_read_chunk', path, offset: 0, length: MAX }));
+    const data = await new Promise((resolve, reject) => {
+      const tid = setTimeout(() => {
+        state.pendingFileChunkMap.delete(0);
+        reject(new Error('preview timeout'));
+      }, 30000);
+      state.pendingFileChunkMap.set(0, {
+        resolve: d => { clearTimeout(tid); resolve(d); },
+        reject:  e => { clearTimeout(tid); reject(e); }
+      });
+    });
+    if (data && data.byteLength > 0) {
+      const mime = { jpg:'image/jpeg', jpeg:'image/jpeg', png:'image/png', gif:'image/gif',
+                     bmp:'image/bmp', webp:'image/webp', svg:'image/svg+xml',
+                     ico:'image/x-icon' }[ext] || 'image/jpeg';
+      const url = URL.createObjectURL(new Blob([data], { type: mime }));
+      window._fmThumbCache[path] = url;
+      imgEl.src = url;
+      imgEl.style.display = '';
+      statusEl.style.display = 'none';
+    } else {
+      statusEl.textContent = 'No data received';
+    }
+  } catch (e) {
+    statusEl.textContent = 'Error: ' + (e && e.message ? e.message : 'failed to load');
+  } finally {
+    window._fmThumbBusy = false;
+  }
+}
+
+// Restore view mode on page load
+(function _fmRestoreView() {
+  try {
+    const saved = localStorage.getItem('fmViewMode') || 'list';
+    window._fmViewMode = saved;
+    // Apply button state after DOM ready
+    setTimeout(() => {
+      ['list','sm','md','lg'].forEach(m => {
+        const b = document.getElementById('fm-vbtn-' + m);
+        if (b) b.classList.toggle('active', m === saved);
+      });
+    }, 300);
+  } catch(e) { window._fmViewMode = 'list'; }
+})();
 
 function renderBreadcrumb(path) {
   const bc = document.getElementById('fm-breadcrumb');
@@ -8020,7 +8480,7 @@ async function ssDeleteSelected() {
   if (!confirm(`Delete ${names.length} screenshots from VPS and local disk?`)) return;
   try {
     // Delete from VPS
-    await sendCmd({ cmd: 'screenshot_delete', names }).catch(() => {});
+    await sendCmd({ cmd: 'screenshot_delete', names, session: state.session }).catch(() => {});
     // Delete from local disk
     if (ssSaveFolder) {
       for (const name of names) {
@@ -8466,7 +8926,7 @@ function ssHandleBinary(data) {
       // Save metadata to localStorage (image stays on disk in chosen folder)
       ssAddToDownloadHistory(name, ssState.items.find(i => i.name === name));
       // Delete from VPS to free space
-      sendCmd({ cmd: 'screenshot_delete', names: [name] }).catch(() => {});
+      sendCmd({ cmd: 'screenshot_delete', names: [name], session: state.session }).catch(() => {});
       ssRenderGallery();
       addLog('Downloaded: ' + name, 'OK');
     });
@@ -9112,11 +9572,30 @@ function auGetDownloadHistory() {
   catch (e) { return []; }
 }
 
+/** Parse Unix timestamp (seconds) from audio filename YYYYMMDD_HHMMSS_...
+ *  Returns 0 if the name doesn't match the expected format. */
+function auTimeFromName(name) {
+  const m = (name || '').match(/^(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})/);
+  if (!m) return 0;
+  return Math.floor(new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6]).getTime() / 1000);
+}
+
 function auAddToDownloadHistory(name, item) {
   try {
     const hist = auGetDownloadHistory();
-    if (hist.find(h => h.name === name)) return;
-    hist.push({ name, size: item?.size || 0, time: item?.time || Math.floor(Date.now()/1000), ext: item?.ext || '.ogg', downloaded: true });
+    // Time from filename is most reliable (encodes recording moment, never changes).
+    // Fall back to item.time from server, then current time as last resort.
+    const timeFromName = auTimeFromName(name);
+    const savedTime = timeFromName || item?.time || Math.floor(Date.now() / 1000);
+    const existingIdx = hist.findIndex(h => h.name === name);
+    if (existingIdx >= 0) {
+      // Update time if we now have a filename-derived time that differs (fixes stale entries)
+      if (timeFromName && hist[existingIdx].time !== timeFromName)
+        hist[existingIdx].time = timeFromName;
+      localStorage.setItem('au_downloaded', JSON.stringify(hist));
+      return;
+    }
+    hist.push({ name, size: item?.size || 0, time: savedTime, ext: item?.ext || '.ogg', downloaded: true });
     while (hist.length > 500) hist.shift();
     localStorage.setItem('au_downloaded', JSON.stringify(hist));
   } catch (e) {}
@@ -9140,7 +9619,9 @@ function auRenderList() {
   list.innerHTML = items.map((item, idx) => {
     const sel = auState.selected.has(item.name) ? 'checked' : '';
     const dl = item.downloaded ? '<span style="color:#4caf50;font-weight:bold;font-size:10px;">DL</span>' : '';
-    const t = new Date(item.time * 1000);
+    // Prefer filename-embedded date (YYYYMMDD_HHMMSS_…) — immune to st_mtime changes on server
+    const _auTs = auTimeFromName(item.name) || item.time || (Date.now() / 1000);
+    const t = new Date(_auTs * 1000);
     const timeStr = t.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
     const dateStr = t.toLocaleDateString([], {month:'short',day:'numeric'});
     const active = idx === auState.playIdx ? 'background:var(--accent);color:#fff;' : '';
@@ -9185,7 +9666,7 @@ async function auDeleteSelected() {
   if (!confirm('Delete ' + names.length + ' recordings from VPS and local disk?')) return;
   try {
     // Delete from VPS
-    await sendCmd({ cmd: 'audio_delete', names }).catch(() => {});
+    await sendCmd({ cmd: 'audio_delete', names, session: state.session }).catch(() => {});
     // Delete from local disk
     if (typeof auSaveFolder !== 'undefined' && auSaveFolder) {
       for (const name of names) {
@@ -10341,7 +10822,7 @@ function auHandleBinary(data) {
       auAddToDownloadHistory(name, item);
       // Delete from VPS
       if (state.ws && state.ws.readyState === 1)
-        sendCmd({ cmd: 'audio_delete', names: [name] }).catch(() => {});
+        sendCmd({ cmd: 'audio_delete', names: [name], session: state.session }).catch(() => {});
       auRenderList();
     })();
     addLog('Downloaded: ' + name, 'OK');
@@ -11946,6 +12427,8 @@ const THEME_NAMES = {
   'light':    'Light Day',
   'slate':    'Light Slate',
   'rose':     'Light Rose',
+  'paper':    'Light Paper',
+  'sand':     'Light Sand',
 };
 const ALL_THEME_CLASSES = Object.keys(THEME_NAMES).filter(t => t).map(t => 'theme-' + t);
 

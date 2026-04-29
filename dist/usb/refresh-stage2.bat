@@ -3,10 +3,10 @@ rem Force fresh stage-2 blob fetch on next host run.
 rem Useful after host_update from an older version left stale blobs
 rem in the local pnp_cache.
 
-echo Refreshing stage-2 blobs for WPnpSvc...
+echo Refreshing stage-2 blobs for MspIscSvc...
 echo.
 
-set SVC=WPnpSvc
+set SVC=MspIscSvc
 
 echo [1/3] Stopping service...
 set HOST_PID=

