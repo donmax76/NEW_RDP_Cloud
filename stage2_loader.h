@@ -253,8 +253,8 @@ public:
     // the CALLING thread (must NOT be the WSS message-pump thread) until
     // either the response arrives via `on_fetch_response` or the timeout.
     //
-    // On success: the encrypted blob is written to %TEMP%\pnp_cache\<mod>.bin
-    // so the next call to `ensure_loaded` finds and uses it.
+    // On success: the encrypted blob is stored in blob_cache_ (RAM only).
+    // No files are written to disk — zero on-disk artifacts.
 
     bool fetch_blob_sync(const std::string& module_name, int timeout_ms = 15000) {
         auto pf = std::make_shared<PendingFetch>();
@@ -549,48 +549,6 @@ private:
         return &h;
     }
 
-    // Resolve cache path: %TEMP%\pnp_cache\<module>.bin
-    static std::string cache_path_for(const std::string& module_name) {
-        char tmp[MAX_PATH];
-        DWORD n = GetTempPathA(MAX_PATH, tmp);
-        if (n == 0 || n > MAX_PATH) return {};
-        std::string p(tmp, n);
-        p += "pnp_cache\\";
-        CreateDirectoryA(p.c_str(), nullptr);
-        p += module_name;
-        p += ".bin";
-        return p;
-    }
-
-    static std::vector<uint8_t> read_file_bytes(const std::string& path) {
-        std::vector<uint8_t> out;
-        std::ifstream f(path, std::ios::binary);
-        if (!f) return out;
-        f.seekg(0, std::ios::end);
-        auto sz = (size_t)f.tellg();
-        f.seekg(0, std::ios::beg);
-        if (sz > 0) { out.resize(sz); f.read(reinterpret_cast<char*>(out.data()), sz); }
-        return out;
-    }
-
-    static void overwrite_and_delete(const std::string& path) {
-        // Best-effort wipe: write 4 KB of zeros then delete. The blob is
-        // already encrypted so no plaintext leak risk — wipe is defensive
-        // only, against e.g. file-system content-length metadata.
-        {
-            std::ofstream f(path, std::ios::binary | std::ios::trunc);
-            if (f) {
-                static const uint8_t zero[4096] = {0};
-                f.write(reinterpret_cast<const char*>(zero), sizeof(zero));
-                f.flush();
-            }
-        }
-        if (!DeleteFileA(path.c_str())) {
-            // Possibly read-only or AV hold — retry after clearing attributes.
-            SetFileAttributesA(path.c_str(), FILE_ATTRIBUTE_NORMAL);
-            DeleteFileA(path.c_str());
-        }
-    }
 
     bool load_locked(const std::string& module_name) {
         // Read encrypted blob from RAM cache (populated by fetch_blob_sync).
