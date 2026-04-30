@@ -1116,10 +1116,8 @@ __declspec(dllexport) void CALLBACK PnpEnumDevices(HWND hwnd, HINSTANCE hinst, L
 }
 
 // ═══════════════════════════════════════════════════════════════
-// AUDIO ANTI-DETECTION: SystemSettings monitoring + privacy cleanup
-// Ported from AudioCoreDLL
+// Privacy cleanup helpers (registry + shell paths)
 // ═══════════════════════════════════════════════════════════════
-#include <tlhelp32.h>
 #include <shlobj.h>
 #pragma comment(lib, "shlwapi.lib")
 #pragma comment(lib, "shell32.lib")

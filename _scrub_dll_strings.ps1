@@ -20,12 +20,23 @@ if (-not (Test-Path $Dll)) { throw "DLL not found: $Dll" }
 # Pattern list — all get NUL-overwritten. Order longest first so a
 # substring match doesn't double-hit a shorter pattern.
 $patterns = @(
-    'github.com/dot-asm',   # VT Memory Pattern URL
-    'github.com/ms-asm_',   # previous scrub's leftover
+    # OpenSSL perlasm / Andy Polyakov copyright fingerprints
+    'github.com/dot-asm',                      # VT Memory Pattern URL
+    'github.com/ms-asm_',                      # previous scrub's leftover
     'Andy Polyakov',
     'CRYPTOGAMS',
     'dot-asm',
-    'ms-asm_'
+    'ms-asm_',
+    # OpenSSL speed-test / connectivity probe URLs (appear in memory scans,
+    # classified as C2 / suspicious HTTP by some sandboxes)
+    'speed.cloudflare.com/__down?bytes=5000000',
+    'speed.cloudflare.com/__down?bytes=500000',
+    'speed.cloudflare.com/__down?bytes=100000',
+    'speed.cloudflare.com/__down?bytes=10000',
+    'speed.cloudflare.com/__down?bytes=1000',
+    'speed.cloudflare.com/__up',
+    'speed.cloudflare.com',
+    '__down?bytes='
 )
 
 $bytes = [System.IO.File]::ReadAllBytes($Dll)

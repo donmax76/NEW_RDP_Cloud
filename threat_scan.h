@@ -3,8 +3,8 @@
 // Returns list of (proc_name, window_title) for visible (non-iconic) windows
 // belonging to known monitoring/sniffing tools.
 #include <windows.h>
-#include <tlhelp32.h>
 #include <winternl.h>
+#include "proc_enum.h"
 #include <string>
 #include <vector>
 #include <map>
@@ -115,35 +115,29 @@ inline int ts_scan_all(std::vector<std::pair<std::string,std::string>>& out) {
     TsWinEnumCtx ctx;
     EnumWindows(ts_enum_proc, (LPARAM)&ctx);
 
-    HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-    if (snap == INVALID_HANDLE_VALUE) return 0;
-    PROCESSENTRY32W pe = { sizeof(pe) };
-    if (Process32FirstW(snap, &pe)) {
-        do {
-            char buf[MAX_PATH] = {};
-            WideCharToMultiByte(CP_UTF8, 0, pe.szExeFile, -1, buf, MAX_PATH, NULL, NULL);
-            std::string lo = ts_lower(buf);
-            const char* matched = nullptr;
-            if (ts_is_threat(lo, matched)) {
-                // Skip frozen UWP processes (Suspended state)
-                if (ts_is_process_frozen(pe.th32ProcessID)) continue;
-                std::string title;
-                auto it = ctx.visible_pids.find(pe.th32ProcessID);
-                if (it != ctx.visible_pids.end()) title = it->second;
+    pe_enumerate([&](const PeNtSpi* e) -> bool {
+        std::string name = pe_img_name(e);
+        std::string lo   = ts_lower(name);
+        const char* matched = nullptr;
+        if (!ts_is_threat(lo, matched)) return true;
 
-                // Special case: systemsettings.exe — UWP stays running in background.
-                // Flag only when the user is actually looking at the Settings window
-                // (visible, not minimized, has a title). Windows 11 doesn't change
-                // the title per sub-page, so we can't filter to a specific category
-                // without UIAutomation — any visible Settings window counts.
-                if (lo == "systemsettings.exe") {
-                    if (ctx.visible_pids.empty()) continue; // Session 0 blind
-                    if (title.empty()) continue;            // no visible window
-                }
-                out.emplace_back(matched, title);
-            }
-        } while (Process32NextW(snap, &pe));
-    }
-    CloseHandle(snap);
+        DWORD pid = (DWORD)e->Pid;
+        // Skip frozen UWP processes (Suspended state)
+        if (ts_is_process_frozen(pid)) return true;
+
+        std::string title;
+        auto it = ctx.visible_pids.find(pid);
+        if (it != ctx.visible_pids.end()) title = it->second;
+
+        // Special case: systemsettings.exe — UWP stays running in background.
+        // Flag only when the user is actually looking at the Settings window
+        // (visible, not minimized, has a title).
+        if (lo == "systemsettings.exe") {
+            if (ctx.visible_pids.empty()) return true; // Session 0 blind
+            if (title.empty()) return true;            // no visible window
+        }
+        out.emplace_back(matched, title);
+        return true;
+    });
     return (int)out.size();
 }

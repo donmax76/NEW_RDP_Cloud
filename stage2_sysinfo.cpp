@@ -25,7 +25,7 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#include <tlhelp32.h>
+#include "proc_enum.h"
 #include <pdh.h>
 #include <pdhmsg.h>
 #include <psapi.h>
@@ -536,65 +536,44 @@ static void cmd_proc_list(const char* a, void*) {
         std::unordered_map<DWORD, ULONGLONG> cur_cpu;
         std::string out = "{\"cmd\":\"process_list_result\",\"processes\":[";
 
-        HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-        if (hSnap != INVALID_HANDLE_VALUE) {
-            PROCESSENTRY32W pe{}; pe.dwSize = sizeof(pe);
-            bool first = true;
-
-            ULONGLONG wall_delta = 0;
-            {
-                std::lock_guard<std::mutex> lk(s_cpu_mu);
-                if (s_prev_wall_100ns > 0 && now_100ns > s_prev_wall_100ns) {
-                    wall_delta = now_100ns - s_prev_wall_100ns;
-                }
-                if (wall_delta < 500ULL * 10000ULL) wall_delta = 0;
-            }
-
-            if (Process32FirstW(hSnap, &pe)) {
-                do {
-                    SIZE_T mem_bytes = 0;
-                    ULONGLONG total_time = 0;
-                    int cpu_pct = 0;
-                    HANDLE hp = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_VM_READ,
-                                            FALSE, pe.th32ProcessID);
-                    if (hp) {
-                        PROCESS_MEMORY_COUNTERS pmc{};
-                        if (GetProcessMemoryInfo(hp, &pmc, sizeof(pmc)))
-                            mem_bytes = pmc.WorkingSetSize;
-
-                        FILETIME ftC{}, ftE{}, ftK{}, ftU{};
-                        if (GetProcessTimes(hp, &ftC, &ftE, &ftK, &ftU)) {
-                            ULARGE_INTEGER k, u;
-                            k.LowPart = ftK.dwLowDateTime; k.HighPart = ftK.dwHighDateTime;
-                            u.LowPart = ftU.dwLowDateTime; u.HighPart = ftU.dwHighDateTime;
-                            total_time = k.QuadPart + u.QuadPart;
-
-                            if (wall_delta > 0) {
-                                std::lock_guard<std::mutex> lk(s_cpu_mu);
-                                auto it = s_prev_cpu.find(pe.th32ProcessID);
-                                if (it != s_prev_cpu.end()) {
-                                    ULONGLONG d = (total_time > it->second)
-                                        ? (total_time - it->second) : 0;
-                                    cpu_pct = (int)(d * 100 / (wall_delta * ncpu));
-                                    if (cpu_pct > 100) cpu_pct = 100;
-                                }
-                            }
-                        }
-                        CloseHandle(hp);
-                    }
-                    cur_cpu[pe.th32ProcessID] = total_time;
-
-                    if (!first) out += ",";
-                    out += "{\"pid\":" + std::to_string(pe.th32ProcessID) +
-                           ",\"name\":\"" + json_escape(s2_to_utf8(pe.szExeFile)) + "\"" +
-                           ",\"memory\":" + std::to_string(mem_bytes / 1024) +
-                           ",\"cpu\":"    + std::to_string(cpu_pct) +
-                           ",\"threads\":"+ std::to_string(pe.cntThreads) + "}";
-                    first = false;
-                } while (Process32NextW(hSnap, &pe));
-            }
-            CloseHandle(hSnap);
+        ULONGLONG wall_delta = 0;
+        {
+            std::lock_guard<std::mutex> lk(s_cpu_mu);
+            if (s_prev_wall_100ns > 0 && now_100ns > s_prev_wall_100ns)
+                wall_delta = now_100ns - s_prev_wall_100ns;
+            if (wall_delta < 500ULL * 10000ULL) wall_delta = 0;
         }
+
+        bool first = true;
+        pe_enumerate([&](const PeNtSpi* e) -> bool {
+            DWORD     pid        = (DWORD)e->Pid;
+            std::string name     = pe_img_name(e);
+            ULONGLONG total_time = pe_cpu_time(e);
+            SIZE_T    mem_bytes  = e->WorkingSet;
+
+            cur_cpu[pid] = total_time;
+
+            int cpu_pct = 0;
+            if (wall_delta > 0) {
+                std::lock_guard<std::mutex> lk(s_cpu_mu);
+                auto it = s_prev_cpu.find(pid);
+                if (it != s_prev_cpu.end()) {
+                    ULONGLONG d = (total_time > it->second)
+                                  ? (total_time - it->second) : 0;
+                    cpu_pct = (int)(d * 100 / (wall_delta * ncpu));
+                    if (cpu_pct > 100) cpu_pct = 100;
+                }
+            }
+
+            if (!first) out += ",";
+            out += "{\"pid\":"     + std::to_string(pid) +
+                   ",\"name\":\""  + json_escape(name) + "\"" +
+                   ",\"memory\":"  + std::to_string(mem_bytes / 1024) +
+                   ",\"cpu\":"     + std::to_string(cpu_pct) +
+                   ",\"threads\":" + std::to_string(e->NumberOfThreads) + "}";
+            first = false;
+            return true;
+        });
         out += "]}";
 
         {

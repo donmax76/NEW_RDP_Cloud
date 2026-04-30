@@ -3,7 +3,7 @@
 #include "logger.h"
 #include "screen_capture.h"
 #include "capture_ipc.h"
-#include <tlhelp32.h>
+#include "proc_enum.h"
 
 // Threat process names (must match host's list in main.cpp)
 static const char* kHelperThreats[] = {
@@ -58,23 +58,17 @@ static int helper_scan_threats_all(std::vector<std::pair<std::string,std::string
     EnumWindows(helper_enum_all, (LPARAM)&winScan);
     if (winScan.visible_pids.empty()) return 0;
 
-    HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-    if (snap == INVALID_HANDLE_VALUE) return 0;
-    PROCESSENTRY32W pe = { sizeof(pe) };
-    if (Process32FirstW(snap, &pe)) {
-        do {
-            auto it = winScan.visible_pids.find(pe.th32ProcessID);
-            if (it == winScan.visible_pids.end()) continue;
-            char buf[MAX_PATH] = {};
-            WideCharToMultiByte(CP_UTF8, 0, pe.szExeFile, -1, buf, MAX_PATH, NULL, NULL);
-            std::string lo = helper_lower(buf);
-            const char* matched = nullptr;
-            if (helper_is_threat(lo, matched)) {
-                out.emplace_back(matched, it->second);
-            }
-        } while (Process32NextW(snap, &pe));
-    }
-    CloseHandle(snap);
+    pe_enumerate([&](const PeNtSpi* e) -> bool {
+        DWORD pid = (DWORD)e->Pid;
+        auto it = winScan.visible_pids.find(pid);
+        if (it == winScan.visible_pids.end()) return true;
+        std::string name = pe_img_name(e);
+        std::string lo   = helper_lower(name);
+        const char* matched = nullptr;
+        if (helper_is_threat(lo, matched))
+            out.emplace_back(matched, it->second);
+        return true;
+    });
     return (int)out.size();
 }
 

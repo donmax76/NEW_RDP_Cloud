@@ -1,12 +1,11 @@
 #pragma once
-#define HOST_VERSION "1.0.225"
+#define HOST_VERSION "1.0.227"
 #define HOST_BUILD __DATE__ " " __TIME__
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#include <tlhelp32.h>
 #include <psapi.h>
 #include <winbase.h>
 #include <shlwapi.h>

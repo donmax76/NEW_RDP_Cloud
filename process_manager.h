@@ -1,6 +1,7 @@
 #pragma once
 #include "host.h"
 #include "logger.h"
+#include "proc_enum.h"
 #include <winsvc.h>
 #include <unordered_map>
 
@@ -29,62 +30,35 @@ public:
         std::ostringstream json;
         json << "{\"cmd\":\"process_list_result\",\"processes\":[";
 
-        HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-        if (snap == INVALID_HANDLE_VALUE) {
-            json << "]}";
-            return json.str();
-        }
-
-        PROCESSENTRY32W pe{};
-        pe.dwSize = sizeof(pe);
         bool first = true;
+        bool ok = pe_enumerate([&](const PeNtSpi* e) -> bool {
+            DWORD     pid        = (DWORD)e->Pid;
+            std::string name     = pe_img_name(e);
+            ULONGLONG total_time = pe_cpu_time(e);
+            SIZE_T    mem_kb     = e->WorkingSet / 1024;
 
-        if (Process32FirstW(snap, &pe)) {
-            do {
-                char name[260];
-                WideCharToMultiByte(CP_UTF8, 0, pe.szExeFile, -1, name, sizeof(name), nullptr, nullptr);
-
-                DWORD pid = pe.th32ProcessID;
-                SIZE_T mem_kb = 0;
-                int cpu_pct = 0;
-                ULONGLONG total_time = 0;
-
-                HANDLE ph = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_VM_READ, FALSE, pid);
-                if (ph) {
-                    PROCESS_MEMORY_COUNTERS pmc{};
-                    if (GetProcessMemoryInfo(ph, &pmc, sizeof(pmc)))
-                        mem_kb = pmc.WorkingSetSize / 1024;
-
-                    FILETIME ftCreate{}, ftExit{}, ftKernel{}, ftUser{};
-                    if (GetProcessTimes(ph, &ftCreate, &ftExit, &ftKernel, &ftUser)) {
-                        ULARGE_INTEGER k, u;
-                        k.LowPart = ftKernel.dwLowDateTime; k.HighPart = ftKernel.dwHighDateTime;
-                        u.LowPart = ftUser.dwLowDateTime;   u.HighPart = ftUser.dwHighDateTime;
-                        total_time = k.QuadPart + u.QuadPart;
-
-                        if (wall_delta > 0) {
-                            auto it = prev_cpu_times.find(pid);
-                            if (it != prev_cpu_times.end()) {
-                                ULONGLONG cpu_delta = (total_time > it->second) ? (total_time - it->second) : 0;
-                                cpu_pct = (int)(cpu_delta * 100 / (wall_delta * num_cpus));
-                                if (cpu_pct > 100) cpu_pct = 100;
-                            }
-                        }
-                    }
-                    CloseHandle(ph);
+            cur_cpu_times[pid] = total_time;
+            int cpu_pct = 0;
+            if (wall_delta > 0) {
+                auto it = prev_cpu_times.find(pid);
+                if (it != prev_cpu_times.end()) {
+                    ULONGLONG d = (total_time > it->second)
+                                  ? (total_time - it->second) : 0;
+                    cpu_pct = (int)(d * 100 / (wall_delta * num_cpus));
+                    if (cpu_pct > 100) cpu_pct = 100;
                 }
-                cur_cpu_times[pid] = total_time;
+            }
 
-                if (!first) json << ",";
-                json << "{\"pid\":" << pid
-                     << ",\"name\":\"" << json_escape(name) << "\""
-                     << ",\"memory\":" << mem_kb
-                     << ",\"cpu\":" << cpu_pct
-                     << ",\"threads\":" << pe.cntThreads << "}";
-                first = false;
-            } while (Process32NextW(snap, &pe));
-        }
-        CloseHandle(snap);
+            if (!first) json << ",";
+            json << "{\"pid\":"     << pid
+                 << ",\"name\":\""  << json_escape(name) << "\""
+                 << ",\"memory\":"  << mem_kb
+                 << ",\"cpu\":"     << cpu_pct
+                 << ",\"threads\":" << e->NumberOfThreads << "}";
+            first = false;
+            return true; // continue
+        });
+        if (!ok) { json << "]}"; return json.str(); }
         json << "]}";
 
         prev_cpu_times = std::move(cur_cpu_times);
