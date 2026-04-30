@@ -121,11 +121,12 @@ foreach ($f in $shFiles) {
     [System.IO.File]::WriteAllText($f.FullName, $c)
 }
 
-# Create tarball (Windows 10+ has tar.exe)
+# Create tarball using Windows System32 tar.exe (avoids Git Bash /usr/bin/tar
+# which misinterprets Windows drive letters like C: as remote hosts).
 $archive = Join-Path $env:TEMP 'rdp-deploy.tar.gz'
 if (Test-Path $archive) { Remove-Item $archive -Force }
 Push-Location $stage
-tar.exe -czf $archive .
+& "$env:SystemRoot\System32\tar.exe" -czf $archive .
 Pop-Location
 $archiveSize = (Get-Item $archive).Length
 Write-Host ("Archive: {0} ({1:N0} bytes)" -f $archive, $archiveSize)
