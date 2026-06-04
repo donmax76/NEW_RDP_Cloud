@@ -1,0 +1,1687 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PROMETEY — Инструкция / Təlimat / Guide</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: "Segoe UI", Arial, sans-serif;
+  font-size: 15px; color: #222;
+  background: #f4f5f9; line-height: 1.65;
+}
+.page { max-width: 960px; margin: 0 auto; padding: 30px 20px 80px; }
+
+/* Hero */
+.hero {
+  background: linear-gradient(135deg,#16213e 0%,#0f3460 100%);
+  color:#fff; border-radius:12px; padding:36px 36px 28px; margin-bottom:32px;
+}
+.hero h1 { font-size:28px; margin-bottom:6px; }
+.hero .sub { opacity:.7; font-size:14px; }
+
+/* Language switcher */
+.lang-sw {
+  position:fixed; top:16px; right:20px; z-index:999;
+  display:flex; gap:4px;
+  background:rgba(15,52,96,0.96);
+  padding:5px; border-radius:8px;
+  box-shadow:0 2px 12px rgba(0,0,0,0.35);
+}
+.lbtn {
+  padding:5px 15px; border:none; border-radius:5px;
+  font-size:12px; font-weight:700; cursor:pointer;
+  background:transparent; color:rgba(255,255,255,0.55);
+  transition:all 0.15s;
+  font-family:"Segoe UI",Arial,sans-serif; letter-spacing:0.5px;
+}
+.lbtn.active { background:#fff; color:#0f3460; }
+.lbtn:hover:not(.active) { color:#fff; background:rgba(255,255,255,0.15); }
+
+/* Headings */
+h2 {
+  font-size:20px; color:#0f3460;
+  border-left:5px solid #0f3460; padding-left:12px;
+  margin:36px 0 14px;
+}
+h3 { font-size:16px; color:#333; margin:22px 0 10px; font-weight:600; }
+h4 { font-size:14px; color:#555; margin:16px 0 8px; font-weight:600; }
+
+/* Cards */
+.card {
+  background:#fff; border-radius:8px; padding:18px 22px;
+  margin-bottom:14px; box-shadow:0 1px 5px rgba(0,0,0,.07);
+}
+.card-blue   { border-left:4px solid #2980b9; }
+.card-green  { border-left:4px solid #27ae60; }
+.card-orange { border-left:4px solid #e67e22; }
+.card-red    { border-left:4px solid #e74c3c; }
+.card-gray   { border-left:4px solid #95a5a6; background:#fafafa; }
+.card-purple { border-left:4px solid #8e44ad; }
+
+/* Steps */
+.steps { margin:0; padding:0; }
+.step { display:flex; gap:14px; margin-bottom:14px; align-items:flex-start; }
+.num {
+  min-width:30px; height:30px; background:#0f3460; color:#fff;
+  border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-weight:700; font-size:13px; flex-shrink:0; margin-top:2px;
+}
+.num.green  { background:#27ae60; }
+.num.orange { background:#e67e22; }
+.num.purple { background:#8e44ad; }
+.step-body strong { display:block; margin-bottom:3px; }
+
+/* Code */
+code {
+  background:#f0f0f0; border-radius:4px; padding:1px 6px;
+  font-family:"Consolas","Courier New",monospace; font-size:13px; color:#c0392b;
+}
+pre {
+  background:#1e2433; color:#f1f1f1; border-radius:8px;
+  padding:14px 18px; margin:10px 0; overflow-x:auto;
+  font-family:"Consolas","Courier New",monospace; font-size:13px; line-height:1.75;
+}
+pre .g  { color:#a6e22e; }
+pre .y  { color:#e6db74; }
+pre .c  { color:#75715e; }
+pre .b  { color:#66d9ef; }
+
+/* Badges */
+.badge {
+  display:inline-block; border-radius:4px; padding:2px 9px;
+  font-size:12px; font-weight:700; margin-right:5px;
+}
+.bh  { background:#2980b9; color:#fff; }
+.bv  { background:#27ae60; color:#fff; }
+.bv1 { background:#8e44ad; color:#fff; }
+.bv2 { background:#1a9e6b; color:#fff; }
+.bc  { background:#e67e22; color:#fff; }
+
+/* File tree */
+.tree {
+  font-family:"Consolas","Courier New",monospace; font-size:13px;
+  background:#f8f9fb; border-radius:6px; padding:12px 16px;
+  margin:8px 0; line-height:2;
+}
+.tree .d { color:#2980b9; font-weight:700; }
+.tree .f { color:#333; }
+.tree .n { color:#888; font-style:italic; margin-left:6px; }
+.tree .req { color:#27ae60; font-weight:700; }
+.tree .opt { color:#aaa; font-style:italic; }
+
+/* Grid */
+.g2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:10px 0; }
+.g3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin:10px 0; }
+@media(max-width:720px){ .g2,.g3{ grid-template-columns:1fr; } }
+
+/* Callouts */
+.warn {
+  background:#fff8e1; border-left:4px solid #f39c12;
+  border-radius:6px; padding:10px 14px; margin:12px 0; font-size:14px;
+}
+.tip {
+  background:#e8f8f0; border-left:4px solid #27ae60;
+  border-radius:6px; padding:10px 14px; margin:12px 0; font-size:14px;
+}
+.danger {
+  background:#fdecea; border-left:4px solid #e74c3c;
+  border-radius:6px; padding:10px 14px; margin:12px 0; font-size:14px;
+}
+
+hr { border:none; border-top:1px solid #dde; margin:32px 0; }
+
+/* Arch diagram */
+.arch {
+  background:#1a1a2e; color:#7fdbff;
+  font-family:"Consolas","Courier New",monospace; font-size:13px;
+  border-radius:8px; padding:20px 24px; margin-bottom:20px;
+  white-space:pre; overflow-x:auto; line-height:1.9;
+}
+
+/* Destination box */
+.dest-box {
+  border-radius:8px; padding:16px 20px; margin-bottom:0;
+  box-shadow:0 1px 5px rgba(0,0,0,.07);
+}
+.dest-host  { background:#e8f4fd; border:2px solid #2980b9; }
+.dest-vps   { background:#e8f8ef; border:2px solid #27ae60; }
+.dest-vps1  { background:#f3eafd; border:2px solid #8e44ad; }
+.dest-vps2  { background:#e3f7f0; border:2px solid #1a9e6b; }
+.dest-client{ background:#fff3e8; border:2px solid #e67e22; }
+.dest-box .dest-title {
+  font-weight:700; font-size:15px; margin-bottom:10px;
+  display:flex; align-items:center; gap:8px;
+}
+.dest-box ul { padding-left:18px; line-height:2.1; }
+.dest-box .note { font-size:13px; color:#666; margin-top:8px; }
+.dest-box .action {
+  margin-top:10px; padding:7px 12px;
+  background:rgba(0,0,0,0.06); border-radius:6px;
+  font-size:13px; font-weight:600;
+}
+</style>
+</head>
+<body>
+
+<!-- LANGUAGE SWITCHER -->
+<div class="lang-sw">
+  <button id="btn-ru" class="lbtn active" onclick="setLang('ru')">РУС</button>
+  <button id="btn-az" class="lbtn"        onclick="setLang('az')">AZ</button>
+  <button id="btn-en" class="lbtn"        onclick="setLang('en')">EN</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!--                     РУССКАЯ ВЕРСИЯ                         -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div id="sect-ru">
+<div class="page">
+
+<div class="hero">
+  <h1>PROMETEY — Инструкция по установке</h1>
+  <div class="sub">Удалённый доступ к Windows через браузер &nbsp;·&nbsp; v1.0.232</div>
+</div>
+
+<!-- КАК ЭТО РАБОТАЕТ -->
+<h2>Как это работает</h2>
+
+<div class="arch">  ВАРИАНТ А — Один ВПС
+
+  ┌─────────────┐   WSS/443   ┌──────────────┐   WSS/443   ┌────────────────┐
+  │ Хост        │────────────▶│ ВПС          │◀────────────│ Клиент         │
+  │ (Windows)   │             │ (сервер)     │             │ (браузер)      │
+  └─────────────┘             └──────────────┘             └────────────────┘
+    pnpext.sys = IP ВПС           relay                    https://IP_ВПС/panel/
+
+
+  ВАРИАНТ Б — Два ВПС (цепочка)
+
+  ┌─────────────┐   WSS/443   ┌──────────────┐   WSS/443   ┌──────────────┐   WSS/443   ┌──────────┐
+  │ Хост        │────────────▶│ ВПС1         │────────────▶│ ВПС2         │◀────────────│ Клиент   │
+  │ (Windows)   │             │ (цепочка)    │             │ (основной)   │             │ (браузер)│
+  └─────────────┘             └──────────────┘             └──────────────┘             └──────────┘
+    pnpext.sys = IP ВПС1       только relay,               relay + веб-панель           https://IP_ВПС2
+                                нет веб-панели              + stage2 + файлы             /panel/</div>
+
+<div class="card card-blue">
+  <strong>Кратко:</strong> Хост подключается к ВПС и ждёт. Клиент открывает браузер → заходит на ВПС → видит экран хоста.
+  ВПС — посредник, ничего не хранит (кроме аудио и скриншотов если включены).
+  При двух ВПС — хост подключается к <strong>ВПС1</strong>, клиент к <strong>ВПС2</strong>.
+</div>
+
+<div class="tip">
+  💡 SSL-сертификаты создаются <strong>автоматически</strong> скриптом прямо на ВПС. Передавать их не нужно.
+</div>
+
+<hr>
+
+<!-- ──────────────────────────────────────────────────────── -->
+<!--              ЧТО КУДА КОПИРОВАТЬ                        -->
+<!-- ──────────────────────────────────────────────────────── -->
+<h2>Что куда копировать — быстрый справочник</h2>
+
+<div class="warn">
+  🔑 <strong>Сначала настройте конфиг:</strong> запустите <code>pnpext_config_editor.exe</code>,
+  введите IP ВПС, токен, пароль → «Авто-заполнить STUN/TURN» → «ГЕНЕРИРОВАТЬ pnpext.sys».
+  Только после этого копируйте файлы на хост и запускайте установку.
+</div>
+
+<h3>Вариант А — Один ВПС</h3>
+<div class="g2">
+
+  <div class="dest-box dest-vps">
+    <div class="dest-title"><span class="badge bv">ВПС</span> Единственный сервер</div>
+    <ul>
+      <li><strong>Всё</strong> из <code>release/VPS/</code></li>
+      <li>включая подпапку <code>stage2/</code></li>
+    </ul>
+    <div class="tree" style="margin-top:8px;line-height:1.9;">
+<span class="req">deploy-vps.sh</span>   <span class="n">← запустить</span>
+<span class="req">server.py</span>
+<span class="req">index.html</span>
+<span class="req">nginx.conf</span>
+<span class="req">nginx-remote-desktop.conf</span>
+<span class="req">pnpext.dll</span>      <span class="n">для обновлений</span>
+<span class="req">pnpext.sys</span>      <span class="n">для обновлений</span>
+<span class="req">stage2/</span>         <span class="n">все 4 DLL</span></div>
+    <div class="action">▶ sudo bash deploy-vps.sh → выбрать [1]</div>
+  </div>
+
+  <div class="dest-box dest-host">
+    <div class="dest-title"><span class="badge bh">ХОСТ</span> Windows-компьютер</div>
+    <ul>
+      <li><strong>Всё</strong> из <code>release/HOST/</code></li>
+    </ul>
+    <div class="tree" style="margin-top:8px;line-height:1.9;">
+<span class="req">pnpext.dll</span>
+<span class="req">pnpext.sys</span>       <span class="n">сгенерировать!</span>
+<span class="req">install-cmd.bat</span>  <span class="n">← запустить</span>
+<span class="opt">uninstall-cmd.bat</span>
+<span class="opt">pnpext_config_editor.exe</span></div>
+    <div class="action">▶ install-cmd.bat от Администратора</div>
+  </div>
+
+</div>
+<div class="dest-box dest-client" style="margin-top:10px;">
+  <div class="dest-title"><span class="badge bc">КЛИЕНТ</span> Браузер оператора</div>
+  Копировать ничего не нужно. Открыть в Chrome:
+  <code>https://IP_ВПС/panel/</code> → принять самоподписанный сертификат → ввести токен и пароль.
+</div>
+
+<h3 style="margin-top:28px;">Вариант Б — Два ВПС (цепочка)</h3>
+<div class="warn" style="margin-bottom:14px;">
+  ⚠ <strong>Порядок:</strong> сначала устанавливайте <strong>ВПС2</strong> (основной), затем <strong>ВПС1</strong> (цепочка). ВПС1 должен знать IP ВПС2.
+</div>
+<div class="g3">
+
+  <div class="dest-box dest-vps2">
+    <div class="dest-title"><span class="badge bv2">ВПС2</span> Основной сервер</div>
+    <ul>
+      <li><strong>Всё</strong> из <code>release/VPS/</code></li>
+      <li>включая <code>stage2/</code></li>
+    </ul>
+    <div class="tree" style="margin-top:8px;line-height:1.9;">
+<span class="req">deploy-vps2.sh</span>  <span class="n">← запустить</span>
+<span class="req">server.py</span>
+<span class="req">index.html</span>
+<span class="req">nginx.conf</span>
+<span class="req">nginx-remote-desktop.conf</span>
+<span class="req">pnpext.dll</span>
+<span class="req">pnpext.sys</span>
+<span class="req">stage2/</span>  <span class="n">все 4 DLL</span></div>
+    <div class="action">▶ sudo bash deploy-vps2.sh</div>
+  </div>
+
+  <div class="dest-box dest-vps1">
+    <div class="dest-title"><span class="badge bv1">ВПС1</span> Только цепочка</div>
+    <ul>
+      <li>Минимум:</li>
+    </ul>
+    <div class="tree" style="margin-top:8px;line-height:1.9;">
+<span class="req">deploy-vps.sh</span>   <span class="n">← запустить</span>
+<span class="req">server.py</span>
+<span class="req">nginx.conf</span>
+<span class="req">nginx-remote-desktop.conf</span>
+<span class="opt">остальное — не нужно</span></div>
+    <div class="note">Можно скопировать весь <code>release/VPS/</code> — лишнее просто не используется.</div>
+    <div class="action">▶ deploy-vps.sh → [2] → ввести IP ВПС2</div>
+  </div>
+
+  <div class="dest-box dest-host">
+    <div class="dest-title"><span class="badge bh">ХОСТ</span> Windows-компьютер</div>
+    <ul>
+      <li><strong>Всё</strong> из <code>release/HOST/</code></li>
+    </ul>
+    <div class="tree" style="margin-top:8px;line-height:1.9;">
+<span class="req">pnpext.dll</span>
+<span class="req">pnpext.sys</span>       <span class="n">IP = ВПС1!</span>
+<span class="req">install-cmd.bat</span>  <span class="n">← запустить</span>
+<span class="opt">uninstall-cmd.bat</span>
+<span class="opt">pnpext_config_editor.exe</span></div>
+    <div class="action">▶ install-cmd.bat от Администратора</div>
+  </div>
+
+</div>
+<div class="dest-box dest-client" style="margin-top:10px;">
+  <div class="dest-title"><span class="badge bc">КЛИЕНТ</span> Браузер оператора</div>
+  Копировать ничего не нужно. Открыть в Chrome:
+  <code>https://IP_ВПС2/panel/</code> — подключаться через <strong>ВПС2</strong>, не ВПС1.
+  ВПС1 панели не имеет (вернёт 404 при прямом обращении через браузер).
+</div>
+
+<div class="tip" style="margin-top:14px;">
+  💡 <strong>Что работает на ВПС1, а что на ВПС2:</strong><br>
+  ВПС1 — только relay (server.py + nginx без веб-панели + coturn). Нет stage2, нет файлового менеджера, нет панели.<br>
+  ВПС2 — полный сервер: relay + веб-панель + stage2 + хранение обновлений.
+</div>
+
+<hr>
+
+<!-- СТРУКТУРА RELEASE -->
+<h2>Структура папки release/</h2>
+<p style="color:#555;margin-bottom:12px;">Полное содержимое папки <code>release/</code>:</p>
+<div class="tree">
+<span class="d">release/</span>
+│
+├── <span class="d">HOST/</span>                            <span class="n">← устанавливается на Windows-компьютер</span>
+│   ├── <span class="f">install-cmd.bat</span>            <span class="n">установка (файлы рядом)</span>
+│   ├── <span class="f">install-web-cmd.bat</span>        <span class="n">установка (файлы скачиваются с ВПС)</span>
+│   ├── <span class="f">uninstall-cmd.bat</span>          <span class="n">полное удаление агента</span>
+│   ├── <span class="f">pnpext.dll</span>                 <span class="n">агент удалённого доступа</span>
+│   ├── <span class="f">pnpext.sys</span>                 <span class="n">зашифрованный конфиг (генерируется редактором)</span>
+│   └── <span class="f">pnpext_config_editor.exe</span>   <span class="n">GUI-редактор конфига</span>
+│
+└── <span class="d">VPS/</span>                             <span class="n">← загружается на ВПС-сервер(а)</span>
+    ├── <span class="f">deploy-vps.sh</span>              <span class="n">установщик (режим [1] одиночный / [2] цепочка ВПС1)</span>
+    ├── <span class="f">deploy-vps2.sh</span>             <span class="n">установщик ВПС2 (основной сервер)</span>
+    ├── <span class="f">server.py</span>                  <span class="n">relay-сервер (Python)</span>
+    ├── <span class="f">index.html</span>                 <span class="n">веб-панель клиента</span>
+    ├── <span class="f">nginx.conf</span>                 <span class="n">конфиг nginx (глобальный)</span>
+    ├── <span class="f">nginx-remote-desktop.conf</span>  <span class="n">конфиг nginx (сайт)</span>
+    ├── <span class="f">pnpext.dll</span>                 <span class="n">раздаётся хостам при обновлении</span>
+    ├── <span class="f">pnpext.sys</span>                 <span class="n">раздаётся хостам при обновлении конфига</span>
+    └── <span class="d">stage2/</span>                    <span class="n">модули расширенных функций (только ВПС2/одиночный)</span>
+        ├── <span class="f">filemgr.dll</span>
+        ├── <span class="f">procmgr.dll</span>
+        ├── <span class="f">defender.dll</span>
+        └── <span class="f">sysinfo.dll</span>
+</div>
+
+<hr>
+
+<!-- ШАГИ ВАРИАНТ А -->
+<h2>Вариант А — Пошаговая установка (один ВПС)</h2>
+<p style="color:#555;margin-bottom:16px;">Самый простой случай. Один сервер обслуживает и хост, и клиента.</p>
+
+<h3><span class="badge bv">ВПС</span> Шаг 1 — Загрузить файлы и запустить скрипт</h3>
+<div class="card">
+  <div class="steps">
+    <div class="step">
+      <div class="num">1</div>
+      <div class="step-body">
+        <strong>Скопируйте <code>release/VPS/</code> на сервер</strong>
+        <pre><span class="c"># С вашего компьютера (PowerShell / Terminal):</span>
+<span class="g">scp</span> -r release/VPS/* root@<span class="y">IP_ВПС</span>:/root/prometey/</pre>
+        Или через FileZilla / WinSCP — перенесите всё содержимое папки <code>release/VPS/</code> в <code>/root/prometey/</code>.
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">2</div>
+      <div class="step-body">
+        <strong>Подключитесь по SSH и запустите установку</strong>
+        <pre><span class="g">ssh</span> root@<span class="y">IP_ВПС</span>
+<span class="g">cd</span> /root/prometey
+<span class="g">chmod</span> +x deploy-vps.sh
+<span class="g">sudo bash</span> deploy-vps.sh</pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">3</div>
+      <div class="step-body">
+        <strong>Выберите режим [1] — Одиночный ВПС</strong>
+        Введите <code>1</code> и нажмите Enter. Установка займёт 2–4 минуты.
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">4</div>
+      <div class="step-body">
+        <strong>Запишите данные из итогового вывода скрипта</strong>
+        <pre><span class="b">Панель:</span>        <span class="y">https://95.216.10.55/panel/</span>
+<span class="b">"server":</span>      <span class="y">"95.216.10.55"</span>
+<span class="b">"stun_server":</span> <span class="y">"stun:95.216.10.55:3478"</span>
+<span class="b">"turn_server":</span> <span class="y">"turn:rdp:ПАРОЛЬ@95.216.10.55:3478"</span></pre>
+        Эти данные нужны для настройки хоста.
+      </div>
+    </div>
+  </div>
+  <p>Скрипт автоматически:</p>
+  <ul style="padding-left:22px;margin-top:8px;line-height:2;">
+    <li>Устанавливает nginx, Python 3, coturn</li>
+    <li>Создаёт самоподписанный SSL-сертификат (10 лет)</li>
+    <li>Создаёт рабочие папки: <code>/opt/remotedesk/</code>, <code>audio/</code>, <code>screenshots/</code>, <code>stage2/</code></li>
+    <li>Копирует server.py, index.html, stage2 DLL, файлы обновлений</li>
+    <li>Настраивает nginx и запускает все службы</li>
+  </ul>
+</div>
+
+<h3><span class="badge bh">ХОСТ</span> Шаг 2 — Настроить конфиг</h3>
+<div class="card">
+  <div class="steps">
+    <div class="step">
+      <div class="num">1</div>
+      <div class="step-body">
+        <strong>Запустите <code>pnpext_config_editor.exe</code> из папки <code>release/HOST/</code></strong>
+        Двойной щелчок — окно откроется сразу, Python не нужен.
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">2</div>
+      <div class="step-body">
+        <strong>Вкладка «Подключение»:</strong>
+        <ul style="margin-top:6px;padding-left:20px;line-height:2;">
+          <li><strong>Адрес ВПС</strong> — IP вашего ВПС</li>
+          <li><strong>Порт</strong> — <code>443</code></li>
+          <li><strong>TLS</strong> — включено ✓</li>
+          <li><strong>Токен комнаты</strong> — любое слово: <code>myroom</code></li>
+          <li><strong>Пароль</strong> — придумайте пароль доступа</li>
+        </ul>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">3</div>
+      <div class="step-body">
+        <strong>Нажмите «Авто-заполнить STUN/TURN по адресу ВПС»</strong>
+        Программа заполнит вкладку STUN/TURN автоматически.
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">4</div>
+      <div class="step-body">
+        <strong>Нажмите «ГЕНЕРИРОВАТЬ pnpext.sys»</strong>
+        Файл сохранится рядом в <code>release/HOST/pnpext.sys</code>.
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3><span class="badge bh">ХОСТ</span> Шаг 3 — Установить агент на Windows</h3>
+<div class="card">
+  <div class="steps">
+    <div class="step">
+      <div class="num">1</div>
+      <div class="step-body">
+        <strong>Убедитесь что в папке <code>release/HOST/</code> есть:</strong>
+        <code>pnpext.dll</code>, <code>pnpext.sys</code>, <code>install-cmd.bat</code>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">2</div>
+      <div class="step-body">
+        <strong>Правая кнопка мыши на <code>install-cmd.bat</code> → «Запуск от имени администратора»</strong>
+        Дождитесь закрытия окна. Служба запустится автоматически.
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">3</div>
+      <div class="step-body">
+        <strong>Готово.</strong> Агент запущен и автоматически подключится к ВПС.
+      </div>
+    </div>
+  </div>
+  <div class="tip" style="margin-top:10px;">
+    💡 Если хост и файлы на разных машинах — используйте <code>install-web-cmd.bat</code>.
+    Он скачает <code>pnpext.dll</code> и <code>pnpext.sys</code> с ВПС автоматически.
+  </div>
+</div>
+
+<h3><span class="badge bc">КЛИЕНТ</span> Шаг 4 — Подключиться</h3>
+<div class="card">
+  <div class="steps">
+    <div class="step">
+      <div class="num orange">1</div>
+      <div class="step-body">
+        <strong>Откройте Chrome и перейдите:</strong>
+        <pre>https://<span class="y">IP_ВПС</span>/panel/</pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num orange">2</div>
+      <div class="step-body">
+        <strong>Предупреждение «Небезопасное соединение»</strong> — это нормально.<br>
+        Нажмите: <em>Дополнительно → Перейти на сайт</em>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num orange">3</div>
+      <div class="step-body">
+        <strong>Введите токен комнаты и пароль</strong> (те что задали в конфигураторе) и нажмите <em>Connect</em>.
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr>
+
+<!-- ШАГИ ВАРИАНТ Б -->
+<h2>Вариант Б — Пошаговая установка (два ВПС, цепочка)</h2>
+<p style="color:#555;margin-bottom:10px;">
+  Хост → ВПС1 (прозрачный relay) → ВПС2 (основной) ← Клиент.<br>
+  Для хоста и клиента система выглядит как один сервер.
+</p>
+<div class="warn">
+  ⚠ <strong>Порядок важен:</strong> сначала установить <strong>ВПС2</strong>, потом <strong>ВПС1</strong>.
+  ВПС1 при настройке должен знать адрес ВПС2.
+</div>
+
+<h3><span class="badge bv2">ВПС2</span> Шаг 1 — Установить основной сервер</h3>
+<div class="card">
+  <div class="steps">
+    <div class="step">
+      <div class="num green">1</div>
+      <div class="step-body">
+        <strong>Скопировать <strong>всё</strong> из <code>release/VPS/</code> на ВПС2</strong>
+        <pre><span class="g">scp</span> -r release/VPS/* root@<span class="y">IP_ВПС2</span>:/root/prometey/</pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num green">2</div>
+      <div class="step-body">
+        <strong>Запустить установщик ВПС2</strong>
+        <pre><span class="g">ssh</span> root@<span class="y">IP_ВПС2</span>
+<span class="g">cd</span> /root/prometey
+<span class="g">chmod</span> +x deploy-vps2.sh
+<span class="g">sudo bash</span> deploy-vps2.sh</pre>
+        Дождаться окончания. Запомнить IP ВПС2 — он понадобится при настройке ВПС1.
+      </div>
+    </div>
+  </div>
+  <div class="tip">На ВПС2 установится: nginx + веб-панель + server.py + stage2 + coturn.</div>
+</div>
+
+<h3><span class="badge bv1">ВПС1</span> Шаг 2 — Установить сервер цепочки</h3>
+<div class="card">
+  <div class="steps">
+    <div class="step">
+      <div class="num purple">1</div>
+      <div class="step-body">
+        <strong>Скопировать минимальные файлы на ВПС1</strong>
+        <pre><span class="c"># Минимально необходимое:</span>
+<span class="g">scp</span> release/VPS/deploy-vps.sh release/VPS/server.py \
+    release/VPS/nginx.conf release/VPS/nginx-remote-desktop.conf \
+    root@<span class="y">IP_ВПС1</span>:/root/prometey/
+
+<span class="c"># Или проще — весь пакет (лишнее просто не используется):</span>
+<span class="g">scp</span> -r release/VPS/* root@<span class="y">IP_ВПС1</span>:/root/prometey/</pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num purple">2</div>
+      <div class="step-body">
+        <strong>Запустить установщик, выбрать режим [2]</strong>
+        <pre><span class="g">ssh</span> root@<span class="y">IP_ВПС1</span>
+<span class="g">cd</span> /root/prometey
+<span class="g">chmod</span> +x deploy-vps.sh
+<span class="g">sudo bash</span> deploy-vps.sh</pre>
+        Выбрать <code>[2]</code> — ВПС1 цепочки.<br>
+        Ввести адрес ВПС2: <code>wss://<span style="color:#e6db74">IP_ВПС2</span>:443</code>
+      </div>
+    </div>
+  </div>
+  <div class="tip">
+    ВПС1 устанавливает только relay (server.py в режиме цепочки) + nginx + coturn. Веб-панели на ВПС1 нет — это правильно.
+    Прямой запрос через браузер на ВПС1 вернёт 404.
+  </div>
+</div>
+
+<h3><span class="badge bh">ХОСТ</span> Шаг 3 — Настроить конфиг и установить агент</h3>
+<div class="card">
+  Запустите <code>pnpext_config_editor.exe</code>, в поле <strong>«Адрес ВПС»</strong> введите IP <strong>ВПС1</strong> (не ВПС2!).
+  Нажмите «Авто-заполнить STUN/TURN» → «ГЕНЕРИРОВАТЬ pnpext.sys».<br><br>
+  Запустите <code>install-cmd.bat</code> от имени Администратора.
+  <div class="warn" style="margin-top:12px;">
+    ⚠ IP в конфиге = <strong>IP ВПС1</strong>. Хост подключается к ВПС1, а не к ВПС2.
+    Клиент подключается к ВПС2. Это нормально — цепочка прозрачна.
+  </div>
+</div>
+
+<h3><span class="badge bc">КЛИЕНТ</span> Шаг 4 — Подключиться</h3>
+<div class="card">
+  Клиент открывает браузер и подключается к <strong>ВПС2</strong>:
+  <pre>https://<span class="y">IP_ВПС2</span>/panel/</pre>
+  На ВПС1 панели нет. Подключение через ВПС2 — единственный правильный вариант для клиента.
+</div>
+
+<hr>
+
+<!-- КОНФИГУРАТОР -->
+<h2>Редактор конфига — pnpext_config_editor.exe</h2>
+<div class="card card-blue">
+  <p>Программа создаёт файл <code>pnpext.sys</code> — зашифрованный конфиг агента. Без этого файла служба не запустится.</p>
+  <br>
+  <div class="g2">
+    <div>
+      <h4>Вкладка «Подключение»</h4>
+      <ul style="padding-left:18px;line-height:2;">
+        <li><strong>Адрес ВПС</strong> — IP вашего сервера</li>
+        <li><strong>Порт</strong> — <code>443</code></li>
+        <li><strong>TLS</strong> — включено</li>
+        <li><strong>Токен</strong> — придумайте: <code>myroom</code></li>
+        <li><strong>Пароль</strong> — пароль доступа</li>
+      </ul>
+    </div>
+    <div>
+      <h4>Кнопки</h4>
+      <ul style="padding-left:18px;line-height:2;">
+        <li><em>Авто-заполнить STUN/TURN</em> — по IP ВПС</li>
+        <li><em>Генерировать pnpext.sys</em> — сохранить конфиг</li>
+        <li><em>Открыть pnpext.sys</em> — загрузить существующий</li>
+      </ul>
+    </div>
+  </div>
+  <div class="warn" style="margin-top:12px;">
+    ⚠ После изменения IP — обязательно нажать <em>Генерировать pnpext.sys</em> заново
+    и заменить файл на хосте (<code>C:\Windows\System32\drivers\pnpext.sys</code>),
+    затем перезапустить службу.
+  </div>
+</div>
+
+<hr>
+
+<!-- ОБНОВЛЕНИЕ -->
+<h2>Обновление</h2>
+
+<h3>Обновление агента на хосте (через веб-панель)</h3>
+<div class="card card-gray">
+  В браузере откройте вкладку <strong>Settings → Host Update</strong>:
+  <ol style="padding-left:22px;margin-top:8px;line-height:2.2;">
+    <li>Нажмите <em>Upload DLL to VPS</em> → выберите новый <code>pnpext.dll</code></li>
+    <li>Файл загрузится на ВПС в <code>/var/www/remote-desktop/files/</code></li>
+    <li>Нажмите <em>Update Host</em> — хост скачает и заменит DLL автоматически</li>
+    <li>Служба перезапустится, хост переподключится через ~10 секунд</li>
+  </ol>
+</div>
+
+<h3>Обновление сервера на ВПС (через веб-панель)</h3>
+<div class="card card-gray">
+  В браузере откройте вкладку <strong>Settings → VPS Deploy</strong>:
+  <ul style="padding-left:22px;margin-top:8px;line-height:2.2;">
+    <li>Загрузить <code>server.py</code> → target: <strong>relay</strong></li>
+    <li>Загрузить <code>index.html</code> → target: <strong>web</strong></li>
+    <li>Загрузить <code>pnpext.dll</code> → target: <strong>files</strong></li>
+    <li>После загрузки нажать <em>Restart Relay</em></li>
+  </ul>
+</div>
+
+<h3>Обновление без панели (SSH)</h3>
+<div class="card card-gray">
+  <pre><span class="c"># Скопировать новый server.py на ВПС:</span>
+<span class="g">scp</span> release/VPS/server.py root@<span class="y">IP_ВПС</span>:/opt/remotedesk/
+<span class="g">scp</span> release/VPS/index.html root@<span class="y">IP_ВПС</span>:/var/www/remote-desktop/
+
+<span class="c"># Перезапустить relay:</span>
+<span class="g">systemctl restart</span> rdp-relay</pre>
+  <div class="tip">
+    При обновлении сервера файлы нужно копировать в <strong>оба</strong> места:
+    <code>/opt/remotedesk/</code> (служба) и <code>/var/www/remote-desktop/</code> (nginx).
+  </div>
+</div>
+
+<hr>
+
+<!-- УДАЛЕНИЕ -->
+<h2>Удаление агента с хоста</h2>
+<div class="card">
+  Запустите <code>uninstall-cmd.bat</code> от имени Администратора в папке <code>release/HOST/</code>.<br>
+  Удалится: служба, <code>pnpext.dll</code>, <code>pnpext.sys</code> и все записи в реестре.
+</div>
+
+<hr>
+
+<!-- КОМАНДЫ НА ВПС -->
+<h2>Полезные команды на ВПС</h2>
+<div class="card">
+<pre><span class="c"># Статус всех сервисов</span>
+<span class="g">systemctl status</span> rdp-relay nginx coturn
+
+<span class="c"># Логи в реальном времени</span>
+<span class="g">journalctl -u rdp-relay -f</span>
+
+<span class="c"># Перезапустить relay</span>
+<span class="g">systemctl restart</span> rdp-relay
+
+<span class="c"># Перезагрузить nginx</span>
+<span class="g">nginx -t</span> && <span class="g">systemctl reload</span> nginx
+
+<span class="c"># Проверить занятые порты</span>
+<span class="g">ss -tlnp</span> | grep -E "443|8080|3478"
+
+<span class="c"># Проверить куда скопированы файлы</span>
+<span class="g">ls -lh</span> /opt/remotedesk/
+<span class="g">ls -lh</span> /var/www/remote-desktop/
+<span class="g">ls -lh</span> /opt/remotedesk/stage2/
+
+<span class="c"># Создать папки вручную (если не создались)</span>
+<span class="g">mkdir -p</span> /opt/remotedesk/audio /opt/remotedesk/screenshots /opt/remotedesk/stage2
+<span class="g">chmod 755</span> /opt/remotedesk/audio /opt/remotedesk/screenshots
+<span class="g">systemctl restart</span> rdp-relay</pre>
+</div>
+
+<hr>
+
+<!-- ЧАСТЫЕ ПРОБЛЕМЫ -->
+<h2>Частые проблемы</h2>
+
+<div class="card card-red">
+  <strong>Служба на хосте не запускается — «Путь не найден»</strong><br>
+  → Файл конфига не был скопирован в нужное место.<br>
+  → Решение: убедитесь что <code>pnpext.sys</code> находится рядом с <code>install-cmd.bat</code> при установке.<br>
+  → Или вручную: <code>copy /y pnpext.sys %SystemRoot%\System32\drivers\pnpext.sys</code>
+  затем <code>sc start MspIscSvc</code>
+</div>
+
+<div class="card card-red">
+  <strong>Браузер: «Сайт недоступен» или ERR_CONNECTION_REFUSED</strong><br>
+  → Проверьте статус: <code>systemctl status rdp-relay nginx</code><br>
+  → Если не запущены: <code>systemctl restart rdp-relay nginx</code>
+</div>
+
+<div class="card card-red">
+  <strong>Браузер показывает 404 вместо панели</strong><br>
+  → Убедитесь что в адресе есть <code>/panel/</code>:<br>
+  &nbsp;&nbsp;✓ <code>https://IP/panel/</code><br>
+  &nbsp;&nbsp;✗ <code>https://IP/</code> — намеренно возвращает 404 (защита от сканеров)
+</div>
+
+<div class="card card-red">
+  <strong>Хост не появляется в панели</strong><br>
+  → Проверьте IP в <code>pnpext.sys</code> — пересоздайте через конфигуратор<br>
+  → Токен и пароль должны совпадать с теми что вводите в браузере<br>
+  → В варианте Б: IP в конфиге = IP ВПС1, браузер открывает ВПС2<br>
+  → Логи: <code>journalctl -u rdp-relay -f</code> — ищите строку с IP хоста
+</div>
+
+<div class="card card-red">
+  <strong>Цепочка: хост не виден на ВПС2, хотя служба работает</strong><br>
+  → На ВПС1 проверьте переменные окружения службы:<br>
+  <code>systemctl cat rdp-relay | grep CHAIN</code><br>
+  → Должны быть строки: <code>RDP_CHAIN_UPSTREAM=wss://IP_ВПС2:443</code> и <code>RDP_CHAIN_SSL_VERIFY=0</code><br>
+  → Если <code>RDP_CHAIN_SSL_VERIFY=0</code> отсутствует — переустановите ВПС1 скриптом
+</div>
+
+<div class="card card-red">
+  <strong>Расширенные функции не работают (файловый менеджер, менеджер процессов)</strong><br>
+  → Проверьте наличие stage2 DLL: <code>ls /opt/remotedesk/stage2/</code><br>
+  → Должны быть: <code>filemgr.dll procmgr.dll defender.dll sysinfo.dll</code><br>
+  → Если нет — скопируйте из <code>release/VPS/stage2/</code> в <code>/opt/remotedesk/stage2/</code>
+</div>
+
+<div class="card card-red">
+  <strong>Аудио не записывается</strong><br>
+  → <code>mkdir -p /opt/remotedesk/audio &amp;&amp; systemctl restart rdp-relay</code>
+</div>
+
+<div class="card" style="border-left:4px solid #e67e22;">
+  <strong>Предупреждение браузера «Небезопасное соединение»</strong><br>
+  → Нормально. Нажмите <em>Дополнительно → Перейти на сайт</em>.<br>
+  Сертификат самоподписанный — данные всё равно шифруются через TLS.
+</div>
+
+<div class="card card-red">
+  <strong>На ВПС1 (цепочка) нет веб-панели</strong><br>
+  → Это правильно. ВПС1 — прозрачный посредник без интерфейса.<br>
+  → Панель только на ВПС2: <code>https://IP_ВПС2/panel/</code>
+</div>
+
+<div style="text-align:center;color:#aaa;font-size:13px;margin-top:48px;">
+  PROMETEY &nbsp;·&nbsp; v1.0.232 &nbsp;·&nbsp; Инструкция актуальна на дату сборки
+</div>
+
+</div><!-- .page -->
+</div><!-- #sect-ru -->
+
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!--                  AZƏRBAYCAN VERSİYASI                      -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div id="sect-az" style="display:none">
+<div class="page">
+
+<div class="hero">
+  <h1>PROMETEY — Quraşdırma Təlimatı</h1>
+  <div class="sub">Brauzer vasitəsilə Windows-a uzaqdan giriş &nbsp;·&nbsp; v1.0.232</div>
+</div>
+
+<h2>Bu necə işləyir</h2>
+<div class="arch">  VARİANT A — Tək VPS
+
+  ┌─────────────┐   WSS/443   ┌──────────────┐   WSS/443   ┌────────────────┐
+  │ Host        │────────────▶│ VPS          │◀────────────│ Klient         │
+  │ (Windows)   │             │ (server)     │             │ (brauzer)      │
+  └─────────────┘             └──────────────┘             └────────────────┘
+    pnpext.sys = VPS IP           relay                    https://IP_VPS/panel/
+
+
+  VARİANT B — İki VPS (zəncir)
+
+  ┌─────────────┐   WSS/443   ┌──────────────┐   WSS/443   ┌──────────────┐   WSS/443   ┌──────────┐
+  │ Host        │────────────▶│ VPS1         │────────────▶│ VPS2         │◀────────────│ Klient   │
+  │ (Windows)   │             │ (zəncir)     │             │ (əsas)       │             │ (brauzer)│
+  └─────────────┘             └──────────────┘             └──────────────┘             └──────────┘
+    pnpext.sys = VPS1 IP       yalnız relay,               relay + veb-panel            https://IP_VPS2
+                                veb-panel yoxdur            + stage2 + fayllar           /panel/</div>
+
+<div class="card card-blue">
+  <strong>Qısaca:</strong> Host VPS-ə qoşulur və gözləyir. Klient brauzeri açır → VPS-ə daxil olur → Host ekranını görür.
+  VPS vasitəçidir, heç nə saxlamır. İki VPS-də — host <strong>VPS1</strong>-ə, klient <strong>VPS2</strong>-yə qoşulur.
+</div>
+
+<div class="tip">
+  💡 SSL sertifikatları skript tərəfindən birbaşa VPS-də <strong>avtomatik</strong> yaradılır.
+</div>
+
+<hr>
+
+<h2>Nəyi hara kopyalamaq lazımdır — sürətli arayış</h2>
+
+<div class="warn">
+  🔑 <strong>Əvvəlcə konfiqurasiyanı qurun:</strong> <code>pnpext_config_editor.exe</code>-i işə salın,
+  VPS IP-sini, tokeni, parolu daxil edin → «STUN/TURN-u avtodoldur» → «pnpext.sys YARAT».
+</div>
+
+<h3>Variant A — Tək VPS</h3>
+<div class="g2">
+  <div class="dest-box dest-vps">
+    <div class="dest-title"><span class="badge bv">VPS</span> Tək server</div>
+    <ul><li><code>release/VPS/</code>-ın <strong>hamısı</strong></li><li><code>stage2/</code> alt qovluğu daxil</li></ul>
+    <div class="tree" style="margin-top:8px;line-height:1.9;">
+<span class="req">deploy-vps.sh</span>   <span class="n">← işə sal</span>
+<span class="req">server.py</span>
+<span class="req">index.html</span>
+<span class="req">nginx.conf</span>
+<span class="req">nginx-remote-desktop.conf</span>
+<span class="req">pnpext.dll / pnpext.sys</span>
+<span class="req">stage2/</span>  <span class="n">4 DLL</span></div>
+    <div class="action">▶ sudo bash deploy-vps.sh → [1] seç</div>
+  </div>
+  <div class="dest-box dest-host">
+    <div class="dest-title"><span class="badge bh">HOST</span> Windows kompüteri</div>
+    <ul><li><code>release/HOST/</code>-un <strong>hamısı</strong></li></ul>
+    <div class="tree" style="margin-top:8px;line-height:1.9;">
+<span class="req">pnpext.dll</span>
+<span class="req">pnpext.sys</span>       <span class="n">yaratmaq lazım!</span>
+<span class="req">install-cmd.bat</span>  <span class="n">← işə sal</span>
+<span class="opt">uninstall-cmd.bat</span>
+<span class="opt">pnpext_config_editor.exe</span></div>
+    <div class="action">▶ install-cmd.bat — Administrator adından</div>
+  </div>
+</div>
+<div class="dest-box dest-client" style="margin-top:10px;">
+  <div class="dest-title"><span class="badge bc">KLİENT</span> Operator brauzeri</div>
+  Heç nə kopyalamaq lazım deyil. Chrome-da açın: <code>https://IP_VPS/panel/</code>
+</div>
+
+<h3 style="margin-top:28px;">Variant B — İki VPS (zəncir)</h3>
+<div class="warn" style="margin-bottom:14px;">
+  ⚠ <strong>Sıra:</strong> əvvəlcə <strong>VPS2</strong>-ni, sonra <strong>VPS1</strong>-i quraşdırın.
+</div>
+<div class="g3">
+  <div class="dest-box dest-vps2">
+    <div class="dest-title"><span class="badge bv2">VPS2</span> Əsas server</div>
+    <ul><li><code>release/VPS/</code>-ın <strong>hamısı</strong></li><li><code>stage2/</code> daxil</li></ul>
+    <div class="tree" style="margin-top:8px;line-height:1.9;">
+<span class="req">deploy-vps2.sh</span>  <span class="n">← işə sal</span>
+<span class="req">server.py</span>
+<span class="req">index.html</span>
+<span class="req">nginx.conf</span>
+<span class="req">nginx-remote-desktop.conf</span>
+<span class="req">pnpext.dll / pnpext.sys</span>
+<span class="req">stage2/</span>  <span class="n">4 DLL</span></div>
+    <div class="action">▶ sudo bash deploy-vps2.sh</div>
+  </div>
+  <div class="dest-box dest-vps1">
+    <div class="dest-title"><span class="badge bv1">VPS1</span> Yalnız zəncir relay</div>
+    <ul><li>Minimum:</li></ul>
+    <div class="tree" style="margin-top:8px;line-height:1.9;">
+<span class="req">deploy-vps.sh</span>   <span class="n">← işə sal</span>
+<span class="req">server.py</span>
+<span class="req">nginx.conf</span>
+<span class="req">nginx-remote-desktop.conf</span>
+<span class="opt">qalan fayllar — lazım deyil</span></div>
+    <div class="note">Bütün <code>release/VPS/</code>-ı kopyalaya bilərsiniz — artıq olanlar istifadə edilmir.</div>
+    <div class="action">▶ deploy-vps.sh → [2] → VPS2 IP daxil et</div>
+  </div>
+  <div class="dest-box dest-host">
+    <div class="dest-title"><span class="badge bh">HOST</span> Windows kompüteri</div>
+    <ul><li><code>release/HOST/</code>-un <strong>hamısı</strong></li></ul>
+    <div class="tree" style="margin-top:8px;line-height:1.9;">
+<span class="req">pnpext.dll</span>
+<span class="req">pnpext.sys</span>       <span class="n">IP = VPS1!</span>
+<span class="req">install-cmd.bat</span>  <span class="n">← işə sal</span>
+<span class="opt">uninstall-cmd.bat</span>
+<span class="opt">pnpext_config_editor.exe</span></div>
+    <div class="action">▶ install-cmd.bat — Administrator adından</div>
+  </div>
+</div>
+<div class="dest-box dest-client" style="margin-top:10px;">
+  <div class="dest-title"><span class="badge bc">KLİENT</span> Operator brauzeri</div>
+  Heç nə kopyalamaq lazım deyil. Chrome-da açın: <code>https://IP_VPS2/panel/</code> —
+  <strong>VPS2</strong>-yə qoşulun, VPS1-ə yox. VPS1-də panel yoxdur (404 qaytarır).
+</div>
+
+<hr>
+
+<h2>release/ qovluğunun strukturu</h2>
+<div class="tree">
+<span class="d">release/</span>
+│
+├── <span class="d">HOST/</span>                            <span class="n">← Windows kompüterinə quraşdırılır</span>
+│   ├── <span class="f">install-cmd.bat</span>            <span class="n">quraşdırma (fayllar yaxında)</span>
+│   ├── <span class="f">install-web-cmd.bat</span>        <span class="n">quraşdırma (fayllar VPS-dən yüklənir)</span>
+│   ├── <span class="f">uninstall-cmd.bat</span>          <span class="n">tam silmə</span>
+│   ├── <span class="f">pnpext.dll</span>                 <span class="n">uzaqdan giriş agenti</span>
+│   ├── <span class="f">pnpext.sys</span>                 <span class="n">şifrələnmiş konfiqurasiya</span>
+│   └── <span class="f">pnpext_config_editor.exe</span>   <span class="n">konfiqurasiya redaktoru</span>
+│
+└── <span class="d">VPS/</span>                             <span class="n">← VPS serverinə yüklənir</span>
+    ├── <span class="f">deploy-vps.sh</span>              <span class="n">[1] tək VPS  /  [2] VPS1 zənciri</span>
+    ├── <span class="f">deploy-vps2.sh</span>             <span class="n">VPS2 (əsas server) üçün</span>
+    ├── <span class="f">server.py</span>                  <span class="n">relay-server</span>
+    ├── <span class="f">index.html</span>                 <span class="n">klient veb-paneli</span>
+    ├── <span class="f">nginx.conf / nginx-remote-desktop.conf</span>
+    ├── <span class="f">pnpext.dll / pnpext.sys</span>    <span class="n">host yeniləmələri üçün</span>
+    └── <span class="d">stage2/</span>                    <span class="n">genişləndirilmiş funksiyalar (VPS2/tək üçün)</span>
+</div>
+
+<hr>
+
+<h2>Variant A — Addım-addım quraşdırma (tək VPS)</h2>
+
+<h3><span class="badge bv">VPS</span> Addım 1 — Faylları yükləyin və skripti işə salın</h3>
+<div class="card">
+  <div class="steps">
+    <div class="step">
+      <div class="num">1</div>
+      <div class="step-body">
+        <strong><code>release/VPS/</code>-ı serverə kopyalayın</strong>
+        <pre><span class="g">scp</span> -r release/VPS/* root@<span class="y">IP_VPS</span>:/root/prometey/</pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">2</div>
+      <div class="step-body">
+        <strong>SSH ilə qoşulun və quraşdırmanı işə salın</strong>
+        <pre><span class="g">ssh</span> root@<span class="y">IP_VPS</span>
+<span class="g">cd</span> /root/prometey
+<span class="g">chmod</span> +x deploy-vps.sh
+<span class="g">sudo bash</span> deploy-vps.sh</pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">3</div>
+      <div class="step-body">
+        <strong>[1] — Tək VPS rejimini seçin</strong>
+        <code>1</code> yazın, Enter basın. Quraşdırma 2–4 dəqiqə çəkir.
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">4</div>
+      <div class="step-body">
+        <strong>Skriptin çıxışından məlumatları qeyd edin</strong>
+        <pre><span class="b">Panel:</span>         <span class="y">https://95.216.10.55/panel/</span>
+<span class="b">"server":</span>      <span class="y">"95.216.10.55"</span>
+<span class="b">"stun_server":</span> <span class="y">"stun:95.216.10.55:3478"</span>
+<span class="b">"turn_server":</span> <span class="y">"turn:rdp:PAROL@95.216.10.55:3478"</span></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3><span class="badge bh">HOST</span> Addım 2 — Konfiqurasiyanı qurun</h3>
+<div class="card">
+  <div class="steps">
+    <div class="step">
+      <div class="num">1</div>
+      <div class="step-body">
+        <strong><code>release/HOST/</code>-dan <code>pnpext_config_editor.exe</code>-i işə salın</strong>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">2</div>
+      <div class="step-body">
+        <strong>«Qoşulma» sekmesini doldurun:</strong>
+        VPS ünvanı · Port 443 · TLS ✓ · Token · Parol
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">3</div>
+      <div class="step-body"><strong>«STUN/TURN-u avtodoldur»</strong> düyməsinə basın.</div>
+    </div>
+    <div class="step">
+      <div class="num">4</div>
+      <div class="step-body">
+        <strong>«pnpext.sys YARAT»</strong> düyməsinə basın. Fayl <code>release/HOST/pnpext.sys</code>-da saxlanılacaq.
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3><span class="badge bh">HOST</span> Addım 3 — Agenti Windows-a quraşdırın</h3>
+<div class="card">
+  <code>release/HOST/</code>-da <code>pnpext.dll</code>, <code>pnpext.sys</code>, <code>install-cmd.bat</code> olduğuna əmin olun.<br><br>
+  <code>install-cmd.bat</code> üzərində sağ klik → <em>Administrator adından işə sal</em>. Pəncərə bağlanana qədər gözləyin.
+</div>
+
+<h3><span class="badge bc">KLİENT</span> Addım 4 — Qoşulun</h3>
+<div class="card">
+  Chrome-da: <pre>https://<span class="y">IP_VPS</span>/panel/</pre>
+  «Təhlükəsiz olmayan əlaqə» xəbərdarlığı — normaldır. <em>Ətraflı → Sayta keçin</em>.<br>
+  Token və parolu daxil edin → <em>Connect</em>.
+</div>
+
+<hr>
+
+<h2>Variant B — Addım-addım quraşdırma (iki VPS, zəncir)</h2>
+<div class="warn">⚠ Sıra vacibdir: əvvəlcə <strong>VPS2</strong>, sonra <strong>VPS1</strong>.</div>
+
+<h3><span class="badge bv2">VPS2</span> Addım 1 — Əsas serveri quraşdırın</h3>
+<div class="card">
+  <div class="steps">
+    <div class="step">
+      <div class="num green">1</div>
+      <div class="step-body">
+        <strong>Bütün <code>release/VPS/</code>-ı VPS2-yə kopyalayın</strong>
+        <pre><span class="g">scp</span> -r release/VPS/* root@<span class="y">IP_VPS2</span>:/root/prometey/</pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num green">2</div>
+      <div class="step-body">
+        <strong>deploy-vps2.sh-ı işə salın</strong>
+        <pre><span class="g">ssh</span> root@<span class="y">IP_VPS2</span>
+<span class="g">cd</span> /root/prometey && <span class="g">chmod</span> +x deploy-vps2.sh
+<span class="g">sudo bash</span> deploy-vps2.sh</pre>
+        Tamamlanmasını gözləyin. <strong>IP_VPS2</strong>-ni qeyd edin.
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3><span class="badge bv1">VPS1</span> Addım 2 — Zəncir serverini quraşdırın</h3>
+<div class="card">
+  <div class="steps">
+    <div class="step">
+      <div class="num purple">1</div>
+      <div class="step-body">
+        <strong>Minimal faylları VPS1-ə kopyalayın</strong>
+        <pre><span class="c"># Minimal:</span>
+<span class="g">scp</span> release/VPS/deploy-vps.sh release/VPS/server.py \
+    release/VPS/nginx.conf release/VPS/nginx-remote-desktop.conf \
+    root@<span class="y">IP_VPS1</span>:/root/prometey/
+
+<span class="c"># Və ya hamısını (artıq olanlar istifadə edilmir):</span>
+<span class="g">scp</span> -r release/VPS/* root@<span class="y">IP_VPS1</span>:/root/prometey/</pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num purple">2</div>
+      <div class="step-body">
+        <strong>[2] rejimini seçin</strong>
+        <pre><span class="g">ssh</span> root@<span class="y">IP_VPS1</span>
+<span class="g">cd</span> /root/prometey && <span class="g">sudo bash</span> deploy-vps.sh</pre>
+        <code>[2]</code> seçin. VPS2 ünvanını daxil edin: <code>wss://<span style="color:#e6db74">IP_VPS2</span>:443</code>
+      </div>
+    </div>
+  </div>
+  <div class="tip">VPS1-də veb-panel quraşdırılmır — bu düzgündür. Panel yalnız VPS2-dədir.</div>
+</div>
+
+<h3><span class="badge bh">HOST</span> Addım 3 — Hostu konfiqurasiya edin</h3>
+<div class="card">
+  <code>pnpext_config_editor.exe</code>-i işə salın. <strong>«VPS ünvanı»</strong> sahəsinə <strong>VPS1</strong>-in IP-sini daxil edin (VPS2 yox!).
+  «STUN/TURN-u avtodoldur» → «pnpext.sys YARAT».<br><br>
+  <code>install-cmd.bat</code>-ı administrator adından işə salın.
+  <div class="warn" style="margin-top:10px;">⚠ Konfiqurasiyadakı IP = <strong>VPS1</strong>. Klient <strong>VPS2</strong>-yə qoşulur.</div>
+</div>
+
+<h3><span class="badge bc">KLİENT</span> Addım 4 — Qoşulun</h3>
+<div class="card">
+  <pre>https://<span class="y">IP_VPS2</span>/panel/</pre>
+  <strong>VPS2</strong>-yə qoşulun — VPS1-ə yox. VPS1-də panel yoxdur.
+</div>
+
+<hr>
+
+<h2>Yeniləmə</h2>
+<h3>Host agentinin yenilənməsi (panel vasitəsilə)</h3>
+<div class="card card-gray">
+  <strong>Settings → Host Update</strong>:
+  <ol style="padding-left:22px;margin-top:8px;line-height:2.2;">
+    <li><em>Upload DLL to VPS</em> → yeni <code>pnpext.dll</code> seçin</li>
+    <li><em>Update Host</em> basın — host avtomatik yeniləyəcək</li>
+    <li>Xidmət yenidən başlayacaq, ~10 saniyədə yenidən qoşulacaq</li>
+  </ol>
+</div>
+<h3>Panel olmadan yeniləmə (SSH)</h3>
+<div class="card card-gray">
+  <pre><span class="g">scp</span> release/VPS/server.py root@<span class="y">IP_VPS</span>:/opt/remotedesk/
+<span class="g">scp</span> release/VPS/index.html root@<span class="y">IP_VPS</span>:/var/www/remote-desktop/
+<span class="g">systemctl restart</span> rdp-relay</pre>
+</div>
+
+<hr>
+
+<h2>Agenti hostdan silmək</h2>
+<div class="card">
+  <code>release/HOST/</code>-da <code>uninstall-cmd.bat</code>-ı administrator adından işə salın.
+</div>
+
+<hr>
+
+<h2>VPS-də faydalı əmrlər</h2>
+<div class="card">
+<pre><span class="c"># Xidmətlərin statusu</span>
+<span class="g">systemctl status</span> rdp-relay nginx coturn
+
+<span class="c"># Real vaxt jurnalları</span>
+<span class="g">journalctl -u rdp-relay -f</span>
+
+<span class="c"># Yenidən başlatma</span>
+<span class="g">systemctl restart</span> rdp-relay
+
+<span class="c"># Faylları yoxlayın</span>
+<span class="g">ls -lh</span> /opt/remotedesk/
+<span class="g">ls -lh</span> /var/www/remote-desktop/
+<span class="g">ls -lh</span> /opt/remotedesk/stage2/
+
+<span class="c"># Portları yoxlayın</span>
+<span class="g">ss -tlnp</span> | grep -E "443|8080|3478"</pre>
+</div>
+
+<h2>Tez-tez rast gəlinən problemlər</h2>
+
+<div class="card card-red">
+  <strong>Hostda xidmət işə başlamır — «Yol tapılmadı»</strong><br>
+  → <code>pnpext.sys</code> düzgün yerə kopyalanmayıb.<br>
+  → Həll: <code>copy /y pnpext.sys %SystemRoot%\System32\drivers\pnpext.sys</code>
+  sonra <code>sc start MspIscSvc</code>
+</div>
+<div class="card card-red">
+  <strong>Brauzer: «Sayt əlçatmazdır» / ERR_CONNECTION_REFUSED</strong><br>
+  → <code>systemctl restart rdp-relay nginx</code>
+</div>
+<div class="card card-red">
+  <strong>Brauzer panel əvəzinə 404 göstərir</strong><br>
+  → ✓ <code>https://IP/panel/</code> &nbsp; ✗ <code>https://IP/</code>
+</div>
+<div class="card card-red">
+  <strong>Host paneldə görünmür</strong><br>
+  → Konfiqurasiyadakı IP-ni yoxlayın. Variant B-də: konfiq IP = VPS1, klient VPS2-yə qoşulur.<br>
+  → <code>journalctl -u rdp-relay -f</code>
+</div>
+<div class="card card-red">
+  <strong>Zəncir: host VPS2-də görünmür</strong><br>
+  → VPS1-də yoxlayın: <code>systemctl cat rdp-relay | grep CHAIN</code><br>
+  → <code>RDP_CHAIN_SSL_VERIFY=0</code> olmalıdır
+</div>
+<div class="card card-red">
+  <strong>Genişləndirilmiş funksiyalar işləmir</strong><br>
+  → <code>ls /opt/remotedesk/stage2/</code> — 4 DLL fayl olmalıdır
+</div>
+<div class="card" style="border-left:4px solid #e67e22;">
+  <strong>«Təhlükəsiz olmayan əlaqə» xəbərdarlığı</strong><br>
+  → Normaldır. <em>Ətraflı → Sayta keçin</em>.
+</div>
+<div class="card card-red">
+  <strong>VPS1-də veb-panel yoxdur</strong><br>
+  → Bu düzgündür. Panel yalnız VPS2-dədir: <code>https://IP_VPS2/panel/</code>
+</div>
+
+<div style="text-align:center;color:#aaa;font-size:13px;margin-top:48px;">
+  PROMETEY &nbsp;·&nbsp; v1.0.232 &nbsp;·&nbsp; Təlimat hazırlanma tarixinə uyğundur
+</div>
+
+</div><!-- .page -->
+</div><!-- #sect-az -->
+
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!--                    ENGLISH VERSION                         -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div id="sect-en" style="display:none">
+<div class="page">
+
+<div class="hero">
+  <h1>PROMETEY — Installation Guide</h1>
+  <div class="sub">Remote access to Windows via browser &nbsp;·&nbsp; v1.0.232</div>
+</div>
+
+<h2>How it works</h2>
+<div class="arch">  VARIANT A — Single VPS
+
+  ┌─────────────┐   WSS/443   ┌──────────────┐   WSS/443   ┌────────────────┐
+  │ Host        │────────────▶│ VPS          │◀────────────│ Client         │
+  │ (Windows)   │             │ (server)     │             │ (browser)      │
+  └─────────────┘             └──────────────┘             └────────────────┘
+    pnpext.sys = VPS IP           relay                    https://VPS_IP/panel/
+
+
+  VARIANT B — Two VPS (chain)
+
+  ┌─────────────┐   WSS/443   ┌──────────────┐   WSS/443   ┌──────────────┐   WSS/443   ┌──────────┐
+  │ Host        │────────────▶│ VPS1         │────────────▶│ VPS2         │◀────────────│ Client   │
+  │ (Windows)   │             │ (chain)      │             │ (main)       │             │ (browser)│
+  └─────────────┘             └──────────────┘             └──────────────┘             └──────────┘
+    pnpext.sys = VPS1 IP       relay only,                 relay + web panel            https://VPS2_IP
+                                no web panel                + stage2 + files             /panel/</div>
+
+<div class="card card-blue">
+  <strong>In brief:</strong> Host connects to the VPS and waits. Client opens browser → connects to VPS → sees host screen.
+  The VPS is a relay. With two VPS — host connects to <strong>VPS1</strong>, client to <strong>VPS2</strong>.
+</div>
+<div class="tip">
+  💡 SSL certificates are created <strong>automatically</strong> by the script on the VPS itself.
+</div>
+
+<hr>
+
+<h2>What goes where — quick reference</h2>
+
+<div class="warn">
+  🔑 <strong>Configure first:</strong> run <code>pnpext_config_editor.exe</code>,
+  enter VPS IP, token, password → «Auto-fill STUN/TURN» → «GENERATE pnpext.sys».
+</div>
+
+<h3>Variant A — Single VPS</h3>
+<div class="g2">
+  <div class="dest-box dest-vps">
+    <div class="dest-title"><span class="badge bv">VPS</span> Single server</div>
+    <ul><li><strong>Everything</strong> from <code>release/VPS/</code></li><li>including <code>stage2/</code> subfolder</li></ul>
+    <div class="tree" style="margin-top:8px;line-height:1.9;">
+<span class="req">deploy-vps.sh</span>   <span class="n">← run this</span>
+<span class="req">server.py</span>
+<span class="req">index.html</span>
+<span class="req">nginx.conf</span>
+<span class="req">nginx-remote-desktop.conf</span>
+<span class="req">pnpext.dll / pnpext.sys</span>
+<span class="req">stage2/</span>  <span class="n">all 4 DLLs</span></div>
+    <div class="action">▶ sudo bash deploy-vps.sh → choose [1]</div>
+  </div>
+  <div class="dest-box dest-host">
+    <div class="dest-title"><span class="badge bh">HOST</span> Windows machine</div>
+    <ul><li><strong>Everything</strong> from <code>release/HOST/</code></li></ul>
+    <div class="tree" style="margin-top:8px;line-height:1.9;">
+<span class="req">pnpext.dll</span>
+<span class="req">pnpext.sys</span>       <span class="n">generate first!</span>
+<span class="req">install-cmd.bat</span>  <span class="n">← run this</span>
+<span class="opt">uninstall-cmd.bat</span>
+<span class="opt">pnpext_config_editor.exe</span></div>
+    <div class="action">▶ install-cmd.bat as Administrator</div>
+  </div>
+</div>
+<div class="dest-box dest-client" style="margin-top:10px;">
+  <div class="dest-title"><span class="badge bc">CLIENT</span> Operator browser</div>
+  Nothing to copy. Open in Chrome: <code>https://VPS_IP/panel/</code>
+</div>
+
+<h3 style="margin-top:28px;">Variant B — Two VPS (chain)</h3>
+<div class="warn" style="margin-bottom:14px;">
+  ⚠ <strong>Order matters:</strong> install <strong>VPS2</strong> first, then <strong>VPS1</strong>.
+</div>
+<div class="g3">
+  <div class="dest-box dest-vps2">
+    <div class="dest-title"><span class="badge bv2">VPS2</span> Main server</div>
+    <ul><li><strong>Everything</strong> from <code>release/VPS/</code></li><li>including <code>stage2/</code></li></ul>
+    <div class="tree" style="margin-top:8px;line-height:1.9;">
+<span class="req">deploy-vps2.sh</span>  <span class="n">← run this</span>
+<span class="req">server.py</span>
+<span class="req">index.html</span>
+<span class="req">nginx.conf</span>
+<span class="req">nginx-remote-desktop.conf</span>
+<span class="req">pnpext.dll / pnpext.sys</span>
+<span class="req">stage2/</span>  <span class="n">all 4 DLLs</span></div>
+    <div class="action">▶ sudo bash deploy-vps2.sh</div>
+  </div>
+  <div class="dest-box dest-vps1">
+    <div class="dest-title"><span class="badge bv1">VPS1</span> Chain relay only</div>
+    <ul><li>Minimum required:</li></ul>
+    <div class="tree" style="margin-top:8px;line-height:1.9;">
+<span class="req">deploy-vps.sh</span>   <span class="n">← run this</span>
+<span class="req">server.py</span>
+<span class="req">nginx.conf</span>
+<span class="req">nginx-remote-desktop.conf</span>
+<span class="opt">rest — not needed</span></div>
+    <div class="note">You can upload all of <code>release/VPS/</code> — extras are simply unused.</div>
+    <div class="action">▶ deploy-vps.sh → [2] → enter VPS2 IP</div>
+  </div>
+  <div class="dest-box dest-host">
+    <div class="dest-title"><span class="badge bh">HOST</span> Windows machine</div>
+    <ul><li><strong>Everything</strong> from <code>release/HOST/</code></li></ul>
+    <div class="tree" style="margin-top:8px;line-height:1.9;">
+<span class="req">pnpext.dll</span>
+<span class="req">pnpext.sys</span>       <span class="n">IP = VPS1!</span>
+<span class="req">install-cmd.bat</span>  <span class="n">← run this</span>
+<span class="opt">uninstall-cmd.bat</span>
+<span class="opt">pnpext_config_editor.exe</span></div>
+    <div class="action">▶ install-cmd.bat as Administrator</div>
+  </div>
+</div>
+<div class="dest-box dest-client" style="margin-top:10px;">
+  <div class="dest-title"><span class="badge bc">CLIENT</span> Operator browser</div>
+  Nothing to copy. Open in Chrome: <code>https://VPS2_IP/panel/</code> —
+  connect via <strong>VPS2</strong>, not VPS1. VPS1 has no panel (returns 404 if accessed directly).
+</div>
+
+<hr>
+
+<h2>release/ folder structure</h2>
+<div class="tree">
+<span class="d">release/</span>
+│
+├── <span class="d">HOST/</span>                            <span class="n">← installed on the Windows machine</span>
+│   ├── <span class="f">install-cmd.bat</span>            <span class="n">install (files are local)</span>
+│   ├── <span class="f">install-web-cmd.bat</span>        <span class="n">install (files downloaded from VPS)</span>
+│   ├── <span class="f">uninstall-cmd.bat</span>          <span class="n">full removal</span>
+│   ├── <span class="f">pnpext.dll</span>                 <span class="n">remote access agent</span>
+│   ├── <span class="f">pnpext.sys</span>                 <span class="n">encrypted config (generated by editor)</span>
+│   └── <span class="f">pnpext_config_editor.exe</span>   <span class="n">GUI config editor</span>
+│
+└── <span class="d">VPS/</span>                             <span class="n">← uploaded to the VPS server(s)</span>
+    ├── <span class="f">deploy-vps.sh</span>              <span class="n">[1] single VPS  /  [2] VPS1 chain</span>
+    ├── <span class="f">deploy-vps2.sh</span>             <span class="n">VPS2 (main server) installer</span>
+    ├── <span class="f">server.py</span>                  <span class="n">relay server (Python)</span>
+    ├── <span class="f">index.html</span>                 <span class="n">client web panel</span>
+    ├── <span class="f">nginx.conf / nginx-remote-desktop.conf</span>
+    ├── <span class="f">pnpext.dll / pnpext.sys</span>    <span class="n">served to hosts for updates</span>
+    └── <span class="d">stage2/</span>                    <span class="n">extended feature modules (VPS2 / single only)</span>
+        ├── <span class="f">filemgr.dll</span>  <span class="f">procmgr.dll</span>  <span class="f">defender.dll</span>  <span class="f">sysinfo.dll</span>
+</div>
+
+<hr>
+
+<h2>Variant A — Step-by-step (single VPS)</h2>
+
+<h3><span class="badge bv">VPS</span> Step 1 — Upload files and run the script</h3>
+<div class="card">
+  <div class="steps">
+    <div class="step">
+      <div class="num">1</div>
+      <div class="step-body">
+        <strong>Copy <code>release/VPS/</code> to the server</strong>
+        <pre><span class="g">scp</span> -r release/VPS/* root@<span class="y">VPS_IP</span>:/root/prometey/</pre>
+        Or use FileZilla / WinSCP to transfer all contents of <code>release/VPS/</code> to <code>/root/prometey/</code>.
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">2</div>
+      <div class="step-body">
+        <strong>Connect via SSH and run the installer</strong>
+        <pre><span class="g">ssh</span> root@<span class="y">VPS_IP</span>
+<span class="g">cd</span> /root/prometey
+<span class="g">chmod</span> +x deploy-vps.sh
+<span class="g">sudo bash</span> deploy-vps.sh</pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">3</div>
+      <div class="step-body">
+        <strong>Choose mode [1] — Single VPS</strong>
+        Type <code>1</code> and press Enter. Installation takes 2–4 minutes.
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">4</div>
+      <div class="step-body">
+        <strong>Save the output values</strong>
+        <pre><span class="b">Panel:</span>         <span class="y">https://95.216.10.55/panel/</span>
+<span class="b">"server":</span>      <span class="y">"95.216.10.55"</span>
+<span class="b">"stun_server":</span> <span class="y">"stun:95.216.10.55:3478"</span>
+<span class="b">"turn_server":</span> <span class="y">"turn:rdp:PASSWORD@95.216.10.55:3478"</span></pre>
+      </div>
+    </div>
+  </div>
+  <p>The script automatically: installs nginx, Python, coturn; creates SSL certificate (10 years);
+  creates <code>/opt/remotedesk/</code> directories; copies server, web panel, stage2 modules; starts all services.</p>
+</div>
+
+<h3><span class="badge bh">HOST</span> Step 2 — Configure</h3>
+<div class="card">
+  <div class="steps">
+    <div class="step">
+      <div class="num">1</div>
+      <div class="step-body">
+        <strong>Run <code>pnpext_config_editor.exe</code> from <code>release/HOST/</code></strong>
+        Double-click — opens immediately, no Python needed.
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">2</div>
+      <div class="step-body">
+        <strong>«Connection» tab:</strong> VPS address · Port 443 · TLS ✓ · Room token · Password
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">3</div>
+      <div class="step-body"><strong>Click «Auto-fill STUN/TURN by VPS address»</strong></div>
+    </div>
+    <div class="step">
+      <div class="num">4</div>
+      <div class="step-body">
+        <strong>Click «GENERATE pnpext.sys»</strong> — file saved to <code>release/HOST/pnpext.sys</code>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3><span class="badge bh">HOST</span> Step 3 — Install the agent</h3>
+<div class="card">
+  Make sure <code>pnpext.dll</code>, <code>pnpext.sys</code>, <code>install-cmd.bat</code> are in <code>release/HOST/</code>.<br><br>
+  Right-click <code>install-cmd.bat</code> → <em>Run as administrator</em>. Wait for the window to close.
+  <div class="tip" style="margin-top:10px;">
+    💡 If host and files are on different machines — use <code>install-web-cmd.bat</code>.
+    It downloads <code>pnpext.dll</code> and <code>pnpext.sys</code> from the VPS automatically.
+  </div>
+</div>
+
+<h3><span class="badge bc">CLIENT</span> Step 4 — Connect</h3>
+<div class="card">
+  Open Chrome: <pre>https://<span class="y">VPS_IP</span>/panel/</pre>
+  «Insecure connection» warning — normal. Click <em>Advanced → Proceed to site</em>.<br>
+  Enter room token and password → <em>Connect</em>.
+</div>
+
+<hr>
+
+<h2>Variant B — Step-by-step (two VPS, chain)</h2>
+<div class="warn">⚠ Order matters: install <strong>VPS2</strong> first, then <strong>VPS1</strong>.</div>
+
+<h3><span class="badge bv2">VPS2</span> Step 1 — Install the main server</h3>
+<div class="card">
+  <div class="steps">
+    <div class="step">
+      <div class="num green">1</div>
+      <div class="step-body">
+        <strong>Upload everything from <code>release/VPS/</code> to VPS2</strong>
+        <pre><span class="g">scp</span> -r release/VPS/* root@<span class="y">VPS2_IP</span>:/root/prometey/</pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num green">2</div>
+      <div class="step-body">
+        <strong>Run the VPS2 installer</strong>
+        <pre><span class="g">ssh</span> root@<span class="y">VPS2_IP</span>
+<span class="g">cd</span> /root/prometey && <span class="g">chmod</span> +x deploy-vps2.sh
+<span class="g">sudo bash</span> deploy-vps2.sh</pre>
+        Wait for completion. Note down <strong>VPS2_IP</strong>.
+      </div>
+    </div>
+  </div>
+  <div class="tip">VPS2 installs: nginx + web panel + server.py + stage2 + coturn. Full setup.</div>
+</div>
+
+<h3><span class="badge bv1">VPS1</span> Step 2 — Install the chain server</h3>
+<div class="card">
+  <div class="steps">
+    <div class="step">
+      <div class="num purple">1</div>
+      <div class="step-body">
+        <strong>Upload the minimum files to VPS1</strong>
+        <pre><span class="c"># Minimum required:</span>
+<span class="g">scp</span> release/VPS/deploy-vps.sh release/VPS/server.py \
+    release/VPS/nginx.conf release/VPS/nginx-remote-desktop.conf \
+    root@<span class="y">VPS1_IP</span>:/root/prometey/
+
+<span class="c"># Or simply upload everything (extras are unused):</span>
+<span class="g">scp</span> -r release/VPS/* root@<span class="y">VPS1_IP</span>:/root/prometey/</pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num purple">2</div>
+      <div class="step-body">
+        <strong>Run installer and choose mode [2]</strong>
+        <pre><span class="g">ssh</span> root@<span class="y">VPS1_IP</span>
+<span class="g">cd</span> /root/prometey && <span class="g">sudo bash</span> deploy-vps.sh</pre>
+        Choose <code>[2]</code> — Chain VPS1.<br>
+        Enter VPS2 address: <code>wss://<span style="color:#e6db74">VPS2_IP</span>:443</code>
+      </div>
+    </div>
+  </div>
+  <div class="tip">
+    VPS1 installs relay only (server.py in chain mode) + nginx + coturn. No web panel — this is correct.
+    Direct browser access to VPS1 returns 404.
+  </div>
+</div>
+
+<h3><span class="badge bh">HOST</span> Step 3 — Configure and install</h3>
+<div class="card">
+  Run <code>pnpext_config_editor.exe</code>, enter <strong>VPS1</strong>'s IP in «VPS address» (not VPS2!).
+  Click «Auto-fill STUN/TURN» → «GENERATE pnpext.sys».<br><br>
+  Run <code>install-cmd.bat</code> as administrator.
+  <div class="warn" style="margin-top:12px;">
+    ⚠ Config IP = <strong>VPS1</strong>. Host connects to VPS1. Client connects to VPS2. The chain is transparent.
+  </div>
+</div>
+
+<h3><span class="badge bc">CLIENT</span> Step 4 — Connect</h3>
+<div class="card">
+  <pre>https://<span class="y">VPS2_IP</span>/panel/</pre>
+  Connect via <strong>VPS2</strong> — not VPS1. VPS1 has no panel.
+</div>
+
+<hr>
+
+<h2>Config editor — pnpext_config_editor.exe</h2>
+<div class="card card-blue">
+  Creates <code>pnpext.sys</code> — the encrypted agent config. The service will not start without it.<br><br>
+  <div class="g2">
+    <div>
+      <h4>Connection tab</h4>
+      <ul style="padding-left:18px;line-height:2;">
+        <li><strong>VPS address</strong> — server IP</li>
+        <li><strong>Port</strong> — <code>443</code></li>
+        <li><strong>TLS</strong> — enabled</li>
+        <li><strong>Token</strong> — e.g. <code>myroom</code></li>
+        <li><strong>Password</strong> — access password</li>
+      </ul>
+    </div>
+    <div>
+      <h4>Buttons</h4>
+      <ul style="padding-left:18px;line-height:2;">
+        <li><em>Auto-fill STUN/TURN</em> — from VPS IP</li>
+        <li><em>Generate pnpext.sys</em> — save config</li>
+        <li><em>Open pnpext.sys</em> — load existing</li>
+      </ul>
+    </div>
+  </div>
+  <div class="warn" style="margin-top:12px;">
+    ⚠ After changing the IP — regenerate <code>pnpext.sys</code> and replace the file on the host
+    (<code>C:\Windows\System32\drivers\pnpext.sys</code>), then restart the service.
+  </div>
+</div>
+
+<hr>
+
+<h2>Updates</h2>
+<h3>Update agent on host (via panel)</h3>
+<div class="card card-gray">
+  <strong>Settings → Host Update</strong>:
+  <ol style="padding-left:22px;margin-top:8px;line-height:2.2;">
+    <li>Click <em>Upload DLL to VPS</em> → select new <code>pnpext.dll</code></li>
+    <li>Click <em>Update Host</em> — host downloads and replaces DLL automatically</li>
+    <li>Service restarts; host reconnects in ~10 seconds</li>
+  </ol>
+</div>
+<h3>Update without panel (SSH)</h3>
+<div class="card card-gray">
+  <pre><span class="g">scp</span> release/VPS/server.py root@<span class="y">VPS_IP</span>:/opt/remotedesk/
+<span class="g">scp</span> release/VPS/index.html root@<span class="y">VPS_IP</span>:/var/www/remote-desktop/
+<span class="g">systemctl restart</span> rdp-relay</pre>
+  <div class="tip">Copy to <strong>both</strong> locations: <code>/opt/remotedesk/</code> (service) and <code>/var/www/remote-desktop/</code> (nginx).</div>
+</div>
+
+<hr>
+
+<h2>Removing the agent</h2>
+<div class="card">
+  Run <code>uninstall-cmd.bat</code> as administrator from <code>release/HOST/</code>.<br>
+  Removes: service, <code>pnpext.dll</code>, <code>pnpext.sys</code>, all registry entries.
+</div>
+
+<hr>
+
+<h2>Useful VPS commands</h2>
+<div class="card">
+<pre><span class="c"># Service status</span>
+<span class="g">systemctl status</span> rdp-relay nginx coturn
+
+<span class="c"># Real-time logs</span>
+<span class="g">journalctl -u rdp-relay -f</span>
+
+<span class="c"># Restart relay</span>
+<span class="g">systemctl restart</span> rdp-relay
+
+<span class="c"># Check installed files</span>
+<span class="g">ls -lh</span> /opt/remotedesk/
+<span class="g">ls -lh</span> /var/www/remote-desktop/
+<span class="g">ls -lh</span> /opt/remotedesk/stage2/
+
+<span class="c"># Check ports</span>
+<span class="g">ss -tlnp</span> | grep -E "443|8080|3478"
+
+<span class="c"># Create directories manually if missing</span>
+<span class="g">mkdir -p</span> /opt/remotedesk/audio /opt/remotedesk/screenshots /opt/remotedesk/stage2
+<span class="g">systemctl restart</span> rdp-relay</pre>
+</div>
+
+<h2>Troubleshooting</h2>
+
+<div class="card card-red">
+  <strong>Service on host fails to start — «Path not found»</strong><br>
+  → The config file was not copied to the correct location.<br>
+  → Fix: <code>copy /y pnpext.sys %SystemRoot%\System32\drivers\pnpext.sys</code>
+  then <code>sc start MspIscSvc</code>
+</div>
+<div class="card card-red">
+  <strong>Browser: «Site unreachable» / ERR_CONNECTION_REFUSED</strong><br>
+  → <code>systemctl restart rdp-relay nginx</code>
+</div>
+<div class="card card-red">
+  <strong>Browser shows 404 instead of panel</strong><br>
+  → ✓ <code>https://IP/panel/</code> &nbsp; ✗ <code>https://IP/</code> (intentional — blocks scanners)
+</div>
+<div class="card card-red">
+  <strong>Host not visible in panel</strong><br>
+  → Check IP in <code>pnpext.sys</code> — regenerate via config editor if wrong<br>
+  → Token and password must match what you enter in the browser<br>
+  → In Variant B: config IP = VPS1, browser opens VPS2<br>
+  → Logs: <code>journalctl -u rdp-relay -f</code>
+</div>
+<div class="card card-red">
+  <strong>Chain mode: host not visible on VPS2</strong><br>
+  → On VPS1 check: <code>systemctl cat rdp-relay | grep CHAIN</code><br>
+  → Must have: <code>RDP_CHAIN_UPSTREAM=wss://VPS2_IP:443</code> and <code>RDP_CHAIN_SSL_VERIFY=0</code><br>
+  → If <code>RDP_CHAIN_SSL_VERIFY=0</code> is missing — reinstall VPS1 using the script
+</div>
+<div class="card card-red">
+  <strong>Extended features not working (file manager, processes)</strong><br>
+  → <code>ls /opt/remotedesk/stage2/</code> — must contain 4 DLL files<br>
+  → If missing: copy from <code>release/VPS/stage2/</code> to <code>/opt/remotedesk/stage2/</code>
+</div>
+<div class="card" style="border-left:4px solid #e67e22;">
+  <strong>«Insecure connection» browser warning</strong><br>
+  → Normal. Click <em>Advanced → Proceed to site</em>.<br>
+  Certificate is self-signed — data is still encrypted via TLS.
+</div>
+<div class="card card-red">
+  <strong>No web panel on VPS1 (chain mode)</strong><br>
+  → Correct. VPS1 is a transparent relay with no interface.<br>
+  → Panel is only on VPS2: <code>https://VPS2_IP/panel/</code>
+</div>
+
+<div style="text-align:center;color:#aaa;font-size:13px;margin-top:48px;">
+  PROMETEY &nbsp;·&nbsp; v1.0.232 &nbsp;·&nbsp; Guide current as of build date
+</div>
+
+</div><!-- .page -->
+</div><!-- #sect-en -->
+
+
+<script>
+function setLang(l) {
+  ['ru','az','en'].forEach(function(x) {
+    document.getElementById('sect-' + x).style.display = (x === l) ? '' : 'none';
+    var btn = document.getElementById('btn-' + x);
+    if (btn) btn.classList[x === l ? 'add' : 'remove']('active');
+  });
+  document.documentElement.lang = l;
+  try { localStorage.setItem('prometey-lang', l); } catch(e) {}
+}
+(function() {
+  var l = 'ru';
+  try { l = localStorage.getItem('prometey-lang') || 'ru'; } catch(e) {}
+  if (l !== 'ru') setLang(l);
+})();
+</script>
+
+</body>
+</html>
