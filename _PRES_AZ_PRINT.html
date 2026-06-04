@@ -1,0 +1,792 @@
+﻿<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8">
+<title>PROMETEY — Prezentasiya</title>
+<style>
+  @page { size: A4; margin: 0; }
+  :root {
+    --accent: #2563eb;
+    --accent2: #16a34a;
+    --accent3: #ea580c;
+    --accent4: #9333ea;
+    --accent5: #d97706;
+    --danger: #dc2626;
+    --fg: #1f2328;
+    --muted: #59636e;
+    --bg: #ffffff;
+    --bg2: #f6f8fa;
+    --bg3: #eaeef2;
+    --bd: #d0d7de;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #ffffff;
+    color: var(--fg);
+    line-height: 1.65;
+    font-size: 13px;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* ── Page breaks ── */
+  .page-break { page-break-before: always; break-before: page; }
+  .no-break { page-break-inside: avoid !important; break-inside: avoid !important; }
+  h1, h2, h3, h4 { page-break-after: avoid !important; break-after: avoid !important; }
+  p { orphans: 3; widows: 3; }
+
+  /* ── Cover ── */
+  .cover {
+    height: 297mm; /* A4 height (297mm) minus top+bottom margins (14mm×2) */
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 50px 40px; position: relative;
+    background: linear-gradient(165deg, #f0f4ff 0%, #ffffff 40%, #f0fdf4 100%);
+    overflow: hidden;
+    page-break-after: always; break-after: page;
+  }
+  .cover-bg-logo {
+    position: absolute; inset: 0; z-index: 0;
+    display: flex; align-items: center; justify-content: center; pointer-events: none;
+  }
+  .cover-bg-logo img {
+    /* contain = fill page maximally without cropping */
+    width: 100%; height: 100%; object-fit: contain;
+    opacity: 0.14; filter: saturate(0.9);
+  }
+  .cover-content { position: relative; z-index: 1; }
+  .cover-badge {
+    font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase;
+    color: var(--accent); font-weight: 700;
+    background: rgba(37,99,235,.08); border: 1.5px solid rgba(37,99,235,.25);
+    padding: 6px 22px; border-radius: 99px; margin-bottom: 28px;
+  }
+  .cover-title {
+    font-size: 64px; font-weight: 900; letter-spacing: -3px;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent4) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .cover-sub {
+    font-size: 22px; font-weight: 600; color: var(--muted);
+    margin: 12px 0 28px; letter-spacing: 0.3px;
+  }
+  .cover-desc {
+    font-size: 15px; color: var(--muted); max-width: 620px;
+    margin: 0 auto 36px; line-height: 1.8;
+  }
+  .chips { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 20px; }
+  .chip { padding: 7px 18px; border-radius: 99px; font-size: 12px; font-weight: 600; border: 1.5px solid; white-space: nowrap; }
+  .chip-b { background: rgba(37,99,235,.08); border-color: rgba(37,99,235,.35); color: #1d4ed8; }
+  .chip-g { background: rgba(22,163,74,.08); border-color: rgba(22,163,74,.35); color: #15803d; }
+  .chip-p { background: rgba(147,51,234,.08); border-color: rgba(147,51,234,.35); color: #7e22ce; }
+  .chip-o { background: rgba(234,88,12,.08); border-color: rgba(234,88,12,.35); color: #c2410c; }
+  .chip-r { background: rgba(220,38,38,.08); border-color: rgba(220,38,38,.35); color: #b91c1c; }
+
+  .cover-ver { font-size: 12px; color: var(--muted); font-family: monospace; margin-top: 24px; }
+
+  /* ── Section ── */
+  .section { padding: 48px 32px; max-width: 1100px; margin: 0 auto; }
+  .sec-num { font-size: 11px; color: var(--accent); text-transform: uppercase; letter-spacing: 2.5px; font-weight: 700; margin-bottom: 6px; }
+  .sec-title { font-size: 32px; font-weight: 800; letter-spacing: -1px; margin-bottom: 8px; color: var(--fg); }
+  .sec-desc { font-size: 15px; color: var(--muted); max-width: 700px; margin-bottom: 36px; line-height: 1.75; }
+
+  /* ── Divider ── */
+  .divider { border: none; border-top: 1.5px solid var(--bd); margin: 0; }
+
+  /* ── Journey (3-column diagram) ── */
+  .journey { display: flex; align-items: stretch; gap: 0; margin: 24px 0 36px; }
+  .jn {
+    flex: 1; background: #fff; border: 1.5px solid var(--bd);
+    border-radius: 14px; padding: 22px 18px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.04);
+    position: relative;
+  }
+  .jn::before { content:''; position: absolute; top: 0; left: 0; right: 0; height: 4px; border-radius: 14px 14px 0 0; }
+  .jn.blue::before { background: var(--accent); }
+  .jn.orange::before { background: var(--accent5); }
+  .jn.green::before { background: var(--accent2); }
+  .jn-icon { font-size: 32px; margin-bottom: 10px; }
+  .jn-name { font-size: 17px; font-weight: 800; margin-bottom: 4px; }
+  .jn-role { font-size: 12px; color: var(--muted); margin-bottom: 14px; line-height: 1.5; }
+  .jn-item { font-size: 11.5px; color: var(--muted); padding: 3px 0; display: flex; gap: 6px; align-items: flex-start; line-height: 1.45; }
+  .jn-item b { color: var(--fg); font-weight: 600; white-space: nowrap; }
+  .jn-arr {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 0 6px; gap: 4px; min-width: 60px;
+  }
+  .jn-arr-line { width: 100%; height: 2px; background: linear-gradient(90deg, var(--accent), var(--accent5)); }
+  .jn-arr-label { font-size: 10px; color: var(--muted); text-align: center; line-height: 1.35; }
+
+  /* ── Feature cards ── */
+  .feat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 24px 0; }
+  .feat-card {
+    background: #fff; border: 1.5px solid var(--bd); border-radius: 12px;
+    padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.03);
+    page-break-inside: avoid !important; break-inside: avoid !important;
+  }
+  .feat-icon { font-size: 28px; margin-bottom: 10px; }
+  .feat-title { font-size: 14px; font-weight: 700; margin-bottom: 6px; color: var(--fg); }
+  .feat-desc { font-size: 12px; color: var(--muted); line-height: 1.65; }
+
+  /* ── Security layers ── */
+  .sec-layers { display: flex; flex-direction: column; gap: 0; border-radius: 14px; overflow: hidden; border: 1.5px solid var(--bd); margin: 24px 0; box-shadow: 0 2px 8px rgba(0,0,0,.03); }
+  .sec-layer { padding: 20px 24px; display: flex; align-items: flex-start; gap: 18px; border-bottom: 1px solid var(--bd); page-break-inside: avoid !important; break-inside: avoid !important; }
+  .sec-layer:last-child { border-bottom: none; }
+  .sec-num-badge {
+    width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 800; flex-shrink: 0;
+  }
+  .sec-layer-title { font-size: 15px; font-weight: 700; margin-bottom: 5px; }
+  .sec-layer-plain { font-size: 13px; color: var(--fg); margin-bottom: 8px; line-height: 1.7; }
+  .sec-layer-tech { font-size: 11.5px; color: var(--muted); line-height: 1.65; }
+  .l1 { background: rgba(37,99,235,.04); } .l1 .sec-num-badge { background: rgba(37,99,235,.15); color: var(--accent); }
+  .l2 { background: rgba(22,163,74,.04); } .l2 .sec-num-badge { background: rgba(22,163,74,.15); color: var(--accent2); }
+  .l3 { background: rgba(147,51,234,.04); } .l3 .sec-num-badge { background: rgba(147,51,234,.15); color: var(--accent4); }
+  .l4 { background: rgba(234,88,12,.04); } .l4 .sec-num-badge { background: rgba(234,88,12,.15); color: var(--accent3); }
+  .l5 { background: rgba(220,38,38,.04); } .l5 .sec-num-badge { background: rgba(220,38,38,.15); color: var(--danger); }
+  .l6 { background: rgba(217,119,6,.04); } .l6 .sec-num-badge { background: rgba(217,119,6,.15); color: var(--accent5); }
+  .l7 { background: rgba(37,99,235,.04); } .l7 .sec-num-badge { background: rgba(37,99,235,.15); color: var(--accent); }
+
+  /* ── Encryption detail cards ── */
+  .enc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 24px 0; }
+  .enc-card {
+    background: #fff; border: 1.5px solid var(--bd); border-radius: 12px;
+    padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.03);
+    page-break-inside: avoid !important; break-inside: avoid !important;
+  }
+  .enc-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .enc-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .enc-title { font-size: 14px; font-weight: 700; }
+  .enc-desc { font-size: 12.5px; color: var(--muted); line-height: 1.7; }
+  .enc-tech { font-size: 11px; color: var(--accent4); font-family: monospace; margin-top: 8px; padding: 6px 10px; background: rgba(147,51,234,.06); border-radius: 6px; }
+
+  /* ── Sniff comparison ── */
+  .sniff-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 24px 0; }
+  .sniff-card { border: 1.5px solid var(--bd); border-radius: 12px; padding: 20px; page-break-inside: avoid !important; break-inside: avoid !important; }
+  .sniff-card.red-tint { border-color: rgba(220,38,38,.35); background: rgba(220,38,38,.03); }
+  .sniff-card.green-tint { border-color: rgba(22,163,74,.35); background: rgba(22,163,74,.03); }
+  .sniff-title { font-size: 14px; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .sniff-item { font-size: 12px; color: var(--muted); padding: 5px 0; border-bottom: 1px solid rgba(0,0,0,.06); display: flex; gap: 8px; align-items: flex-start; line-height: 1.6; }
+  .sniff-item:last-child { border-bottom: none; }
+  .sniff-icon { flex-shrink: 0; margin-top: 2px; }
+
+  /* ── AV table ── */
+  .av-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 20px 0; }
+  .av-table th { text-align: left; padding: 10px 14px; border-bottom: 2px solid var(--bd); color: var(--muted); text-transform: uppercase; font-size: 10px; letter-spacing: 1.5px; }
+  .av-table td { padding: 10px 14px; border-bottom: 1px solid rgba(0,0,0,.06); vertical-align: top; }
+  .ok { color: var(--accent2); font-weight: 700; }
+
+  /* ── Info box ── */
+  .infobox { padding: 16px 20px; border-radius: 10px; font-size: 12.5px; line-height: 1.75; margin: 16px 0; page-break-inside: avoid !important; break-inside: avoid !important; }
+  .infobox.blue { background: rgba(37,99,235,.06); border-left: 4px solid var(--accent); }
+  .infobox.green { background: rgba(22,163,74,.06); border-left: 4px solid var(--accent2); }
+  .infobox.orange { background: rgba(234,88,12,.06); border-left: 4px solid var(--accent3); }
+  .infobox.purple { background: rgba(147,51,234,.06); border-left: 4px solid var(--accent4); }
+
+  /* ── Gallery ── */
+  .gallery-section { padding: 40px 32px; }
+  .gallery-title { font-size: 32px; font-weight: 800; color: var(--accent); margin-bottom: 8px; text-align: center; }
+  .gallery-intro { font-size: 14px; color: var(--muted); text-align: center; margin-bottom: 30px; }
+  .gallery-slide {
+    page-break-before: always; break-before: page;
+    padding: 20px 0; text-align: center;
+    page-break-inside: avoid !important; break-inside: avoid !important;
+  }
+  .gallery-slide:first-of-type { page-break-before: avoid; break-before: avoid; }
+  .gallery-img-wrap {
+    background: linear-gradient(135deg, #f6f8fa 0%, #eaeef2 100%);
+    border: 2px solid #d0d7de; border-radius: 14px; padding: 16px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.08);
+    display: inline-block; max-width: 100%;
+  }
+  .gallery-img {
+    max-width: 100%; max-height: 200mm; height: auto;
+    border-radius: 8px; display: block;
+    box-shadow: 0 4px 12px rgba(0,0,0,.12);
+  }
+  .gallery-caption { margin-top: 18px; font-size: 22px; font-weight: 700; color: var(--fg); }
+  .gallery-num {
+    display: inline-block; padding: 5px 16px;
+    background: var(--accent); color: white;
+    border-radius: 99px; font-size: 13px; font-weight: 700; margin-bottom: 10px;
+  }
+  .gallery-desc { margin-top: 8px; font-size: 14px; color: var(--muted); max-width: 600px; margin-left: auto; margin-right: auto; line-height: 1.65; }
+
+  /* ── Footer ── */
+  footer { text-align: center; padding: 40px 32px; border-top: 1.5px solid var(--bd); color: var(--muted); font-size: 12px; }
+
+  /* ── Flow diagram ── */
+  .flow-box {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    margin: 24px 0; flex-wrap: wrap;
+  }
+  .flow-node {
+    background: #fff; border: 1.5px solid var(--bd); border-radius: 10px;
+    padding: 12px 18px; font-size: 12px; font-weight: 600;
+    box-shadow: 0 2px 6px rgba(0,0,0,.04); text-align: center; min-width: 100px;
+  }
+  .flow-arrow { font-size: 20px; color: var(--accent); font-weight: 700; }
+
+  /* ── Highlight numbers ── */
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 24px 0; }
+  .stat-card {
+    text-align: center; background: #fff; border: 1.5px solid var(--bd);
+    border-radius: 12px; padding: 20px 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.03);
+    page-break-inside: avoid !important; break-inside: avoid !important;
+  }
+  .stat-num { font-size: 36px; font-weight: 900; margin-bottom: 4px; }
+  .stat-label { font-size: 12px; color: var(--muted); font-weight: 500; }
+
+  /* ── Print overrides ── */
+  @media print {
+    html, body { background: #fff !important; }
+    body { padding: 0 12mm !important; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+    * { animation: none !important; transition: none !important; }
+    img { max-width: 100% !important; height: auto !important; }
+
+    .cover { height: 297mm !important; padding: 60px 50px !important; }
+
+    hr.divider { display: none !important; }
+
+    .section {
+      page-break-before: always !important;
+      break-before: page !important;
+      padding-top: 22mm !important;
+      padding-bottom: 12mm !important;
+    }
+
+    /* sec-layers: remove overflow:hidden so break-inside:avoid works */
+    .sec-layers {
+      overflow: visible !important;
+      border-radius: 8px !important;
+    }
+
+    .feat-card, .enc-card, .sec-layer, .sniff-card, .infobox,
+    .journey, .flow-box, .av-table tr {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+    }
+
+    h2, h3, h4, .sec-num, .sec-title, .sec-desc {
+      page-break-after: avoid !important;
+      break-after: avoid !important;
+    }
+
+    /* Keep grids/layers attached to section header — don't allow break before them */
+    .feat-grid, .enc-grid, .sniff-grid, .sec-layers {
+      page-break-before: avoid !important;
+      break-before: avoid !important;
+    }
+
+    .av-table thead { page-break-after: avoid !important; break-after: avoid !important; }
+
+    p { orphans: 4; widows: 4; }
+
+    /* Fix PROMETEY gradient title — background-clip:text renders as solid bar in print */
+    .cover-title {
+      background: none !important;
+      -webkit-background-clip: unset !important;
+      background-clip: unset !important;
+      -webkit-text-fill-color: var(--accent) !important;
+      color: var(--accent) !important;
+    }
+
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!--              COVER PAGE                         -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="cover">
+  <!-- Full-page semi-transparent logo background -->
+  <div class="cover-bg-logo">
+    <img src="docs/img/logo.jpg" alt="">
+  </div>
+
+  <!-- All cover content sits above the logo -->
+  <div class="cover-content">
+    <h1 class="cover-title">PROMETEY</h1>
+    <div class="cover-sub">Uzaqdan gizli Nəzarət Sistemi</div>
+    <p class="cover-desc">
+      Adi brauzer vasitəsilə kompüter üzərində tam nəzarət. İstifadəçiyə görünmədən işləyir.
+      Bütün məlumatlar şifrələnib. Başqa ölkədəki relay server operatoru gizlədir.
+      Heç bir əlavə proqram quraşdırılmır — yalnız brauzer.
+    </p>
+    <div class="chips">
+      <span class="chip chip-b">&#128274; Tam trafik şifrələnməsi</span>
+      <span class="chip chip-g">&#129513; Modullar yaddaşa yüklənir</span>
+      <span class="chip chip-p">&#128273; Güclü autentifikasiya</span>
+      <span class="chip chip-o">&#128737;&#65039; Antiviruslara görünməz</span>
+      <span class="chip chip-r">&#128123; İstifadəçiyə görünməz</span>
+    </div>
+    <div class="cover-ver">v1.0.232 &middot; 2026</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!--              PART 1 — ARCHITECTURE              -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="section page-break">
+  <div class="sec-num">Hissə 1</div>
+  <h2 class="sec-title">Sistem Arxitekturası</h2>
+  <p class="sec-desc">
+    Üç iştirakçı: Obyekt (idarə olunan kompüter), VPS-server (başqa ölkədə vasitəçi) və Operator (siz, brauzerdə).
+    Obyekt və operator heç vaxt birbaşa bağlanmır — yalnız vasitəçi server vasitəsilə. Bu anonimliyin əsasıdır.
+  </p>
+
+  <!-- 3-column journey -->
+  <div class="journey no-break">
+    <div class="jn blue">
+      <div class="jn-icon">&#128421;&#65039;</div>
+      <div class="jn-name">Obyekt</div>
+      <div class="jn-role">İdarə olunan kompüter<br>(Windows, sahibinə görünmədən)</div>
+      <div class="jn-item"><b>Agent:</b>&nbsp;görünməz servis MspIscSvc</div>
+      <div class="jn-item"><b>Fayl:</b>&nbsp;pnpext.dll (svchost.exe daxilindəki)</div>
+      <div class="jn-item"><b>Başlanma:</b>&nbsp;Windows ilə avtomatik</div>
+      <div class="jn-item"><b>Görünür?</b>&nbsp;<span style="color:#15803d;font-weight:600">Xeyr — nə ikon, nə pəncərə</span></div>
+      <div class="jn-item"><b>Konfiq:</b>&nbsp;AES-256 ilə şifrələnmiş</div>
+    </div>
+    <div class="jn-arr">
+      <div class="jn-arr-line"></div>
+      <div class="jn-arr-label"><b style="color:var(--accent)">&#8594;</b><br>şifrəli kanal<br>port 443 (HTTPS)</div>
+      <div class="jn-arr-line"></div>
+    </div>
+    <div class="jn orange">
+      <div class="jn-icon">&#9729;&#65039;</div>
+      <div class="jn-name">VPS Server</div>
+      <div class="jn-role">Başqa ölkədə relay server<br>(məlumat saxlamır, yalnız oturur)</div>
+      <div class="jn-item"><b>Rol:</b>&nbsp;obyekt ilə operator arasında körpü</div>
+      <div class="jn-item"><b>İstifadəçilər:</b>&nbsp;şifrəli parollar + rollar</div>
+      <div class="jn-item"><b>Birbaşa əlaqə?</b>&nbsp;<span style="color:#15803d;font-weight:600">Xeyr — heç vaxt</span></div>
+      <div class="jn-item"><b>Jurnallar:</b>&nbsp;yalnız RAM-da, yenidən başladıqda itirilir</div>
+    </div>
+    <div class="jn-arr">
+      <div class="jn-arr-line"></div>
+      <div class="jn-arr-label"><b style="color:var(--accent5)">&#8594;</b><br>şifrəli kanal<br>port 443 (HTTPS)</div>
+      <div class="jn-arr-line"></div>
+    </div>
+    <div class="jn green">
+      <div class="jn-icon">&#129489;&#8205;&#128187;</div>
+      <div class="jn-name">Operator</div>
+      <div class="jn-role">Siz — brauzerdə idarə edirsiniz<br>istənilən cihazdan</div>
+      <div class="jn-item"><b>Interfeys:</b>&nbsp;brauzer, heç bir proqram lazım deyil</div>
+      <div class="jn-item"><b>Giriş:</b>&nbsp;istifadəçi adı + parol</div>
+      <div class="jn-item"><b>Rollar:</b>&nbsp;Administrator / Operator</div>
+      <div class="jn-item"><b>IP görünür?</b>&nbsp;<span style="color:#15803d;font-weight:600">Xeyr — obyekt bilmir</span></div>
+    </div>
+  </div>
+
+  <!-- Data flow -->
+  <div class="infobox green no-break">
+    <b>&#128270; Məlumat axını:</b> Operator düyməyə basır &#8594; əmr şifrələnir (TLS 1.3) &#8594; VPS onu obyektə göndərir &#8594;
+    obyekt icra edir &#8594; nəticə eyni zəncir ilə geri qayıdır. Heç bir məlumat şifrəsizsiz ötmür.
+    Bütün kanal adi HTTPS trafiki kimi görünür — firewall-lar bloklamır, sniffer-lər oxuya bilmir.
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════ -->
+<!--              PART 2 — CAPABILITIES              -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="section page-break">
+  <div class="sec-num">Hissə 2</div>
+  <h2 class="sec-title">Sistemin İmkanları</h2>
+  <p class="sec-desc">
+    Bütün funksiyalar brauzerdə işləyir. Operatorun kompüterinə heç bir proqram quraşdırılmır.
+    Tam Windows nəzarəti — yalnız bir klik məsafəsində.
+  </p>
+
+  <div class="feat-grid">
+    <div class="feat-card no-break">
+      <div class="feat-icon">&#128421;&#65039;</div>
+      <div class="feat-title">Real vaxt ekran yayımı</div>
+      <div class="feat-desc">Obyektin ekranını birbaşa brauzerdə görürsünüz. JPEG, H.264 və VP8 kodlama. FPS, keyfiyyət və miqyas tənzimlənir. WebRTC P2P dəstəklənir.</div>
+    </div>
+    <div class="feat-card no-break">
+      <div class="feat-icon">&#128193;</div>
+      <div class="feat-title">Fayl meneceri</div>
+      <div class="feat-desc">Bütün qovluqlara giriş — sistem və gizli daxil. Fayllar yüklənmə, endirmə, silmə və adını dəyişmə. Çoxlu fayl paralel yükləmə.</div>
+    </div>
+    <div class="feat-card no-break">
+      <div class="feat-icon">&#9881;&#65039;</div>
+      <div class="feat-title">Proseslər və servislər</div>
+      <div class="feat-desc">Bütün işləyən proqramlar və Windows servisləri. İstənilən prosesi bitirə, yeni başlada və ya servis növünü dəyişə bilərsiniz.</div>
+    </div>
+    <div class="feat-card no-break">
+      <div class="feat-icon">&#128187;</div>
+      <div class="feat-title">Terminal (cmd / PowerShell)</div>
+      <div class="feat-desc">SYSTEM hüquqları ilə tam terminal. İstənilən əmri icra edin — nəticə dərhal görünür. PowerShell və cmd dəstəklənir.</div>
+    </div>
+    <div class="feat-card no-break">
+      <div class="feat-icon">&#128203;</div>
+      <div class="feat-title">Windows Reyestri</div>
+      <div class="feat-desc">Tam reyestr girişi: açar və dəyərlərin yaradılması, redaktəsi, silinməsi. Bütün məlumat növləri dəstəklənir.</div>
+    </div>
+    <div class="feat-card no-break">
+      <div class="feat-icon">&#128247;</div>
+      <div class="feat-title">Avtomatik skrinşot</div>
+      <div class="feat-desc">Müəyyən aralıqlarda ekran görüntüsü. Yalnız müəyyən proqramlar üçün və ya həmişə. VPS-də saxlama.</div>
+    </div>
+    <div class="feat-card no-break">
+      <div class="feat-icon">&#127908;&#65039;</div>
+      <div class="feat-title">Audio: yazma və canlı dinləmə</div>
+      <div class="feat-desc">Mikrofon və sistem sesi. WASAPI loopback — tepsidə ikon görünmür. Canlı rejimdə brauzerdə dinləyə bilərsiniz. Opus kodlama.</div>
+    </div>
+    <div class="feat-card no-break">
+      <div class="feat-icon">&#128200;</div>
+      <div class="feat-title">Aktivlik tarixi</div>
+      <div class="feat-desc">Obyektin nə vaxt yandığını, söndüyünü, kilid vurduğunu izləyir. Ümumi işləmə müddəti, sessiya sayı, dövr statistikası.</div>
+    </div>
+    <div class="feat-card no-break">
+      <div class="feat-icon">&#128100;</div>
+      <div class="feat-title">Operator idarəetməsi</div>
+      <div class="feat-desc">Bir neçə operator fərqli icazələrlə. Kimisi yalnız ekran görür, kimisi tam girişə malikdir. Hər biri öz girişi ilə daxil olur.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Part 2 davamı — explicit page break so page 4 gets padding-top -->
+<div class="section page-break">
+  <div class="feat-grid">
+    <div class="feat-card no-break">
+      <div class="feat-icon">&#128260;</div>
+      <div class="feat-title">Uzaqdan yeniləmə</div>
+      <div class="feat-desc">Brauzerdən agentin yeni versiyasını yükləyin — obyekt yükləyib köhnəsini əvəz edər. Fiziki giriş lazım deyil.</div>
+    </div>
+    <div class="feat-card no-break">
+      <div class="feat-icon">&#128737;&#65039;</div>
+      <div class="feat-title">Mühafizə idarəetməsi</div>
+      <div class="feat-desc">Windows Defender idarəsi, sistem jurnallarının təmizlənməsi, aktivlik izlərinin silinməsi.</div>
+    </div>
+    <div class="feat-card no-break">
+      <div class="feat-icon">&#128293;</div>
+      <div class="feat-title">Öz-özünü məhvetmə</div>
+      <div class="feat-desc">Bir düyməylə tam silinmə: servis dayandırılır, fayllar silinir, reyestr təmizlənir. Geriyə heç nə qalmır.</div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════ -->
+<!--      PART 3 — ENCRYPTION & CHANNEL SECURITY    -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="section page-break">
+  <div class="sec-num">Hissə 3</div>
+  <h2 class="sec-title">Şifrələmə və Kanal Mühafizəsi</h2>
+  <p class="sec-desc">
+    Sistemin ən güclü tərəfi — çoxlaylıqlı şifrələmə arxitekturası. Hər bir məlumat parçası
+    bir neçə müstəqil mühafizə layı ilə qorunur. Aşağıda hər layın ətraflı təsviri verilmişdir.
+  </p>
+
+  <!-- Encryption cards with deep detail -->
+  <div class="enc-grid">
+    <div class="enc-card no-break">
+      <div class="enc-card-head">
+        <div class="enc-dot" style="background:var(--accent);"></div>
+        <div class="enc-title">&#127760; TLS 1.3 — Transport Şifrələnməsi</div>
+      </div>
+      <div class="enc-desc">
+        Obyekt &#8596; VPS &#8596; Operator arasındakı <b>bütün</b> trafik TLS 1.3 protokolu ilə şifrələnir. Bu, internetdə mövcud olan ən müasir şifrələmə standartıdır.
+        <br><br>
+        <b>Necə işləyir:</b> Əlaqə qurulduqda TLS handshake başa çatır — hər iki tərəf müvəqqəti sessiya açarları yaradır (Ephemeral Diffie-Hellman).
+        Bu açarlar heç vaxt şəbəkədə ötmür, yalnız qısa müddətli RAM-da movcuddur.
+        Hətta keçmiş trafikin bütün paketləri yığılsa da, sessiya açarları olmadan onları oxumaq mümkün deyil (<b>Forward Secrecy</b>).
+        <br><br>
+        <b>Nəticədə:</b> Sniffer, ISP və ya hakimiyyət orqanları yalnız təsadüfi baytlar görürlər — məlumat məfhumu, əmrin tipi və ya hədəfi müəyyən etmək mümkün deyil.
+      </div>
+      <div class="enc-tech">TLS_AES_256_GCM_SHA384 &middot; X25519 ECDHE &middot; Port 443 &middot; nginx reverse proxy</div>
+    </div>
+
+    <div class="enc-card no-break">
+      <div class="enc-card-head">
+        <div class="enc-dot" style="background:var(--accent2);"></div>
+        <div class="enc-title">&#128274; WSS — WebSocket Secure</div>
+      </div>
+      <div class="enc-desc">
+        Bütün əmr və məlumat kanalları WSS (WebSocket over HTTPS) protokolundan istifadə edir. Bu, adi HTTPS bağlantısının üstündən daimi ikitərəfli kanal açır.
+        <br><br>
+        <b>Niyə WebSocket?</b> Adi HTTP yalnız "sorğu-cavab" formatında işləyir. WebSocket isə server və klient arasında daimi açıq bağlantı saxlayır — bu, real vaxt ekran yayımı, anında əmr icrası və canlı audio üçün vacibdir.
+        <br><br>
+        <b>Maskirovka:</b> Kənarından baxanda bu trafik adi HTTPS veb-sayt açmaqdan fərqlənmir. Heç bir DPI (Deep Packet Inspection) sistemi bunun uzaqdan idarəetmə olduğunu müəyyən edə bilməz.
+      </div>
+      <div class="enc-tech">wss://server:443/host &middot; wss://server:443/ws &middot; Upgrade: websocket</div>
+    </div>
+  </div>
+</div>
+
+<!-- Part 3 davamı — explicit page break so page 6 gets padding-top -->
+<div class="section page-break">
+  <div class="enc-grid">
+    <div class="enc-card no-break">
+      <div class="enc-card-head">
+        <div class="enc-dot" style="background:var(--accent4);"></div>
+        <div class="enc-title">&#128272; AES-256-GCM — Modul Şifrələnməsi</div>
+      </div>
+      <div class="enc-desc">
+        Stage-2 modulları (fayl meneceri, proses idarəetməsi, mühafizə) VPS-də AES-256-GCM ilə şifrələnmiş formada saxlanılır.
+        <br><br>
+        <b>Açar mexanizmi:</b> Hər obyekt (host) üçün unikal <b>per-room key</b> yaradılır. Bu açar yalnız hədəf obyektin yaddaşında movcuddur. Hətta VPS-ə tam giriş əldə edilsə də, modullar şifrəsizləşdirilə bilməz — çünki açar VPS-də saxlanılmır.
+        <br><br>
+        <b>GCM rejimi necə qoruyur:</b> AES-GCM yalnız şifrələmə deyil, həm də <b>autentikləşdirilmiş şifrələmə</b> (AEAD) təklif edir. Mesajın bir baytı belə dəyişdirilsə, bütün blok rədd edilir — manipulyasiya mümkün deyil.
+        <br><br>
+        <b>256-bit açar gücü:</b> 2<sup>256</sup> mümkün kombinasiya — bu, kainatdakı bütün atomlardan çoxdur. Ən güclü superkompüter belə bu açarın tapılmasına milyard illərdən çox vaxt sərf edər.
+      </div>
+      <div class="enc-tech">AES-256-GCM &middot; 96-bit IV &middot; 128-bit auth tag &middot; per-room key derivation</div>
+    </div>
+
+    <div class="enc-card no-break">
+      <div class="enc-card-head">
+        <div class="enc-dot" style="background:var(--accent5);"></div>
+        <div class="enc-title">&#128190; AES-256-CBC — Konfiq Şifrələnməsi</div>
+      </div>
+      <div class="enc-desc">
+        Agentin parametr fayli (<b>pnpext.sys</b>) diskdə şifrələnmiş formada saxlanılır. Server ünvanı, parol, otaq tokeni — heç nə açıq mətnlə yazılmır.
+        <br><br>
+        <b>İkiqat mühafizə:</b> Əvvəlcə açar PBKDF2-HMAC-SHA256 metodu ilə paroldan əldə edilir (100,000 iterasiya — qaba gücə davamlı). Sonra məlumatlar AES-256-CBC ilə şifrələnir.
+        <br><br>
+        <b>Fiziki giriş ssenarisi:</b> Hətta kimsə sabit diski çıxarıb analiz etsə belə, pnpext.sys faylini oxumaq mümkün deyil — çünki açar yalnız agentin yaddaşındadır və diskdə heç vaxt saxlanılmır.
+      </div>
+      <div class="enc-tech">AES-256-CBC &middot; PBKDF2-HMAC-SHA256 (100K iter) &middot; random salt &middot; random IV</div>
+    </div>
+  </div>
+
+  <!-- Data flow diagram -->
+  <h3 style="font-size:18px;font-weight:700;margin:36px 0 16px;">&#128279; Şifrəli Kanal Sxemi</h3>
+  <div class="flow-box no-break" style="margin-bottom:24px;">
+    <div class="flow-node" style="border-color:var(--accent);background:rgba(37,99,235,.04)">&#128421;&#65039; Obyekt<br><small style="color:var(--muted)">pnpext.dll</small></div>
+    <div class="flow-arrow">&#8594;</div>
+    <div class="flow-node" style="border-color:var(--accent4);background:rgba(147,51,234,.04)">&#128274; TLS 1.3<br><small style="color:var(--muted)">AES-256-GCM</small></div>
+    <div class="flow-arrow">&#8594;</div>
+    <div class="flow-node" style="border-color:var(--accent5);background:rgba(234,88,12,.04)">&#9729;&#65039; VPS<br><small style="color:var(--muted)">nginx + relay</small></div>
+    <div class="flow-arrow">&#8594;</div>
+    <div class="flow-node" style="border-color:var(--accent4);background:rgba(147,51,234,.04)">&#128274; TLS 1.3<br><small style="color:var(--muted)">AES-256-GCM</small></div>
+    <div class="flow-arrow">&#8594;</div>
+    <div class="flow-node" style="border-color:var(--accent2);background:rgba(22,163,74,.04)">&#129489;&#8205;&#128187; Operator<br><small style="color:var(--muted)">Brauzer</small></div>
+  </div>
+
+  <div class="infobox purple no-break">
+    <b>&#128161; Forward Secrecy nədir?</b> Hər yeni TLS sessiyası üçün müvəqqəti Diffie-Hellman açarları yaradılır. Hətta uzunmüddətli server sertifikatı oğurlansa belə, keçmiş sessiyaların şifrəsini açmaq <b>mümkün deyil</b> — çünki sessiya açarları artıq RAM-da mövcud deyil. Bu, retrospektiv deşifrəetmənin tamamilə qarşısını alır.
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════ -->
+<!--    PART 3b — NETWORK ANONYMITY                  -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="section page-break">
+  <div class="sec-num">Hissə 3 (davamı)</div>
+  <h2 class="sec-title">Şəbəkə Anonimliyi</h2>
+  <p class="sec-desc">
+    Operator heç vaxt aşkarlanmır. VPS başqa ölkədə yerləşir və birbaşa əlaqəni kəsər.
+    Araşdıranlar yalnız VPS-ə qoşulan adi HTTPS trafiki görürlər — bunun arxasında nə olduğunu bilmək mümkün deyil.
+  </p>
+
+  <div class="sniff-grid">
+    <div class="sniff-card red-tint no-break">
+      <div class="sniff-title"><span style="font-size:18px;">&#128269;</span> Sniffer / Müstəntəq nə görür</div>
+      <div class="sniff-item"><span class="sniff-icon">&#10060;</span><b>Obyektin IP-si</b> — yalnız VPS IP ünvanı ilə əlaqə görünür. Digər tərəfdə kimin olduğu məlum deyil.</div>
+      <div class="sniff-item"><span class="sniff-icon">&#10060;</span><b>Operatorun IP-si</b> — obyekt operatorun IP-ni bilmir və öyrənə bilmir. O heç vaxt obyektə göndərilmir.</div>
+      <div class="sniff-item"><span class="sniff-icon">&#10060;</span><b>Trafik məzmunu</b> — bütün məlumat axini şifrələnmişdir (TLS 1.3). Sniffer təsadüfi baytlar görür.</div>
+      <div class="sniff-item"><span class="sniff-icon">&#10060;</span><b>Aktivlik növü</b> — trafik adi HTTPS kimi görünür. Uzaqdan idarəetmə olduğunu müəyyən etmək mümkün deyil.</div>
+    </div>
+    <div class="sniff-card green-tint no-break">
+      <div class="sniff-title"><span style="font-size:18px;">&#9989;</span> VPS necə qoruyur</div>
+      <div class="sniff-item"><span class="sniff-icon">&#128737;&#65039;</span><b>Birbaşa əlaqənin kəsilməsi</b> — obyekt yalnız VPS IP-sini bilir. Operator yalnız VPS IP-sini bilir. Bir-birinin ünvanını bilmirlər.</div>
+      <div class="sniff-item"><span class="sniff-icon">&#127758;</span><b>Fərqli yurisdiksiya</b> — başqa ölkədə VPS deməkdir ki, yerli hakimiyyət jurnalları tələb edə bilməz. Beynəlxalq sorğu lazımdır.</div>
+      <div class="sniff-item"><span class="sniff-icon">&#128274;</span><b>İstifadəçi məlumatı yoxdur</b> — parollar yalnız şifrələnmiş hash formada saxlanılır (PBKDF2). Server müsadirə edilsə belə parollar açılmır.</div>
+      <div class="sniff-item"><span class="sniff-icon">&#128465;&#65039;</span><b>Əməliyyat jurnalı yoxdur</b> — sessiya tokenları yalnız RAM-da. Yenidən başladıldıqda heç bir iz qalmır.</div>
+    </div>
+  </div>
+
+  <div class="infobox blue no-break">
+    <b>Araşdırmada maksimum öyrənilə biləcəklər:</b>
+    Obyektdə — onun 443 portunda (HTTPS) VPS IP ünvanına müntəzəm əlaqə qurduğu. Bu hər hansı digər veb-sayta qoşulmaqdan fərqlənmir.
+    Aktiv sessiya ilə VPS-ə fiziki giriş olmadan <b>nə məqsədi, nə operatoru, nə məzmunu</b> müəyyən etmək mümkün deyil.
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════ -->
+<!--    PART 4 — SECURITY LAYERS                     -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="section page-break">
+  <div class="sec-num">Hissə 4</div>
+  <h2 class="sec-title">Mühafizə Layları</h2>
+  <p class="sec-desc">
+    Yeddi müstəqil mühafizə layı sistemi hər tərəfdən qoruyur — şəbəkə səviyyəsindən başlamış fiziki disk analizinə qədər.
+  </p>
+
+  <div class="sec-layers">
+    <div class="sec-layer l1 no-break">
+      <div class="sec-num-badge">1</div>
+      <div style="flex:1;">
+        <div class="sec-layer-title">&#127760; Şəbəkə şifrələnməsi — TLS 1.3</div>
+        <div class="sec-layer-plain">
+          Bütün trafik ən müasir TLS 1.3 standartı ilə şifrələnir. Port 443 — standart HTTPS portu: firewall-lar bloklamır, DPI sistemləri adi veb trafik kimi götürür.
+          Forward Secrecy — keçmiş sessiyalar heç vaxt açıla bilməz.
+        </div>
+        <div class="sec-layer-tech">
+          <b style="color:var(--accent4)">WebSocket Secure (WSS)</b> — HTTPS üstündə daimi ikitərəfli kanal. Trafik veb-sayt açmaqdan fərqlənmir.
+          <br><b style="color:var(--accent4)">Cipher suite:</b> TLS_AES_256_GCM_SHA384, X25519 key exchange, ECDSA sertifikat.
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-layer l2 no-break">
+      <div class="sec-num-badge">2</div>
+      <div style="flex:1;">
+        <div class="sec-layer-title">&#128273; Parol mühafizəsi — PBKDF2</div>
+        <div class="sec-layer-plain">
+          Operator parolları açıq mətnlə heç vaxt saxlanılmır. PBKDF2-HMAC-SHA256 (100,000 iterasiya) + per-user salt ilə hash-lənir.
+          Eyni parollar fərqli hash-lar yaradır. Qaba güclə tapmaq illərlə çəkər.
+        </div>
+        <div class="sec-layer-tech">
+          <b style="color:var(--accent4)">Session token</b> — server RAM-da birdəfəlik token. Yenidən başladıqda itirilir, oğurlanan token köhnəlir.
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-layer l3 no-break">
+      <div class="sec-num-badge">3</div>
+      <div style="flex:1;">
+        <div class="sec-layer-title">&#129513; Diskdə və yaddaşda iz yoxdur</div>
+        <div class="sec-layer-plain">
+          Diskdə yalnız iki fayl: agent (pnpext.dll) və şifrələnmiş konfiq (pnpext.sys). Heç bir log, keş və ya müvəqqəti fayl yaradılmır.
+          Yaddaşda anonim icra olunan bölgələr yoxdur — yaddaş skaneri yalnız normal svchost.exe görür.
+        </div>
+        <div class="sec-layer-tech">
+          <b style="color:var(--accent4)">Reflective Load</b> — stage-2 modulları VPS-dən şifrəli yüklənir, RAM-da şifrəsizləşdirilir, PE başlıqları silinir. Forensics skaneri iz tapmaz.
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-layer l4 no-break">
+      <div class="sec-num-badge">4</div>
+      <div style="flex:1;">
+        <div class="sec-layer-title">&#128721; Antiviruslara görünməzlik</div>
+        <div class="sec-layer-plain">
+          Agent fayli (pnpext.dll) statik və dinamik analizdə antivirus şübhəsini oyatmamaq üçün xüsusi hazırlanıb.
+          VirusTotal nəticəsi: Elastic, THOR YARA, Windows Defender — heç biri aşkarlaya bilmir.
+        </div>
+        <div class="sec-layer-tech">
+          <b style="color:var(--accent4)">/DELAYLOAD</b> — 17 sistem kitabxanası import cədvəlindən gizlədilib.
+          <br><b style="color:var(--accent4)">Microsoft metadata</b> — fayl xüsusiyyətlərindən "Microsoft Corporation" görünür.
+          <br><b style="color:var(--accent4)">String obfuscation</b> — şübhəli sətirlər runtime-da fraqmentlərdən yığılır.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Part 4 davamı — explicit page break so page 9 gets padding-top -->
+<div class="section page-break">
+  <div class="sec-layers">
+    <div class="sec-layer l5 no-break">
+      <div class="sec-num-badge">5</div>
+      <div style="flex:1;">
+        <div class="sec-layer-title">&#128123; İstifadəçiyə tam görünməzlik</div>
+        <div class="sec-layer-plain">
+          Kompüter sahibi agentin işləməsinin heç bir əlamətini görmür: ikon, açılan pəncərə, tepsi qeydi, mikrofon ikonu — heç nə.
+          Agent standart Windows sistem komponenti kimi maskalanır.
+        </div>
+        <div class="sec-layer-tech">
+          <b style="color:var(--accent4)">WASAPI SYSTEM kontekstindən</b> — mikrofon ikonu görünmür (privacy indicator yalnız istifadəçi sessiyalarında işləyir).
+          <br><b style="color:var(--accent4)">DACL + failureflag=1</b> — admin belə servisi dayandıra bilmir, avtomatik yenidən başlar.
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-layer l6 no-break">
+      <div class="sec-num-badge">6</div>
+      <div style="flex:1;">
+        <div class="sec-layer-title">&#128190; Konfiq şifrələnməsi</div>
+        <div class="sec-layer-plain">
+          pnpext.sys fayli AES-256-CBC + PBKDF2 ilə şifrələnir. Server, parol, otaq tokeni — heç nə açıq mətnlə yox.
+          Fiziki disk analizi belə konfiqin içini oxuya bilməz.
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-layer l7 no-break">
+      <div class="sec-num-badge">7</div>
+      <div style="flex:1;">
+        <div class="sec-layer-title">&#129529; Öz-özünü təmizləmə</div>
+        <div class="sec-layer-plain">
+          Servis dayandırıldıqda bütün modullar yaddaşdan boşaldılır, müvəqqəti fayllar silinir, sistem jurnalları agentlə bağlı qeydlərindən avtomatik təmizlənir. Heç bir iz qalmır.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════ -->
+<!--    PART 5 — AV STATUS                           -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="section page-break">
+  <div class="sec-num">Hissə 5</div>
+  <h2 class="sec-title">Antivirus Testi Nəticələri</h2>
+  <p class="sec-desc">
+    pnpext.dll VirusTotal-da test edilmişdir. Aşağıdakı cədvəl ən populyar AV mühərriklərinin nəticələrini göstərir.
+  </p>
+
+  <table class="av-table no-break">
+    <thead>
+      <tr>
+        <th>Mühərrik</th>
+        <th>Status</th>
+        <th>Necə əldə edilib</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>Elastic ML</b></td>
+        <td><span class="ok">&#10003; Aşkarlanmayıb</span></td>
+        <td style="color:var(--muted);font-size:11px;">Microsoft metadata + /DELAYLOAD 17 DLL + OpenSSL izlərinin təmizlənməsi</td>
+      </tr>
+      <tr>
+        <td><b>THOR YARA</b></td>
+        <td><span class="ok">&#10003; Aşkarlanmayıb</span></td>
+        <td style="color:var(--muted);font-size:11px;">Şübhəli sətirlər runtime-da fraqmentlərdən yığılır — YARA nümunələri uyğun gəlmir</td>
+      </tr>
+      <tr>
+        <td><b>Windows Defender</b></td>
+        <td><span class="ok">&#10003; Aşkarlanmayıb</span></td>
+        <td style="color:var(--muted);font-size:11px;">Rəqəmsal imza + Microsoft metadata + DLL gecikdirilmiş yükləmə</td>
+      </tr>
+      <tr>
+        <td><b>T1057 (Process Discovery)</b></td>
+        <td><span class="ok">&#10003; Azaldılmış</span></td>
+        <td style="color:var(--muted);font-size:11px;">NtQuerySystemInformation əvəzinə CreateToolhelp32Snapshot — IAT-da iz yoxdur</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="infobox orange no-break">
+    <b>Qeyd:</b> VirusTotal sandbox-da davranış etiketləri (T1027, T1071) məlumat annotasiyalarıdır, aşkarlama deyil.
+    Heç bir AV mühərriki "Malicious" qərarı verməyib. Bütün əsas mühərrikləri — təmiz.
+  </div>
+</div>
+
+<hr class="divider">
+
+<footer>
+  <div style="font-size:28px;margin-bottom:8px;">&#9889;</div>
+  <div style="font-size:18px;font-weight:800;color:var(--fg);">PROMETEY</div>
+  <div style="margin-top:6px;color:var(--muted);font-size:13px;">Gizli Uzaqdan İdarəetmə Sistemi</div>
+  <div style="margin-top:6px;font-size:11px;font-family:monospace;color:var(--muted);">v1.0.232</div>
+</footer>
+
+</body>
+</html>

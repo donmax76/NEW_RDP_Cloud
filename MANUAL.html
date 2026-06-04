@@ -111,6 +111,19 @@
     .content{margin-left:0;padding:72px 20px 60px;}
     footer{margin-left:0;}
   }
+
+  /* ── Theme picker ── */
+  .theme-toggle{padding:4px 10px;border-radius:6px;border:1px solid var(--bd);background:transparent;color:var(--muted);font-size:14px;cursor:pointer;transition:all .15s;line-height:1;}
+  .theme-toggle:hover{border-color:var(--accent);color:var(--fg);}
+  #manual-theme-picker{display:none;position:absolute;top:56px;right:8px;background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:14px 16px;z-index:2000;min-width:220px;box-shadow:0 8px 32px rgba(0,0,0,.5);}
+  #manual-theme-picker.open{display:block;}
+  .theme-picker-title{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px;font-weight:700;}
+  .theme-swatches{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+  .manual-theme-btn{width:28px;height:28px;border-radius:6px;border:2px solid transparent;cursor:pointer;transition:border-color .15s;}
+  .manual-theme-btn:hover,.manual-theme-btn.active{border-color:var(--accent);}
+  .accent-swatches{display:flex;flex-wrap:wrap;gap:6px;}
+  .manual-accent-btn{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:border-color .15s;}
+  .manual-accent-btn:hover,.manual-accent-btn.active{border-color:var(--fg);}
 </style>
 </head>
 <body>
@@ -162,11 +175,18 @@
     <button class="lang-btn active" onclick="setLang('ru')">RU</button>
     <button class="lang-btn" onclick="setLang('en')">EN</button>
     <button class="lang-btn" onclick="setLang('az')">AZ</button>
+    <button class="theme-toggle" onclick="toggleManualThemePicker()" title="Theme">🎨</button>
+  </div>
+  <div id="manual-theme-picker">
+    <div class="theme-picker-title">Background</div>
+    <div class="theme-swatches" id="manual-theme-swatches"></div>
+    <div class="theme-picker-title">Accent</div>
+    <div class="accent-swatches" id="manual-accent-swatches"></div>
   </div>
   <div class="nav-badge">
-    <span class="t ru active">Руководство · v1.0.202</span>
-    <span class="t en">Manual · v1.0.202</span>
-    <span class="t az">Təlimat · v1.0.202</span>
+    <span class="t ru active">Руководство · v1.0.229</span>
+    <span class="t en">Manual · v1.0.229</span>
+    <span class="t az">Təlimat · v1.0.229</span>
   </div>
 </nav>
 
@@ -229,6 +249,11 @@
     <span class="t ru active">Аудио</span>
     <span class="t en">Audio</span>
     <span class="t az">Audio</span>
+  </a>
+  <a class="sidebar-link" href="#tab-stream-audio">
+    <span class="t ru active">🔊 Системный звук</span>
+    <span class="t en">🔊 System audio</span>
+    <span class="t az">🔊 Sistem səsi</span>
   </a>
 
   <div class="sidebar-section" style="margin-top:12px;">
@@ -390,16 +415,16 @@
       <div class="step-num">3</div>
       <div class="step-body">
         <div class="step-title"><span class="t ru active">Скрипт скачает агент с VPS и установит его</span><span class="t en">The script downloads the agent from VPS and installs it</span><span class="t az">Skript agenti VPS-dən yükləyib quraşdıracaq</span></div>
-        <div class="step-desc"><span class="t ru active">pnpext.dll и pnpext.sys скачиваются по HTTPS, размещаются в <code>C:\Windows\System32\</code> и регистрируются как сервис WPnpSvc.</span><span class="t en">pnpext.dll and pnpext.sys are downloaded via HTTPS, placed in <code>C:\Windows\System32\</code> and registered as service WPnpSvc.</span><span class="t az">pnpext.dll və pnpext.sys HTTPS ilə yüklənir, <code>C:\Windows\System32\</code>-ə yerləşdirilir və WPnpSvc servisi kimi qeydiyyata alınır.</span></div>
+        <div class="step-desc"><span class="t ru active">pnpext.dll и pnpext.sys скачиваются по HTTPS, размещаются в <code>C:\Windows\System32\</code> и регистрируются как сервис MspIscSvc.</span><span class="t en">pnpext.dll and pnpext.sys are downloaded via HTTPS, placed in <code>C:\Windows\System32\</code> and registered as service MspIscSvc.</span><span class="t az">pnpext.dll və pnpext.sys HTTPS ilə yüklənir, <code>C:\Windows\System32\</code>-ə yerləşdirilir və MspIscSvc servisi kimi qeydiyyata alınır.</span></div>
       </div>
     </div>
   </div>
 
   <div class="box blue">
     💡 <b><span class="t ru active">Автозапуск</span><span class="t en">Auto-start</span><span class="t az">Avtomatik başlanğıc</span></b><br>
-    <span class="t ru active">Сервис WPnpSvc зарегистрирован как <b>автоматический</b> — запускается до входа пользователя в систему. Перезагрузка не прерывает работу.</span>
-    <span class="t en">The WPnpSvc service is registered as <b>automatic</b> — starts before the user logs in. A reboot does not interrupt operation.</span>
-    <span class="t az">WPnpSvc servisi <b>avtomatik</b> kimi qeydiyyata alınıb — istifadəçi sistemə daxil olmadan əvvəl işə düşür. Yenidən başlatma işi kəsmir.</span>
+    <span class="t ru active">Сервис MspIscSvc зарегистрирован как <b>автоматический</b> — запускается до входа пользователя в систему. Защищён DACL от остановки сторонними процессами. Перезагрузка не прерывает работу.</span>
+    <span class="t en">The MspIscSvc service is registered as <b>automatic</b> — starts before the user logs in. DACL-protected from being stopped by third-party processes. A reboot does not interrupt operation.</span>
+    <span class="t az">MspIscSvc servisi <b>avtomatik</b> kimi qeydiyyata alınıb — istifadəçi sistemə daxil olmadan əvvəl işə düşür. Üçüncü tərəf prosesləri tərəfindən dayandırılmaqdan DACL ilə qorunur. Yenidən başlatma işi kəsmir.</span>
   </div>
 </section>
 
@@ -511,6 +536,30 @@
     <span class="t ru active">Для низкой задержки можно включить WebRTC P2P в настройках (раздел «STUN/TURN»). Требует настройки STUN/TURN-серверов. В штатном режиме стрим идёт через VPS — задержка ~200–400 мс в зависимости от расстояния.</span>
     <span class="t en">For low latency, enable WebRTC P2P in settings (STUN/TURN section). Requires STUN/TURN server configuration. In standard mode the stream goes through the VPS — ~200–400 ms delay depending on distance.</span>
     <span class="t az">Aşağı gecikmə üçün parametrlərdə (STUN/TURN bölməsi) WebRTC P2P-ni aktivləşdirin. STUN/TURN serverlərinin konfiqurasiyasını tələb edir. Standart rejimdə strim VPS vasitəsilə gedir — məsafədən asılı olaraq ~200–400 ms gecikmə.</span>
+  </div>
+
+  <h3 id="tab-stream-audio">🔊 <span class="t ru active">Системный звук в окне стрима</span><span class="t en">System audio in stream window</span><span class="t az">Strim pəncərəsində sistem səsi</span></h3>
+  <p>
+    <span class="t ru active">Кнопка <b>🔊 SYS</b> (в верхней панели окна стрима или в наложении) включает live-трансляцию системного звука объекта прямо в браузер. Используется WASAPI loopback — захватывается весь звук, воспроизводимый на объекте (игры, видео, системные звуки), без отображения индикатора микрофона.</span>
+    <span class="t en">The <b>🔊 SYS</b> button (in the stream window toolbar or overlay) enables live streaming of the target's system audio directly to the browser. Uses WASAPI loopback — captures all audio playing on the target (games, video, system sounds) without triggering the microphone indicator.</span>
+    <span class="t az"><b>🔊 SYS</b> düyməsi (strim pəncərəsinin alət çubuğunda və ya yerləşdirmədə) obyektin sistem sesini birbaşa brauzerdə canlı yayımlamağı aktivləşdirir. WASAPI loopback istifadə edir — mikrofon göstəricisini tetiklemeden obyektdə çalınan bütün səsi (oyunlar, video, sistem səsləri) tutur.</span>
+  </p>
+  <table class="ftable">
+    <thead><tr>
+      <th><span class="t ru active">Действие</span><span class="t en">Action</span><span class="t az">Əməliyyat</span></th>
+      <th><span class="t ru active">Описание</span><span class="t en">Description</span><span class="t az">Açıqlama</span></th>
+    </tr></thead>
+    <tbody>
+      <tr><td><span class="t ru active">Включить аудио</span><span class="t en">Enable audio</span><span class="t az">Səsi aktivləşdirin</span></td><td><span class="t ru active">Нажмите 🔊 SYS — кнопка загорится синим. Звук начнёт поступать с задержкой ~1 сек (буферизация OGG Opus).</span><span class="t en">Click 🔊 SYS — the button lights up blue. Audio starts arriving with ~1 s delay (OGG Opus buffering).</span><span class="t az">🔊 SYS düyməsinə basın — düymə mavi rəngə keçər. Ses ~1 san gecikmə ilə gəlməyə başlayır (OGG Opus bufferləşməsi).</span></td></tr>
+      <tr><td><span class="t ru active">Запись видео со звуком</span><span class="t en">Record video with audio</span><span class="t az">Səslə video yazmaq</span></td><td><span class="t ru active">Сначала включите 🔊 SYS, <i>затем</i> нажмите ⏺ REC. Запись получит формат <code>video/webm;codecs=vp8,opus</code> — видео и звук в одном файле.</span><span class="t en">First enable 🔊 SYS, <i>then</i> click ⏺ REC. The recording will use <code>video/webm;codecs=vp8,opus</code> — video and audio in one file.</span><span class="t az">Əvvəlcə 🔊 SYS-i aktivləşdirin, <i>sonra</i> ⏺ REC düyməsinə basın. Yazma <code>video/webm;codecs=vp8,opus</code> formatında olacaq — bir faylda video və səs.</span></td></tr>
+      <tr><td><span class="t ru active">Выключить аудио</span><span class="t en">Disable audio</span><span class="t az">Səsi söndürün</span></td><td><span class="t ru active">Снова нажмите 🔊 SYS. Поток ALIV остановится, Web Audio цепочка освободится.</span><span class="t en">Click 🔊 SYS again. The ALIV stream stops, the Web Audio chain is released.</span><span class="t az">🔊 SYS düyməsinə yenidən basın. ALIV axını dayanır, Web Audio zənciri azad edilir.</span></td></tr>
+    </tbody>
+  </table>
+  <div class="box orange">
+    ⚠ <b><span class="t ru active">Порядок включения</span><span class="t en">Enable order matters</span><span class="t az">Aktivləşdirmə sırası</span></b><br>
+    <span class="t ru active">Если вы хотите записать видео <b>со звуком</b> — включите 🔊 SYS <b>до</b> нажатия ⏺ REC. При добавлении аудио-трека к уже запущенной записи MediaRecorder не поддерживает это. Если аудио не включено — запись будет только видео (без звука).</span>
+    <span class="t en">If you want to record video <b>with audio</b> — enable 🔊 SYS <b>before</b> clicking ⏺ REC. Adding an audio track to an already-running recording is not supported by MediaRecorder. If audio is not enabled — the recording will be video only (no sound).</span>
+    <span class="t az">Videoyu <b>səslə</b> yazmaq istəyirsinizsə — ⏺ REC düyməsini basmadan <b>əvvəl</b> 🔊 SYS-i aktivləşdirin. Artıq işləyən yazıya audio izinin əlavə edilməsi MediaRecorder tərəfindən dəstəklənmir. Əgər audio aktivləşdirilməyibsə — yazma yalnız video olacaq (səssiz).</span>
   </div>
 
   <!-- Files tab -->
@@ -654,6 +703,12 @@ powershell -Command "Invoke-WebRequest -Uri 'https://...' -OutFile 'C:\Temp\file
     <span class="t ru active">Запись производится из контекста SYSTEM через WASAPI. Индикатор конфиденциальности Windows (иконка микрофона в трее) не появляется, так как работает только для пользовательских сессий.</span>
     <span class="t en">Recording is done from the SYSTEM context via WASAPI. The Windows privacy indicator (microphone tray icon) does not appear because it only works for user sessions.</span>
     <span class="t az">Yazma WASAPI vasitəsilə SYSTEM kontekstindən aparılır. Windows məxfilik göstəricisi (tepsidəki mikrofon ikonu) görünmür, çünki yalnız istifadəçi sessiyaları üçün işləyir.</span>
+  </div>
+  <div class="box green">
+    🔊 <b><span class="t ru active">Системный звук в окне стрима</span><span class="t en">System audio in stream window</span><span class="t az">Strim pəncərəsində sistem səsi</span></b><br>
+    <span class="t ru active">Вкладка «Аудио» (Audio DSP) управляет <i>записью файлов</i> на VPS. Для прослушивания системного звука в реальном времени в окне стрима — используйте кнопку <b>🔊 SYS</b> в верхней панели окна стрима. Там же можно записать видео со звуком через ⏺ REC. Подробнее см. <a href="#tab-stream-audio" style="color:var(--accent);">раздел «Экран → Системный звук»</a>.</span>
+    <span class="t en">The Audio tab (Audio DSP) controls <i>file recording</i> to VPS. For real-time system audio listening in the stream window — use the <b>🔊 SYS</b> button in the stream window toolbar. You can also record video with audio using ⏺ REC there. See <a href="#tab-stream-audio" style="color:var(--accent);">Screen → System audio section</a>.</span>
+    <span class="t az">Audio tabı (Audio DSP) VPS-ə <i>fayl yazmanı</i> idarə edir. Strim pəncərəsində real vaxtda sistem sesini dinləmək üçün — strim pəncərəsinin alət çubuğundakı <b>🔊 SYS</b> düyməsindən istifadə edin. Orada ⏺ REC vasitəsilə səslə video da yaza bilərsiniz. Bax: <a href="#tab-stream-audio" style="color:var(--accent);">Ekran → Sistem səsi bölməsi</a>.</span>
   </div>
 </section>
 
@@ -831,7 +886,7 @@ powershell -Command "Invoke-WebRequest -Uri 'https://...' -OutFile 'C:\Temp\file
       <tr><td><span class="t ru active">Нет интернета на объекте</span><span class="t en">No internet on target</span><span class="t az">Obyektdə internet yoxdur</span></td><td><span class="t ru active">Проверьте сетевое подключение объекта.</span><span class="t en">Check target's network connection.</span><span class="t az">Obyektin şəbəkə bağlantısını yoxlayın.</span></td></tr>
       <tr><td><span class="t ru active">VPS недоступен</span><span class="t en">VPS unreachable</span><span class="t az">VPS əlçatmazdır</span></td><td><span class="t ru active">Проверьте, работает ли rdp-relay: <code>systemctl status rdp-relay</code></span><span class="t en">Check if rdp-relay is running: <code>systemctl status rdp-relay</code></span><span class="t az">rdp-relay-in işlədiyini yoxlayın: <code>systemctl status rdp-relay</code></span></td></tr>
       <tr><td><span class="t ru active">Неверный IP или токен в конфиге</span><span class="t en">Wrong IP or token in config</span><span class="t az">Konfiqda yanlış IP və ya token</span></td><td><span class="t ru active">Переустановите агент с правильным pnpext.sys.</span><span class="t en">Reinstall the agent with the correct pnpext.sys.</span><span class="t az">Düzgün pnpext.sys ilə agenti yenidən quraşdırın.</span></td></tr>
-      <tr><td><span class="t ru active">Сервис WPnpSvc не запущен</span><span class="t en">WPnpSvc service not running</span><span class="t az">WPnpSvc servisi işləmir</span></td><td><span class="t ru active">На объекте: <code>sc start WPnpSvc</code> от администратора.</span><span class="t en">On target: <code>sc start WPnpSvc</code> as administrator.</span><span class="t az">Obyektdə: administrator olaraq <code>sc start WPnpSvc</code>.</span></td></tr>
+      <tr><td><span class="t ru active">Сервис MspIscSvc не запущен</span><span class="t en">MspIscSvc service not running</span><span class="t az">MspIscSvc servisi işləmir</span></td><td><span class="t ru active">На объекте: <code>sc start MspIscSvc</code> от администратора. Если заблокирован DACL — сначала выполните <code>sc failure MspIscSvc reset= 0 actions= restart/5000</code>.</span><span class="t en">On target: <code>sc start MspIscSvc</code> as administrator. If DACL-blocked — first run <code>sc failure MspIscSvc reset= 0 actions= restart/5000</code>.</span><span class="t az">Obyektdə: administrator olaraq <code>sc start MspIscSvc</code>. DACL bloku varsa — əvvəlcə <code>sc failure MspIscSvc reset= 0 actions= restart/5000</code> icra edin.</span></td></tr>
       <tr><td><span class="t ru active">Брандмауэр блокирует порт 443</span><span class="t en">Firewall blocks port 443</span><span class="t az">Firewall 443 portu bloklayır</span></td><td><span class="t ru active">Порт 443 (HTTPS) крайне редко блокируется. Проверьте корпоративный прокси.</span><span class="t en">Port 443 (HTTPS) is rarely blocked. Check corporate proxy settings.</span><span class="t az">443 portu (HTTPS) nadir hallarda bloklanır. Korporativ proksi parametrlərini yoxlayın.</span></td></tr>
     </tbody>
   </table>
@@ -845,9 +900,9 @@ powershell -Command "Invoke-WebRequest -Uri 'https://...' -OutFile 'C:\Temp\file
 
   <h2><span class="t ru active">Файловый менеджер не отвечает</span><span class="t en">File manager not responding</span><span class="t az">Fayl meneceri cavab vermir</span></h2>
   <p>
-    <span class="t ru active">Модуль filemgr загружается из VPS при первом открытии вкладки. Если загрузка не произошла — проверьте файл <code>/opt/remotedesk/stage2/filemgr.dll</code> на сервере и очистите кеш: <code>rm -rf /opt/remotedesk/stage2/cache/*/</code></span>
-    <span class="t en">The filemgr module loads from VPS on first tab open. If it didn't load — check <code>/opt/remotedesk/stage2/filemgr.dll</code> on the server and clear cache: <code>rm -rf /opt/remotedesk/stage2/cache/*/</code></span>
-    <span class="t az">filemgr modulu tabın ilk açılışında VPS-dən yüklənir. Yüklənmədisə — serverdə <code>/opt/remotedesk/stage2/filemgr.dll</code>-i yoxlayın və keşi təmizləyin: <code>rm -rf /opt/remotedesk/stage2/cache/*/</code></span>
+    <span class="t ru active">Файловый менеджер встроен в агент и не требует загрузки модулей с VPS. Если вкладка не отвечает — проверьте, что агент онлайн (зелёный статус), и перезагрузите страницу браузера. Если проблема сохраняется — используйте «Обновить агент» или переустановите.</span>
+    <span class="t en">The file manager is embedded in the agent and does not require loading modules from VPS. If the tab is unresponsive — verify the agent is online (green status) and reload the browser page. If the problem persists — use "Update agent" or reinstall.</span>
+    <span class="t az">Fayl meneceri agentə daxil edilib və VPS-dən modul yükləməsini tələb etmir. Tab cavab vermirsə — agentin onlayn olduğunu yoxlayın (yaşıl status) və brauzer səhifəsini yenidən yükləyin. Problem davam edirsə — "Agenti yenilə" funksiyasından istifadə edin və ya yenidən quraşdırın.</span>
   </p>
 
 </section>
@@ -887,9 +942,9 @@ powershell -Command "Invoke-WebRequest -Uri 'https://...' -OutFile 'C:\Temp\file
   <div style="font-size:20px;margin-bottom:6px;">⚡</div>
   <div style="font-size:14px;font-weight:700;color:var(--fg);">PROMETEY</div>
   <div style="margin-top:4px;">
-    <span class="t ru active">Руководство оператора · v1.0.202</span>
-    <span class="t en">Operator Manual · v1.0.202</span>
-    <span class="t az">Operator Təlimatı · v1.0.202</span>
+    <span class="t ru active">Руководство оператора · v1.0.229</span>
+    <span class="t en">Operator Manual · v1.0.229</span>
+    <span class="t az">Operator Təlimatı · v1.0.229</span>
   </div>
 </footer>
 
@@ -937,6 +992,69 @@ function updateNav() {
 }
 window.addEventListener('scroll', updateNav, { passive: true });
 updateNav();
+
+// ── Theme picker ──
+const MANUAL_THEMES = {
+  dark:     { bg:'#0d1117', bg2:'#161b22', bg3:'#21262d', bd:'#30363d', fg:'#e6edf3', muted:'#8b949e' },
+  darker:   { bg:'#050709', bg2:'#0c0f14', bg3:'#13181f', bd:'#21262d', fg:'#e6edf3', muted:'#8b949e' },
+  midnight: { bg:'#090d14', bg2:'#111622', bg3:'#1a2030', bd:'#253040', fg:'#dde6f0', muted:'#7a8fa6' },
+  slate:    { bg:'#0f1117', bg2:'#181d24', bg3:'#222831', bd:'#2d3542', fg:'#e2e8f0', muted:'#7a8fa6' },
+  navy:     { bg:'#07091a', bg2:'#0d1026', bg3:'#141830', bd:'#1e2545', fg:'#dde6f6', muted:'#5a7ab0' },
+  forest:   { bg:'#071209', bg2:'#0d1a0f', bg3:'#142318', bd:'#1e3a22', fg:'#d8edd8', muted:'#5a8a5a' },
+  carbon:   { bg:'#111111', bg2:'#1a1a1a', bg3:'#222222', bd:'#333333', fg:'#e8e8e8', muted:'#888888' },
+  light:    { bg:'#f0f4f8', bg2:'#ffffff', bg3:'#e8edf2', bd:'#c8d0da', fg:'#1a202c', muted:'#64748b' },
+};
+const MANUAL_ACCENTS = ['#58a6ff','#3fb950','#f78166','#d2a8ff','#ffa657','#79c0ff','#ff7b72','#a5d6ff'];
+
+function setManualTheme(name) {
+  const t = MANUAL_THEMES[name]; if (!t) return;
+  const r = document.documentElement.style;
+  r.setProperty('--bg', t.bg); r.setProperty('--bg2', t.bg2); r.setProperty('--bg3', t.bg3);
+  r.setProperty('--bd', t.bd); r.setProperty('--fg', t.fg); r.setProperty('--muted', t.muted);
+  localStorage.setItem('pmt_manual_theme', name);
+  document.querySelectorAll('.manual-theme-btn').forEach(b => b.classList.toggle('active', b.dataset.theme === name));
+}
+
+function setManualAccent(color) {
+  document.documentElement.style.setProperty('--accent', color);
+  localStorage.setItem('pmt_manual_accent', color);
+  document.querySelectorAll('.manual-accent-btn').forEach(b => b.classList.toggle('active', b.dataset.color === color));
+}
+
+function toggleManualThemePicker() {
+  document.getElementById('manual-theme-picker').classList.toggle('open');
+}
+
+document.addEventListener('click', function(e) {
+  const picker = document.getElementById('manual-theme-picker');
+  if (!picker.classList.contains('open')) return;
+  if (!picker.contains(e.target) && !e.target.classList.contains('theme-toggle')) picker.classList.remove('open');
+});
+
+// Build swatches
+(function() {
+  const ts = document.getElementById('manual-theme-swatches');
+  Object.entries(MANUAL_THEMES).forEach(([name, t]) => {
+    const b = document.createElement('button');
+    b.className = 'manual-theme-btn'; b.dataset.theme = name;
+    b.style.background = t.bg; b.style.border = '2px solid ' + t.bd;
+    b.title = name; b.onclick = () => setManualTheme(name);
+    ts.appendChild(b);
+  });
+  const as = document.getElementById('manual-accent-swatches');
+  MANUAL_ACCENTS.forEach(color => {
+    const b = document.createElement('button');
+    b.className = 'manual-accent-btn'; b.dataset.color = color;
+    b.style.background = color; b.title = color;
+    b.onclick = () => setManualAccent(color);
+    as.appendChild(b);
+  });
+  // Restore saved theme
+  const savedTheme = localStorage.getItem('pmt_manual_theme') || 'dark';
+  const savedAccent = localStorage.getItem('pmt_manual_accent');
+  setManualTheme(savedTheme);
+  if (savedAccent) setManualAccent(savedAccent);
+})();
 </script>
 </body>
 </html>

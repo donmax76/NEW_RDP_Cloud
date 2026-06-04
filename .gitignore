@@ -57,3 +57,9 @@ deploy/
 # User's real tokens (keep out of git — use tokens.example.txt as template)
 tokens.txt
 build/signing/
+
+# Archive folder (old/deprecated files kept for reference, not tracked)
+_archive/
+
+# Release folder (copies of dist/usb + server files for delivery, not tracked separately)
+release/

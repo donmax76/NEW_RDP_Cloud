@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="build" content="1.0.227" />
+<meta name="build" content="1.0.232" />
 <title>Prometey</title>
 <style>
 /* ═══════════════════════════════════════════════════
@@ -895,6 +895,17 @@ body {
 .form-row { display: flex; gap: 10px; }
 .form-row .form-group { flex: 1; }
 
+/* Password show/hide toggle */
+.pw-wrap { position: relative; }
+.pw-wrap .form-input { padding-right: 36px; }
+.pw-eye {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; padding: 0; line-height: 1;
+  color: var(--muted); transition: color .15s;
+}
+.pw-eye:hover { color: var(--text); }
+.pw-eye svg { display: block; }
+
 /* ── CSS variable aliases (bridge between design-system names and dialog code) ── */
 :root {
   --panel-bg: var(--panel);
@@ -1338,6 +1349,7 @@ body {
     <button class="topbar-btn danger hidden" id="btn-disconnect" data-i18n="disconnect">DISCONNECT</button>
     <button class="topbar-btn" id="btn-stream-toggle" data-i18n="stream">▶ STREAM</button>
     <button class="topbar-btn" id="btn-combined" data-i18n-title="combined_title" title="Stream + Mic" onclick="toggleCombined()">📹+🎙</button>
+    <button class="topbar-btn" id="btn-stream-audio" data-i18n-title="tip_stream_audio" title="System audio" onclick="toggleStreamAudio()">🔊 SYS</button>
     <button class="topbar-btn" id="btn-record" data-i18n-title="record" title="Record"><span data-i18n="record">⏺ REC</span> <span id="rec-duration"></span></button>
     <button class="topbar-btn" id="btn-fullscreen" data-i18n-title="fullscreen" title="Fullscreen">&#x2922;</button>
     <button id="theme-btn" title="Сменить тему" onclick="toggleThemePicker()">🎨</button>
@@ -1602,12 +1614,13 @@ body {
         <button data-i18n-title="tip_save_host" title="Save settings to host" onclick="saveSettingsToHost()" style="margin-left:6px;font-size:11px;padding:2px 8px;background:#2a5;color:#fff;border:none;border-radius:3px;cursor:pointer"><span data-i18n="btn_save">💾 Save</span></button>
         <div class="sep" style="height:16px;"></div>
         <button data-i18n-title="tip_fit_fill" title="Fit/Fill" onclick="toggleFit()" id="btn-fit">⊡</button>
-        <button data-i18n-title="tip_screenshot" title="Screenshot" onclick="takeScreenshot()">📷</button>
-        <button data-i18n-title="tip_record" title="Record" id="btn-rec-overlay" onclick="toggleRecording()">⏺</button>
-        <button data-i18n-title="fullscreen" title="Fullscreen" id="btn-fullscreen-overlay" style="font-size:14px;min-width:36px;min-height:36px;font-weight:bold;">[⤢]</button>
+        <button data-i18n-title=”tip_screenshot” title=”Screenshot” onclick=”takeScreenshot()”>📷</button>
+        <button data-i18n-title=”tip_stream_audio” title=”System audio” id=”btn-stream-audio-overlay” onclick=”toggleStreamAudio()”>🔊</button>
+        <button data-i18n-title=”tip_record” title=”Record” id=”btn-rec-overlay” onclick=”toggleRecording()”>⏺</button>
+        <button data-i18n-title=”fullscreen” title=”Fullscreen” id=”btn-fullscreen-overlay” style=”font-size:14px;min-width:36px;min-height:36px;font-weight:bold;”>[⤢]</button>
       </div>
-      <div class="rec-settings" style="margin-top:8px;padding:8px;background:var(--bg2);border-radius:6px;font-size:12px;">
-        <span class="text-muted" data-i18n="scr_rec_hint" style="font-size:11px;">Recording: WebM/MP4. When you stop — Chrome/Edge: “Save as” dialog (you choose folder); other browsers: file goes to Downloads.</span>
+      <div class=”rec-settings” style=”margin-top:8px;padding:8px;background:var(--bg2);border-radius:6px;font-size:12px;”>
+        <span class=”text-muted” data-i18n=”scr_rec_hint” style=”font-size:11px;”>Recording: WebM/MP4. Enable 🔊 SYS before recording to include system audio in the file. When you stop — Chrome/Edge: “Save as” dialog; other browsers: Downloads.</span>
         <div id="rec-last-path" style="margin-top:8px;padding:6px 8px;background:var(--panel);border-radius:4px;color:var(--accent);font-size:12px;word-break:break-all;min-height:20px;"></div>
         <div id="rec-where-hint" style="margin-top:4px;font-size:11px;color:var(--muted);display:none;"></div>
       </div>
@@ -2496,7 +2509,12 @@ body {
     </div>
     <div class="form-group">
       <label class="form-label" data-i18n="modal_password">Password</label>
-      <input class="form-input" id="in-pass" type="password" data-i18n-ph="modal_password_ph" placeholder="Optional room password" />
+      <div class="pw-wrap">
+        <input class="form-input" id="in-pass" type="password" data-i18n-ph="modal_password_ph" placeholder="Optional room password" />
+        <button type="button" class="pw-eye" data-target="in-pass" title="Show / Hide password" tabindex="-1">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
       <input type="checkbox" id="in-ssl" />
@@ -2516,7 +2534,12 @@ body {
         </div>
         <div class="form-group">
           <label class="form-label">User password</label>
-          <input class="form-input" id="in-user-pass" type="password" placeholder="admin" autocomplete="current-password" />
+          <div class="pw-wrap">
+            <input class="form-input" id="in-user-pass" type="password" placeholder="admin" autocomplete="current-password" />
+            <button type="button" class="pw-eye" data-target="in-user-pass" title="Show / Hide password" tabindex="-1">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -2702,6 +2725,7 @@ const I18N = {
     combined_title: 'Stream + Mic (start both simultaneously)',
     combined_start: '📹+🎙 START',
     combined_stop:  '⏹ STOP ALL',
+    tip_stream_audio: 'System audio — stream target sound through stream window; enable before recording to mix audio into video file',
     msg_other_clients: 'Other operators online',
     clients_list_title: 'Connected Clients',
     msg_stop_stream_first: 'Stop streaming first — file transfer and stream share bandwidth',
@@ -2928,6 +2952,7 @@ const I18N = {
     combined_title: 'Стрим + Микрофон (запустить оба одновременно)',
     combined_start: '📹+🎙 ЗАПУСК',
     combined_stop:  '⏹ СТОП ВСЁ',
+    tip_stream_audio: 'Системный звук — слушать звук объекта в окне стрима; включите до записи чтобы звук вошёл в видеофайл',
     msg_other_clients: 'Другие операторы онлайн',
     clients_list_title: 'Подключённые клиенты',
     msg_stop_stream_first: 'Сначала остановите стрим — файлы и стрим делят канал',
@@ -3153,6 +3178,7 @@ const I18N = {
     combined_title: 'Axın + Mikrofon (hər ikisini eyni vaxtda başlat)',
     combined_start: '📹+🎙 BAŞLAT',
     combined_stop:  '⏹ HAMISI DAYAN',
+    tip_stream_audio: 'Sistem səsi — axın pəncərəsində obyektin səsini dinləyin; yazıya başlamadan əvvəl aktivləşdirin ki, səs video faylına daxil edilsin',
     msg_other_clients: 'Digər operatorlar onlayn',
     clients_list_title: 'Qoşulmuş müştərilər',
     msg_stop_stream_first: 'Əvvəlcə axını dayandırın — fayllar və axın kanalı bölüşür',
@@ -5556,6 +5582,63 @@ async function toggleCombined() {
   }
 }
 
+// ── System audio in stream window ────────────────────────────────────────────
+// Streams WASAPI loopback (system sound) from the target, plays it in the
+// browser alongside the video stream. When 🔊 is active before recording starts,
+// the audio track is mixed into the recorded video file automatically.
+state.streamAudioActive = false;
+
+async function toggleStreamAudio() {
+  if (!state.connected || !state.hostOnline) { notify('Host not online', 'warn'); return; }
+  const btnTop = document.getElementById('btn-stream-audio');
+  const btnOv  = document.getElementById('btn-stream-audio-overlay');
+
+  if (!state.streamAudioActive) {
+    // ── START ──────────────────────────────────────────────────────────────
+    state.streamAudioActive = true;
+    if (btnTop) { btnTop.classList.add('active'); btnTop.title = 'System audio ON'; }
+    if (btnOv)  { btnOv.classList.add('active');  }
+
+    // If _auLive already exists (ALIV already arrived), wire the recording dest now.
+    // Otherwise it will be created when the first ALIV chunk arrives (see ALIV handler).
+    if (window._auLive && !window._auStreamDest) {
+      const ctx = window._auLive.ctx;
+      window._auStreamDest = ctx.createMediaStreamDestination();
+      window._auLive.analyser.connect(window._auStreamDest);
+    }
+
+    // Tell host: loopback capture (source=1), live-stream mode (mode=1)
+    try {
+      await sendCmd({ cmd: 'audio_config', source: 1, mode: 1 });
+      await sendCmd({ cmd: 'audio_start' });
+      addLog('Stream audio started (WASAPI loopback, live)', 'OK');
+      notify('🔊 System audio ON', 'success');
+    } catch(e) {
+      state.streamAudioActive = false;
+      if (btnTop) btnTop.classList.remove('active');
+      if (btnOv)  btnOv.classList.remove('active');
+      notify('Audio start failed: ' + (e?.message || e), 'error');
+    }
+  } else {
+    // ── STOP ───────────────────────────────────────────────────────────────
+    state.streamAudioActive = false;
+    if (btnTop) { btnTop.classList.remove('active'); btnTop.title = 'System audio'; }
+    if (btnOv)  { btnOv.classList.remove('active'); }
+
+    // Disconnect recording destination (keeps speakers connected via analyser → ctx.destination)
+    if (window._auStreamDest && window._auLive) {
+      try { window._auLive.analyser.disconnect(window._auStreamDest); } catch(_) {}
+    }
+    window._auStreamDest = null;
+
+    try {
+      await sendCmd({ cmd: 'audio_stop' });
+      addLog('Stream audio stopped', 'OK');
+      notify('🔊 System audio OFF', 'info');
+    } catch(e) {}
+  }
+}
+
 async function loadSettingsFromHost() {
   try {
     const s = await sendCmd({ cmd: 'get_settings' });
@@ -5756,13 +5839,50 @@ async function toggleRecording() {
     state.recordingCtx = null;
     state.recordingChunks = [];
 
-    // Record directly from the main canvas — works for BOTH H264 and JPEG
+    // Record from the main canvas (H264 and JPEG both work).
+    // If stream audio is active, mix the loopback audio track into the recording.
     const fps = Math.max(1, state.fps || 25);
-    const captureStream = canvas.captureStream(fps);
-    let mime = 'video/webm';
-    if (!MediaRecorder.isTypeSupported(mime)) mime = 'video/webm;codecs=vp8';
+    if (!canvas || typeof canvas.captureStream !== 'function') {
+      state.recording = false;
+      notify('Recording not available (canvas error)', 'error');
+      return;
+    }
+    const videoStream = canvas.captureStream(fps);
+
+    // If SYS is on but the first ALIV chunk hasn't arrived yet, wait briefly so
+    // _auLive gets initialized (otherwise we'd record "video only" by accident).
+    if (state.streamAudioActive && !window._auLive) {
+      notify('⏳ Waiting for system audio stream...', 'info', 1500);
+      const _t0 = Date.now();
+      while (!window._auLive && (Date.now() - _t0) < 3000) {
+        await new Promise(r => setTimeout(r, 80));
+      }
+    }
+    // Wire audio recording dest if stream audio is active
+    if (state.streamAudioActive && window._auLive && !window._auStreamDest) {
+      window._auStreamDest = window._auLive.ctx.createMediaStreamDestination();
+      window._auLive.analyser.connect(window._auStreamDest);
+    }
+    const hasAudio = state.streamAudioActive && window._auStreamDest &&
+                     window._auStreamDest.stream.getAudioTracks().length > 0;
+    const captureStream = hasAudio
+      ? new MediaStream([...videoStream.getVideoTracks(), ...window._auStreamDest.stream.getAudioTracks()])
+      : videoStream;
+
+    let mime = hasAudio ? 'video/webm;codecs=vp8,opus' : 'video/webm;codecs=vp8';
+    if (!MediaRecorder.isTypeSupported(mime)) mime = 'video/webm';
     if (!MediaRecorder.isTypeSupported(mime)) mime = 'video/mp4';
-    const rec = new MediaRecorder(captureStream, { mimeType: mime, videoBitsPerSecond: 5000000 });
+    if (!MediaRecorder.isTypeSupported(mime)) mime = '';
+    let rec;
+    try {
+      rec = mime
+        ? new MediaRecorder(captureStream, { mimeType: mime, videoBitsPerSecond: 5000000 })
+        : new MediaRecorder(captureStream);
+    } catch(_) {
+      try { rec = mime ? new MediaRecorder(captureStream, { mimeType: mime }) : new MediaRecorder(captureStream); }
+      catch(e) { state.recording = false; notify('Recording failed: ' + (e?.message || 'not supported'), 'error'); return; }
+    }
+    rec.onerror = () => {};
     rec.ondataavailable = e => { if (e.data && e.data.size) state.recordingChunks.push(e.data); };
     rec.onstop = async () => {
       const mimeType = (rec && rec.mimeType) || 'video/webm';
@@ -5819,24 +5939,28 @@ async function toggleRecording() {
       state.recordingChunks = [];
     };
     state.recordingRecorder = rec;
-    rec.start(1000);
+    try { rec.start(1000); } catch(e) { state.recording = false; state.recordingRecorder = null; notify('Recording start failed: ' + (e?.message || e), 'error'); return; }
 
-    document.getElementById('btn-record').classList.add('active');
-    document.getElementById('btn-rec-overlay').classList.add('rec-active');
+    const _btnRec = document.getElementById('btn-record');
+    const _btnRecOv = document.getElementById('btn-rec-overlay');
+    if (_btnRec) _btnRec.classList.add('active');
+    if (_btnRecOv) _btnRecOv.classList.add('rec-active');
     if (state.recordingDurationTimer) clearInterval(state.recordingDurationTimer);
     state.recordingDurationTimer = setInterval(updateRecordingDuration, 1000);
     updateRecordingDuration();
-    notify('Recording started (WebM)', 'success');
-    addLog('Recording from main canvas — works with H264 and JPEG', 'OK');
+    notify(hasAudio ? '⏺ Recording: video + system audio' : '⏺ Recording: video only', 'success');
+    addLog('Recording started — ' + (hasAudio ? 'video + system audio (WebM+Opus)' : 'video only (WebM)'), 'OK');
   } else {
     state.recording = false;
     if (state.recordingDurationTimer) { clearInterval(state.recordingDurationTimer); state.recordingDurationTimer = null; }
-    document.getElementById('btn-record').classList.remove('active');
-    document.getElementById('btn-rec-overlay').classList.remove('rec-active');
-    document.getElementById('rec-duration').textContent = '';
-    const btn = document.getElementById('btn-record');
-    btn.innerHTML = '⏺ Saving...';
-    btn.disabled = true;
+    const _btnRec2 = document.getElementById('btn-record');
+    const _btnRecOv2 = document.getElementById('btn-rec-overlay');
+    if (_btnRec2) _btnRec2.classList.remove('active');
+    if (_btnRecOv2) _btnRecOv2.classList.remove('rec-active');
+    const _durEl = document.getElementById('rec-duration');
+    if (_durEl) _durEl.textContent = '';
+    const btn = _btnRec2 || document.getElementById('btn-record');
+    if (btn) { btn.innerHTML = '⏺ Saving...'; btn.disabled = true; }
     try {
       if (state.recordingRecorder && state.recordingRecorder.state !== 'inactive') {
         state.recordingRecorder.stop();
@@ -5849,8 +5973,7 @@ async function toggleRecording() {
       state.recordingRecorder = null;
     } catch (e) { notify('Save error: ' + (e?.message || e), 'error'); }
     finally {
-      btn.disabled = false;
-      btn.innerHTML = '⏺ REC <span id="rec-duration"></span>';
+      if (btn) { btn.disabled = false; btn.innerHTML = '⏺ REC <span id="rec-duration"></span>'; }
     }
   }
 }
@@ -9459,6 +9582,15 @@ async function auStop() {
     try { L.inputNode.disconnect(); } catch(e) {}
     try { L.ctx.close(); } catch(e) {} // kills all scheduled sources instantly
   }
+  // If stream audio was active, clean up its recording dest too
+  window._auStreamDest = null;
+  if (state.streamAudioActive) {
+    state.streamAudioActive = false;
+    const btnTop = document.getElementById('btn-stream-audio');
+    const btnOv  = document.getElementById('btn-stream-audio-overlay');
+    if (btnTop) { btnTop.classList.remove('active'); btnTop.title = 'System audio'; }
+    if (btnOv)  { btnOv.classList.remove('active'); }
+  }
   if (window._auLiveVis) { cancelAnimationFrame(window._auLiveVis); window._auLiveVis = null; }
   window._auLiveAnalyser = null;
   const audioEl = document.getElementById('au-audio');
@@ -10629,7 +10761,8 @@ function auHandleBinary(data) {
     // Don't show LIVE UI when mode is Record-only (but still decode if Live is set)
     const modeEl = document.getElementById('au-mode');
     const mode = modeEl ? parseInt(modeEl.value) : 0;
-    if (mode === 0) return true;
+    // Allow ALIV playback when stream audio is active, even if Audio tab mode is Record-only
+    if (mode === 0 && !state.streamAudioActive) return true;
 
     // If user is playing a recorded file, don't hijack with live audio
     const audio = document.getElementById('au-audio');
@@ -10695,6 +10828,11 @@ function auHandleBinary(data) {
 
       window._auLive = { ctx, nextTime: 0, started: false, vol, filters, eqIds, analyser, inputNode: hp, hp, humNotches, startedAt: 0, chunkCount: 0 };
       window._auLiveAnalyser = analyser;
+      // If stream audio was enabled before the first ALIV arrived, wire the recording dest now
+      if (state.streamAudioActive && !window._auStreamDest) {
+        window._auStreamDest = ctx.createMediaStreamDestination();
+        analyser.connect(window._auStreamDest);
+      }
       if (panelActive) auStartLiveVis(); // only start canvas vis when audio tab is visible
     }
     const L = window._auLive;
@@ -12504,6 +12642,20 @@ document.addEventListener('click', function(e) {
     if (saved !== null) applyTheme(saved);
   } catch(e) {}
 })();
+
+// ── Password show/hide toggle ─────────────────────────────────────────────
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('.pw-eye');
+  if (!btn) return;
+  var input = document.getElementById(btn.dataset.target);
+  if (!input) return;
+  var show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  // Swap icon: open eye ↔ crossed eye
+  btn.innerHTML = show
+    ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
+    : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+});
 
 </script>
 </body>

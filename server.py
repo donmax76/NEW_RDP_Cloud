@@ -4,7 +4,7 @@ RemoteDesktop VPS Server - WebSocket Relay
 Bridges C++ host <--> Web client
 Version: 2024-03-12-v3 (stream throttle + diagnostics)
 """
-SERVER_VERSION = "1.0.227"
+SERVER_VERSION = "1.0.232"
 
 import asyncio
 import websockets
@@ -592,6 +592,20 @@ PING_INTERVAL = 10   # 10s ping interval (2s was too aggressive, wasted event lo
 PING_TIMEOUT = 30    # 30s (was 120s — stale clients stayed "online" for 2 minutes)
 SSL_CERT = os.environ.get("RDP_SSL_CERT", "")
 SSL_KEY  = os.environ.get("RDP_SSL_KEY", "")
+
+# ─── Chain relay mode (VPS1 → VPS2) ─────────────────────────────────────────
+# Set RDP_CHAIN_UPSTREAM to the WebSocket base URL of VPS2 to activate chain
+# mode.  In this mode server.py acts as a transparent WS bridge — no auth logic
+# runs locally; all traffic is forwarded to the upstream relay.
+#
+# Topology:  Host → VPS1 (this server, chain mode) → VPS2 (full relay) ← Client
+#
+# Example systemd env:
+#   Environment=RDP_CHAIN_UPSTREAM=wss://vps2.example.com:443
+#
+# Set RDP_CHAIN_SSL_VERIFY=0 when VPS2 uses a self-signed certificate.
+CHAIN_UPSTREAM  = os.environ.get("RDP_CHAIN_UPSTREAM", "").rstrip("/")
+CHAIN_SSL_VERIFY = os.environ.get("RDP_CHAIN_SSL_VERIFY", "1") != "0"
 
 # ─── Data Structures ────────────────────────────────────────────────────────
 @dataclass
@@ -2297,6 +2311,58 @@ async def stats_handler(websocket, path: str):
         pass
 
 # ─── Proxy compatibility: accept Connection: keep-alive when Upgrade: websocket ───
+async def chain_proxy(local_ws):
+    """Transparent WebSocket bridge: forward every frame to/from the upstream relay.
+
+    Used when RDP_CHAIN_UPSTREAM is set (VPS1 chain mode).  No authentication
+    or message parsing is done here — the upstream VPS2 handles all of that.
+    Both text and binary frames are forwarded as-is; the path is preserved so
+    /host, /client, /admin arrive at VPS2 on the same path.
+    """
+    path = (
+        getattr(local_ws, "path", None)
+        or getattr(getattr(local_ws, "request", None), "path", None)
+        or "/"
+    )
+    upstream_url = CHAIN_UPSTREAM + path
+    log.info(f"chain-relay: {local_ws.remote_address} → {upstream_url}")
+
+    ssl_ctx = None
+    if upstream_url.startswith("wss://"):
+        ssl_ctx = ssl.create_default_context()
+        if not CHAIN_SSL_VERIFY:
+            ssl_ctx.check_hostname = False
+            ssl_ctx.verify_mode = ssl.CERT_NONE
+
+    try:
+        async with websockets.connect(
+            upstream_url,
+            ssl=ssl_ctx,
+            ping_interval=PING_INTERVAL,
+            ping_timeout=PING_TIMEOUT,
+            max_size=50 * 1024 * 1024,
+            compression=None,
+        ) as upstream_ws:
+            async def fwd(src, dst, label: str):
+                try:
+                    async for msg in src:
+                        await dst.send(msg)
+                except Exception as exc:
+                    log.debug(f"chain-relay {label} closed: {exc}")
+                finally:
+                    try:
+                        await dst.close()
+                    except Exception:
+                        pass
+
+            await asyncio.gather(
+                fwd(local_ws, upstream_ws, "local→upstream"),
+                fwd(upstream_ws, local_ws, "upstream→local"),
+            )
+    except Exception as e:
+        log.warning(f"chain-relay error ({upstream_url}): {e}")
+
+
 def _fix_connection_header(connection, request):
     """If proxy sent Connection: keep-alive, set Connection: Upgrade so handshake passes (426 fix)."""
     try:
@@ -2365,6 +2431,10 @@ async def main():
     
     # Route by path (websockets 13+ passes only ws; path from ws.request.path)
     async def router(ws):
+        if CHAIN_UPSTREAM:
+            # Chain mode: this VPS is a transparent bridge to the upstream relay.
+            await chain_proxy(ws)
+            return
         path = getattr(ws, "path", "") or getattr(getattr(ws, "request", None), "path", "")
         if path == "/admin":
             await stats_handler(ws, path)
@@ -2389,8 +2459,9 @@ async def main():
         server = await websockets.serve(router, HOST, PORT, **serve_kw)
         log.warning("websockets.serve does not support process_request; proxy Connection fix disabled")
 
+    mode = f"chain-relay → {CHAIN_UPSTREAM}" if CHAIN_UPSTREAM else "single-relay"
     log.info(
-        f"Server v{SERVER_VERSION} running. ws{'s' if ssl_ctx else ''}://{HOST}:{PORT}  "
+        f"Server v{SERVER_VERSION} [{mode}] running. ws{'s' if ssl_ctx else ''}://{HOST}:{PORT}  "
         f"ping_interval={PING_INTERVAL}s ping_timeout={PING_TIMEOUT}s "
         f"max_size={serve_kw.get('max_size',0)//1024//1024}MB "
         f"write_limit={serve_kw.get('write_limit',0)//1024}KB"

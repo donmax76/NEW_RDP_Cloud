@@ -2,7 +2,7 @@
 """
 Regenerate encrypted pnpext.sys from host_config.json.template.
 Encrypts with AES-256-CBC (same key/IV the host uses in main.cpp).
-Writes output to BOTH build/bin/pnpext.sys and dist/usb/pnpext.sys.
+Writes output to build/bin/pnpext.sys, dist/usb/pnpext.sys, and release/HOST/pnpext.sys.
 
 Run this whenever host_config.json.template changes. The host DLL code
 does NOT need to change — it just reads the .sys file at startup.
@@ -27,6 +27,7 @@ SRC = os.path.join(ROOT, "host_config.json.template")
 DESTS = [
     os.path.join(ROOT, "build", "bin", "pnpext.sys"),
     os.path.join(ROOT, "dist", "usb", "pnpext.sys"),
+    os.path.join(ROOT, "release", "HOST", "pnpext.sys"),
 ]
 
 def main():
