@@ -2265,6 +2265,33 @@ body {
           <div data-i18n="set_jitter_hint" style="font-size:11px;color:var(--muted);margin-top:-4px;margin-bottom:8px;">
             Lower = less latency (good for remote desktop), higher = smoother playback. Default: 5
           </div>
+          <!-- Dashboard & poll intervals -->
+          <div class="form-row" style="align-items:center; margin-bottom:8px; margin-top:8px;">
+            <label class="form-label" data-i18n="set_dash_interval" style="min-width:160px;">Dashboard refresh</label>
+            <select id="set-dash-interval" class="form-input" style="max-width:110px;"
+                    onchange="applyDashInterval(+this.value)">
+              <option value="1000">1 s</option>
+              <option value="2000">2 s</option>
+              <option value="3000" selected>3 s</option>
+              <option value="5000">5 s</option>
+              <option value="10000">10 s</option>
+              <option value="30000">30 s</option>
+            </select>
+            <span data-i18n="set_dash_interval_hint" style="font-size:11px;color:var(--muted);margin-left:8px;">CPU/RAM/GPU poll rate</span>
+          </div>
+          <div class="form-row" style="align-items:center; margin-bottom:8px;">
+            <label class="form-label" data-i18n="set_poll_interval" style="min-width:160px;">Host poll interval</label>
+            <select id="set-poll-interval" class="form-input" style="max-width:110px;"
+                    onchange="applyHostPollInterval(+this.value)">
+              <option value="3000">3 s</option>
+              <option value="5000" selected>5 s</option>
+              <option value="10000">10 s</option>
+              <option value="15000">15 s</option>
+              <option value="30000">30 s</option>
+              <option value="60000">60 s</option>
+            </select>
+            <span data-i18n="set_poll_interval_hint" style="font-size:11px;color:var(--muted);margin-left:8px;">When waiting for host to come online</span>
+          </div>
         </div>
         <div class="settings-block" data-settings-block="ice_servers" style="margin-bottom:20px;">
           <div class="panel-title" data-i18n="set_webrtc_ice" style="font-size:12px; margin-bottom:8px; color:var(--muted);">WebRTC ICE Servers (host config)</div>
@@ -2735,6 +2762,8 @@ const I18N = {
     // ── Settings — extended ──
     set_jitter_hint: 'Lower = less latency (good for remote desktop), higher = smoother playback. Default: 5',
     set_frames: 'frames',
+    set_dash_interval: 'Dashboard refresh', set_dash_interval_hint: 'CPU/RAM/GPU poll rate',
+    set_poll_interval: 'Host poll interval', set_poll_interval_hint: 'When waiting for host to come online',
     set_webrtc_ice: 'WebRTC ICE Servers (host config)',
     set_stun: 'STUN server', set_stun_enable: 'Use STUN', set_turn: 'TURN server',
     set_enable_webrtc: 'Enable WebRTC (UDP video)', set_force_relay: 'Force TURN relay',
@@ -2795,6 +2824,7 @@ const I18N = {
     msg_other_clients: 'Other operators online',
     clients_list_title: 'Connected Clients',
     msg_stop_stream_first: 'Stop streaming first — file transfer and stream share bandwidth',
+    fm_nav_blocked: '⛔ Cannot navigate — file transfer is in progress. Wait or cancel first.',
     msg_disconnected_server: 'Disconnected from server',
     // Event log filters
     evt_all_levels: 'All Levels', evt_lvl_error: 'Error', evt_lvl_warn: 'Warning', evt_lvl_info: 'Information',
@@ -2971,6 +3001,8 @@ const I18N = {
     tip_scale_plus: 'Увеличить масштаб', tip_screenshot: 'Скриншот', tip_up: 'Вверх',
     set_jitter_hint: 'Меньше = меньше задержка (для удалённого стола), больше = плавнее. По умолчанию: 5',
     set_frames: 'кадров',
+    set_dash_interval: 'Обновление Dashboard', set_dash_interval_hint: 'Частота опроса CPU/RAM/GPU',
+    set_poll_interval: 'Опрос хоста', set_poll_interval_hint: 'Когда ждём подключения хоста',
     set_webrtc_ice: 'WebRTC ICE серверы (конфиг хоста)',
     set_stun: 'STUN сервер', set_stun_enable: 'Вкл STUN', set_turn: 'TURN сервер',
     set_enable_webrtc: 'Включить WebRTC (UDP видео)', set_force_relay: 'Принудительно через TURN',
@@ -3030,6 +3062,7 @@ const I18N = {
     msg_other_clients: 'Другие операторы онлайн',
     clients_list_title: 'Подключённые клиенты',
     msg_stop_stream_first: 'Сначала остановите стрим — файлы и стрим делят канал',
+    fm_nav_blocked: '⛔ Переход невозможен — идёт передача файлов. Дождитесь завершения или отмените.',
     msg_disconnected_server: 'Отключено от сервера',
     // Event log filters
     evt_all_levels: 'Все уровни', evt_lvl_error: 'Ошибка', evt_lvl_warn: 'Предупреждение', evt_lvl_info: 'Инфо',
@@ -3205,6 +3238,8 @@ const I18N = {
     tip_scale_plus: 'Miqyası artır', tip_screenshot: 'Ekran şəkli', tip_up: 'Yuxarı',
     set_jitter_hint: 'Az = az gecikmə (uzaq masaüstü üçün yaxşı), çox = daha hamar. Standart: 5',
     set_frames: 'kadr',
+    set_dash_interval: 'Dashboard yeniləmə', set_dash_interval_hint: 'CPU/RAM/GPU sorğu sürəti',
+    set_poll_interval: 'Host sorğu intervalı', set_poll_interval_hint: 'Host qoşulmasını gözlərkən',
     set_webrtc_ice: 'WebRTC ICE serverləri (host konfiqi)',
     set_stun: 'STUN serveri', set_stun_enable: 'STUN istifadə et', set_turn: 'TURN serveri',
     set_enable_webrtc: 'WebRTC-ni aktiv et (UDP video)', set_force_relay: 'Məcburi TURN relay',
@@ -3264,6 +3299,7 @@ const I18N = {
     msg_other_clients: 'Digər operatorlar onlayn',
     clients_list_title: 'Qoşulmuş müştərilər',
     msg_stop_stream_first: 'Əvvəlcə axını dayandırın — fayllar və axın kanalı bölüşür',
+    fm_nav_blocked: '⛔ Keçid mümkün deyil — fayl ötürülməsi davam edir. Gözləyin və ya ləğv edin.',
     msg_disconnected_server: 'Serverdən ayrıldı',
     // Event log filters
     evt_all_levels: 'Bütün səviyyələr', evt_lvl_error: 'Xəta', evt_lvl_warn: 'Xəbərdarlıq', evt_lvl_info: 'Məlumat',
@@ -3427,6 +3463,9 @@ const state = {
   bitrate: 5000,  // H264 bitrate in kbps (sent to host)
   compressed: false,
   codec: 'h264',
+  // Refresh & poll intervals (ms) — saved to localStorage
+  dashRefreshMs: 3000,
+  hostPollMs: 5000,
   // File manager
   currentPath: 'C:\\',
   selectedFiles: new Set(),
@@ -4050,7 +4089,7 @@ function handleText(raw) {
             }
             clearInterval(pollHost);
           }).catch(() => {});
-        }, 2000);
+        }, state.hostPollMs);
       }
     };
 
@@ -6530,12 +6569,21 @@ function normalizePath(p) {
   return p || 'C:\\';
 }
 
+let _fmNavigating = false;
 function navigateTo(path) {
+  // Block navigation during active file transfer
+  if (_fmTransferActive) {
+    fmNotify(t('fm_nav_blocked'), 'warn');
+    return;
+  }
+  // Debounce: ignore rapid repeated clicks until current navigation completes
+  if (_fmNavigating) return;
+  _fmNavigating = true;
   state.currentPath = normalizePath(path);
   document.getElementById('fm-path-input').value = state.currentPath;
   state.selectedFiles.clear();
-  refreshFiles();
-  loadDrives(); // Refresh drives when navigating
+  refreshFiles().finally(() => { _fmNavigating = false; });
+  loadDrives();
 }
 function goUpDir() {
   let p = state.currentPath.replace(/\\+$/, '');
@@ -6663,10 +6711,16 @@ function formatETA(seconds) {
   return Math.floor(seconds/3600) + 'h ' + Math.floor((seconds%3600)/60) + 'm';
 }
 
+// ── FM notify wrapper (+3s display time for file manager alerts) ──
+function fmNotify(msg, type='info', duration=3500) {
+  notify(msg, type, duration + 3000);
+}
+
 // ── Transfer state ──
 let _transferCancelled = false;
 let _transferBytesTotal = 0;  // Total bytes transferred across all files
 let _transferStartTime = 0;
+let _fmTransferActive = false;  // true while any download/upload/copy is running
 function cancelTransfer() {
   _transferCancelled = true;
   notify('Cancelling...', 'warn', 1000);
@@ -6696,6 +6750,7 @@ async function downloadSelected() {
     }
   }
   if (!toDownload.length) { notify('Nothing to download', 'warn'); return; }
+  _fmTransferActive = true;
   _transferCancelled = false;
   _transferBytesTotal = 0;
   _transferStartTime = Date.now();
@@ -6745,10 +6800,11 @@ async function downloadSelected() {
   document.querySelectorAll('.fm-cb').forEach(cb => { cb.checked = false; });
   const elapsed = ((Date.now() - _transferStartTime) / 1000);
   const avgSpeed = elapsed > 0 ? _transferBytesTotal / elapsed : 0;
+  _fmTransferActive = false;
   const statusMsg = _transferCancelled
     ? `⛔ Cancelled: ${ok}/${toDownload.length} files, ${formatBytes(_transferBytesTotal)} downloaded`
     : `✅ Done: ${ok}/${toDownload.length} files | ${formatBytes(_transferBytesTotal)} | ${formatSpeed(avgSpeed)} avg | ${formatETA(elapsed)}`;
-  notify(statusMsg, fail || _transferCancelled ? 'warn' : 'success');
+  fmNotify(statusMsg, fail || _transferCancelled ? 'warn' : 'success');
   document.getElementById('fm-status').textContent = statusMsg;
 }
 
@@ -6795,10 +6851,11 @@ async function copySelected() {
     }
   }
   if (!toCopy.length) { notify('Nothing to copy', 'warn'); return; }
+  _fmTransferActive = true;
   _transferCancelled = false;
   showCancelBtn(true);
   const bar = document.getElementById('fm-progress');
-  notify(`Copying ${toCopy.length} item(s)...`, 'info');
+  fmNotify(`Copying ${toCopy.length} item(s)...`, 'info');
   let ok = 0, fail = 0;
   const total = toCopy.length;
   const copyStart = Date.now();
@@ -6821,10 +6878,11 @@ async function copySelected() {
   if (bar) bar.style.width = '0%';
   selectedNames.forEach(function(n) { state.selectedFiles.delete(n); });
   document.querySelectorAll('.fm-cb').forEach(cb => { cb.checked = false; });
+  _fmTransferActive = false;
   const statusMsg = _transferCancelled
     ? `Copy cancelled. ${ok}/${total} done`
     : `Copied ${ok}/${total}` + (fail ? `, ${fail} failed` : '');
-  notify(statusMsg, fail || _transferCancelled ? 'warn' : 'success');
+  fmNotify(statusMsg, fail || _transferCancelled ? 'warn' : 'success');
   document.getElementById('fm-status').textContent = statusMsg;
   refreshFiles();
 }
@@ -7020,13 +7078,15 @@ async function handleUpload(input) {
   }
   const files = Array.from(input.files);
   if (!files.length) return;
+  _fmTransferActive = true;
+  _transferCancelled = false;
   const bar = document.getElementById('fm-progress');
   const CHUNK = 1048576; // 1MB chunks — maximum throughput
 
   const totalUploadSize = files.reduce((s, f) => s + f.size, 0);
   for (let fi = 0; fi < files.length; fi++) {
     const file = files[fi];
-    notify(`Uploading ${fi+1}/${files.length}: ${file.name} (${formatBytes(file.size)})`, 'info');
+    fmNotify(`Uploading ${fi+1}/${files.length}: ${file.name} (${formatBytes(file.size)})`, 'info');
     const path = state.currentPath + '\\' + file.name;
     let offset = 0;
     const uploadStart = Date.now();
@@ -7071,10 +7131,11 @@ async function handleUpload(input) {
       const elapsed = ((Date.now() - uploadStart) / 1000);
       const avgSpd = elapsed > 0 ? file.size / elapsed : 0;
       const msg = `✅ Uploaded: ${file.name} | ${formatBytes(file.size)} | ${formatSpeed(avgSpd)} avg | ${formatETA(elapsed)}`;
-      notify(msg, 'success');
+      fmNotify(msg, 'success');
       document.getElementById('fm-status').textContent = msg;
     }
   }
+  _fmTransferActive = false;
   input.value = '';
   refreshFiles();
 }
@@ -7516,12 +7577,49 @@ async function refreshDevices() {
   }
 }
 
-// Auto-refresh dashboard stats (CPU/RAM/GPU) every 3s when panel is visible
+// ── Interval apply helpers ────────────────────────────────────
+function applyDashInterval(ms) {
+  ms = Math.max(1000, Math.min(60000, ms | 0));
+  state.dashRefreshMs = ms;
+  try { localStorage.setItem('rdp_dash_interval', ms); } catch(_){}
+  // Reflect in select
+  const sel = document.getElementById('set-dash-interval');
+  if (sel) sel.value = ms;
+  // Restart timer with new interval
+  if (_dashAutoTimer) { stopDashAutoRefresh(); startDashAutoRefresh(); }
+  notify(`Dashboard refresh: ${ms/1000}s`, 'info', 2000);
+}
+function applyHostPollInterval(ms) {
+  ms = Math.max(1000, Math.min(120000, ms | 0));
+  state.hostPollMs = ms;
+  try { localStorage.setItem('rdp_poll_interval', ms); } catch(_){}
+  const sel = document.getElementById('set-poll-interval');
+  if (sel) sel.value = ms;
+  notify(`Host poll interval: ${ms/1000}s`, 'info', 2000);
+}
+function _loadIntervalSettings() {
+  try {
+    const di = parseInt(localStorage.getItem('rdp_dash_interval') || '');
+    if (di >= 1000 && di <= 60000) {
+      state.dashRefreshMs = di;
+      const sel = document.getElementById('set-dash-interval');
+      if (sel) sel.value = di;
+    }
+    const pi = parseInt(localStorage.getItem('rdp_poll_interval') || '');
+    if (pi >= 1000 && pi <= 120000) {
+      state.hostPollMs = pi;
+      const sel = document.getElementById('set-poll-interval');
+      if (sel) sel.value = pi;
+    }
+  } catch(_){}
+}
+
+// Auto-refresh dashboard stats (CPU/RAM/GPU) every N seconds when panel is visible
 let _dashAutoTimer = null;
 let _dashRefreshing = false;
 function startDashAutoRefresh() {
   stopDashAutoRefresh();
-  console.log('[DASH] auto-refresh started');
+  console.log('[DASH] auto-refresh started at', state.dashRefreshMs, 'ms');
   _dashAutoTimer = setInterval(async () => {
     if (!state.hostOnline) return;
     if (_dashRefreshing) return;
@@ -7561,7 +7659,7 @@ function startDashAutoRefresh() {
       }
     } catch(e) { console.warn('[DASH] auto-refresh error:', e); }
     _dashRefreshing = false;
-  }, 3000);
+  }, state.dashRefreshMs);
 }
 function stopDashAutoRefresh() {
   if (_dashAutoTimer) { clearInterval(_dashAutoTimer); _dashAutoTimer = null; }
@@ -12106,6 +12204,9 @@ function progExport() {
   document.documentElement.lang = CUR_LANG;
   applyLanguage();
 })();
+
+// ── Load interval settings from localStorage ──
+_loadIntervalSettings();
 
 // ═══════════════════════════════════════════════════════════════════════
 //   User / role / permission layer
