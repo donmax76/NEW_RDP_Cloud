@@ -1312,6 +1312,11 @@ body {
   color: var(--accent);
 }
 .panel-actions { display: flex; gap: 6px; margin-left: auto; }
+
+/* ── Infra node status dots ── */
+.infra-dot-online  { background: var(--success) !important; box-shadow: 0 0 6px var(--success); }
+.infra-dot-offline { background: var(--danger)  !important; box-shadow: 0 0 4px var(--danger); }
+.infra-dot-probing { background: var(--warn)    !important; animation: pulse 1s infinite; }
 </style>
 </head>
 <body>
@@ -1515,6 +1520,59 @@ body {
             <div id="d-devices-list" style="margin-top:6px;max-height:300px;overflow-y:auto;font-size:12px;"></div>
           </div>
         </div>
+        <!-- ── INFRASTRUCTURE STATUS ── -->
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
+          <div class="panel-title" data-i18n="title_infra" style="font-size:13px;">INFRASTRUCTURE</div>
+          <button class="fm-btn" onclick="refreshInfraStatus()" id="infra-refresh-btn" style="font-size:11px;">↻ <span data-i18n="btn_refresh">Refresh</span></button>
+          <span style="font-size:11px;color:var(--muted);" id="infra-last-update"></span>
+        </div>
+        <div class="dash-grid" id="infra-grid">
+          <!-- VPS2 node card -->
+          <div class="dash-card" id="infra-vps2-card">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+              <span id="infra-vps2-dot" style="width:10px;height:10px;border-radius:50%;background:var(--muted);display:inline-block;flex-shrink:0;transition:background .3s;"></span>
+              <span class="dash-card-icon" style="font-size:16px;">🖥</span>
+              <span class="dash-card-title" data-i18n="infra_vps2_title" style="font-size:13px;font-weight:700;">VPS2 / Relay</span>
+              <span id="infra-vps2-mode" style="font-size:10px;color:var(--muted);margin-left:auto;"></span>
+            </div>
+            <div style="font-size:12px;line-height:2;color:var(--text);">
+              <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);" data-i18n="infra_lbl_ver">Version</span><span id="infra-vps2-ver" style="color:var(--accent);">—</span></div>
+              <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);" data-i18n="infra_lbl_uptime">Uptime</span><span id="infra-vps2-uptime">—</span></div>
+              <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);" data-i18n="infra_lbl_hosts">Hosts</span><span id="infra-vps2-hosts">—</span></div>
+              <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);" data-i18n="infra_lbl_clients">Clients</span><span id="infra-vps2-clients">—</span></div>
+              <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);" data-i18n="infra_lbl_rooms">Rooms</span><span id="infra-vps2-rooms">—</span></div>
+              <div style="display:flex;justify-content:space-between;" id="infra-vps2-load-row"><span style="color:var(--muted);" data-i18n="infra_lbl_load">Load</span><span id="infra-vps2-load">—</span></div>
+              <div style="display:flex;justify-content:space-between;" id="infra-vps2-mem-row"><span style="color:var(--muted);" data-i18n="infra_lbl_mem">Memory</span><span id="infra-vps2-mem">—</span></div>
+            </div>
+          </div>
+          <!-- VPS1 node card (hidden when no chain configured) -->
+          <div class="dash-card" id="infra-vps1-card" style="display:none;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+              <span id="infra-vps1-dot" style="width:10px;height:10px;border-radius:50%;background:var(--muted);display:inline-block;flex-shrink:0;transition:background .3s;"></span>
+              <span class="dash-card-icon" style="font-size:16px;">🔗</span>
+              <span class="dash-card-title" data-i18n="infra_vps1_title" style="font-size:13px;font-weight:700;">VPS1 / Chain Relay</span>
+              <span id="infra-vps1-rtt" style="font-size:10px;color:var(--muted);margin-left:auto;"></span>
+            </div>
+            <div style="font-size:12px;line-height:2;color:var(--text);">
+              <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);" data-i18n="infra_lbl_status">Status</span><span id="infra-vps1-status">—</span></div>
+              <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);" data-i18n="infra_lbl_host">Host</span><span id="infra-vps1-host" style="color:var(--accent);">—</span></div>
+              <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);" data-i18n="infra_lbl_port">Port</span><span id="infra-vps1-port">—</span></div>
+              <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);" data-i18n="infra_lbl_tcp_rtt">TCP RTT</span><span id="infra-vps1-rtt-val">—</span></div>
+              <div style="display:flex;justify-content:space-between;" id="infra-vps1-err-row" style="display:none;"><span style="color:var(--muted);" data-i18n="infra_lbl_error">Error</span><span id="infra-vps1-err" style="color:var(--danger);font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</span></div>
+            </div>
+            <div class="dash-card-sub" id="infra-vps1-note" style="margin-top:8px;font-size:11px;"></div>
+          </div>
+          <!-- No-chain hint (shown when VPS1 not configured) -->
+          <div class="dash-card" id="infra-nochain-card" style="border-left:3px solid var(--muted);opacity:0.55;">
+            <div class="dash-card-icon">🔗</div>
+            <div class="dash-card-title" data-i18n="infra_nochain_title">VPS1 / Chain Relay</div>
+            <div class="dash-card-sub" data-i18n="infra_nochain_hint" style="margin-top:6px;font-size:11px;">
+              Not configured. Set <code>RDP_CHAIN_VPS1_HOST</code> in VPS2 systemd unit to enable monitoring.
+            </div>
+          </div>
+        </div>
+        <div style="height:20px;"></div>
+
         <div class="panel-title" data-i18n="title_activity" style="font-size:13px; margin-bottom:10px;">ACTIVITY LOG</div>
         <div class="log-feed" id="log-feed"></div>
         <div style="height:16px;"></div>
@@ -2576,7 +2634,15 @@ const I18N = {
     title_dashboard: 'Dashboard', title_files: 'FILES', title_procs: 'PROCESSES', title_services: 'Services',
     title_terminal: 'Terminal', title_screenshots: 'Screenshots', title_audio: 'Audio Recording',
     title_programs: 'Installed Programs', title_settings: 'Settings', title_eventlog: 'Event Log', title_registry: 'Registry Editor',
-    title_activity: 'ACTIVITY LOG', title_speed_test: 'SPEED TEST',
+    title_activity: 'ACTIVITY LOG', title_speed_test: 'SPEED TEST', title_infra: 'INFRASTRUCTURE',
+    infra_vps2_title: 'VPS2 / Relay', infra_vps1_title: 'VPS1 / Chain Relay',
+    infra_nochain_title: 'VPS1 / Chain Relay',
+    infra_nochain_hint: 'Not configured. Set RDP_CHAIN_VPS1_HOST in VPS2 systemd unit to enable monitoring.',
+    infra_lbl_ver: 'Version', infra_lbl_uptime: 'Uptime', infra_lbl_hosts: 'Hosts',
+    infra_lbl_clients: 'Clients', infra_lbl_rooms: 'Rooms', infra_lbl_load: 'Load avg',
+    infra_lbl_mem: 'Memory', infra_lbl_status: 'Status', infra_lbl_host: 'Host',
+    infra_lbl_port: 'Port', infra_lbl_tcp_rtt: 'TCP RTT', infra_lbl_error: 'Error',
+    infra_updated: 'Updated at',
     // ── Common buttons ──
     apply: 'Apply', cancel: 'Cancel', ok: 'OK', refresh: 'Refresh', delete: 'Delete', save: 'Save',
     upload: 'Upload', download: 'Download', start: 'Start', stop: 'Stop', pause: 'Pause', resume: 'Resume',
@@ -2822,7 +2888,15 @@ const I18N = {
     title_dashboard: 'Панель', title_files: 'ФАЙЛЫ', title_procs: 'ПРОЦЕССЫ', title_services: 'Службы',
     title_terminal: 'Терминал', title_screenshots: 'Скриншоты', title_audio: 'Аудиозапись',
     title_programs: 'Установленные программы', title_settings: 'Настройки', title_eventlog: 'Журнал событий', title_registry: 'Редактор реестра',
-    title_activity: 'ЖУРНАЛ АКТИВНОСТИ', title_speed_test: 'ТЕСТ СКОРОСТИ',
+    title_activity: 'ЖУРНАЛ АКТИВНОСТИ', title_speed_test: 'ТЕСТ СКОРОСТИ', title_infra: 'ИНФРАСТРУКТУРА',
+    infra_vps2_title: 'ВПС2 / Релей', infra_vps1_title: 'ВПС1 / Цепочка',
+    infra_nochain_title: 'ВПС1 / Цепочка',
+    infra_nochain_hint: 'Не настроено. Установите RDP_CHAIN_VPS1_HOST в systemd-юните ВПС2 для мониторинга.',
+    infra_lbl_ver: 'Версия', infra_lbl_uptime: 'Аптайм', infra_lbl_hosts: 'Хостов',
+    infra_lbl_clients: 'Клиентов', infra_lbl_rooms: 'Комнат', infra_lbl_load: 'Загрузка',
+    infra_lbl_mem: 'Память', infra_lbl_status: 'Статус', infra_lbl_host: 'Адрес',
+    infra_lbl_port: 'Порт', infra_lbl_tcp_rtt: 'TCP RTT', infra_lbl_error: 'Ошибка',
+    infra_updated: 'Обновлено в',
     apply: 'Применить', cancel: 'Отмена', ok: 'OK', refresh: 'Обновить', delete: 'Удалить', save: 'Сохранить',
     upload: 'Загрузить', download: 'Скачать', start: 'Старт', stop: 'Стоп', pause: 'Пауза', resume: 'Продолжить',
     add: 'Добавить', edit: 'Изменить', close: 'Закрыть', search: 'Поиск', clear: 'Очистить', settings: 'Настройки',
@@ -3048,7 +3122,15 @@ const I18N = {
     title_dashboard: 'Panel', title_files: 'FAYLLAR', title_procs: 'PROSESLƏR', title_services: 'Xidmətlər',
     title_terminal: 'Terminal', title_screenshots: 'Ekran şəkilləri', title_audio: 'Səs yazısı',
     title_programs: 'Quraşdırılmış proqramlar', title_settings: 'Tənzimləmələr', title_eventlog: 'Hadisə jurnalı', title_registry: 'Registr redaktoru',
-    title_activity: 'FƏALİYYƏT JURNALI', title_speed_test: 'SÜRƏT TESTİ',
+    title_activity: 'FƏALİYYƏT JURNALI', title_speed_test: 'SÜRƏT TESTİ', title_infra: 'İNFRASTRUKTUR',
+    infra_vps2_title: 'VPS2 / Relay', infra_vps1_title: 'VPS1 / Zəncir Relay',
+    infra_nochain_title: 'VPS1 / Zəncir Relay',
+    infra_nochain_hint: 'Konfiqurasiya edilməyib. Monitorinq üçün VPS2 systemd unitində RDP_CHAIN_VPS1_HOST təyin edin.',
+    infra_lbl_ver: 'Versiya', infra_lbl_uptime: 'İşləmə müddəti', infra_lbl_hosts: 'Hostlar',
+    infra_lbl_clients: 'Klientlər', infra_lbl_rooms: 'Otaqlar', infra_lbl_load: 'Yük',
+    infra_lbl_mem: 'Yaddaş', infra_lbl_status: 'Status', infra_lbl_host: 'Ünvan',
+    infra_lbl_port: 'Port', infra_lbl_tcp_rtt: 'TCP RTT', infra_lbl_error: 'Xəta',
+    infra_updated: 'Yeniləndi:',
     apply: 'Tətbiq et', cancel: 'Ləğv et', ok: 'OK', refresh: 'Yenilə', delete: 'Sil', save: 'Saxla',
     upload: 'Yüklə', download: 'Endir', start: 'Başlat', stop: 'Dayan', pause: 'Fasilə', resume: 'Davam et',
     add: 'Əlavə et', edit: 'Redaktə et', close: 'Bağla', search: 'Axtar', clear: 'Təmizlə', settings: 'Tənzimləmələr',
@@ -3819,6 +3901,7 @@ function connectToServer() {
     state._lastFrameSeq = undefined;
   _reorderBuf.clear(); _reorderNextSeq = 0; _reorderInited = false;
   // (render loop cleanup removed — using direct rendering)
+    stopInfraAutoRefresh();
     setConnStatus('disconnected');
     addLog(t('msg_disconnected_server'), 'WARN');
     document.getElementById('btn-connect').classList.remove('hidden');
@@ -3938,6 +4021,7 @@ function handleText(raw) {
       addLog(`Connected. Host: ${msg.host_online ? 'ONLINE' : 'OFFLINE'}`, msg.host_online ? 'OK' : 'WARN');
       notify('Connected to relay server', 'success');
       openFileWebSocket();
+      startInfraAutoRefresh();
       if (msg.host_online) {
         refreshDashboard();
         loadSettingsFromHost();
@@ -7482,6 +7566,147 @@ function startDashAutoRefresh() {
 function stopDashAutoRefresh() {
   if (_dashAutoTimer) { clearInterval(_dashAutoTimer); _dashAutoTimer = null; }
   _dashRefreshing = false;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  INFRASTRUCTURE STATUS
+// ═══════════════════════════════════════════════════════════════
+let _infraTimer = null;
+
+function _fmtUptime(s) {
+  if (s == null || isNaN(s)) return '—';
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (d > 0) return d + 'd ' + h + 'h';
+  if (h > 0) return h + 'h ' + m + 'm';
+  return m + 'm';
+}
+
+function _setInfraDot(id, online) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = '';
+  if (online === null)  el.classList.add('infra-dot-probing');
+  else if (online)      el.classList.add('infra-dot-online');
+  else                  el.classList.add('infra-dot-offline');
+}
+
+function _setText(id, text, color) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text;
+  if (color) el.style.color = color; else el.style.color = '';
+}
+
+async function refreshInfraStatus() {
+  if (!state.connected) return;
+  const btn = document.getElementById('infra-refresh-btn');
+  if (btn) btn.disabled = true;
+
+  // Set probing state
+  _setInfraDot('infra-vps2-dot', null);
+  _setInfraDot('infra-vps1-dot', null);
+
+  try {
+    const res = await sendCmd({ cmd: 'infra_status' });
+    const data = (typeof res === 'string') ? JSON.parse(res) : (res.data || res);
+
+    // ── VPS2 ──────────────────────────────────────────────────
+    const v2 = data.vps2 || {};
+    _setInfraDot('infra-vps2-dot', true);
+
+    const modeMap = { 'relay': 'RELAY', 'chain-relay': 'CHAIN VPS1' };
+    _setText('infra-vps2-mode',    modeMap[v2.mode] || (v2.mode || '').toUpperCase());
+    _setText('infra-vps2-ver',     v2.version ? 'v' + v2.version : '—');
+    _setText('infra-vps2-uptime',  _fmtUptime(v2.uptime_s));
+    _setText('infra-vps2-hosts',   v2.hosts_connected != null ? String(v2.hosts_connected) : '—',
+             v2.hosts_connected > 0 ? 'var(--success)' : 'var(--muted)');
+    _setText('infra-vps2-clients', v2.clients_connected != null ? String(v2.clients_connected) : '—');
+    _setText('infra-vps2-rooms',   v2.rooms_active != null ? String(v2.rooms_active) : '—');
+
+    if (v2.load_1m != null) {
+      _setText('infra-vps2-load', v2.load_1m.toFixed(2) + ' / ' + (v2.load_5m || 0).toFixed(2) + ' / ' + (v2.load_15m || 0).toFixed(2));
+      const lr = document.getElementById('infra-vps2-load-row');
+      if (lr) lr.style.display = '';
+    } else {
+      const lr = document.getElementById('infra-vps2-load-row');
+      if (lr) lr.style.display = 'none';
+    }
+
+    if (v2.mem_pct != null) {
+      _setText('infra-vps2-mem',
+        v2.mem_used_mb + ' MB / ' + v2.mem_total_mb + ' MB (' + v2.mem_pct + '%)',
+        v2.mem_pct > 85 ? 'var(--danger)' : v2.mem_pct > 65 ? 'var(--warn)' : '');
+      const mr = document.getElementById('infra-vps2-mem-row');
+      if (mr) mr.style.display = '';
+    } else {
+      const mr = document.getElementById('infra-vps2-mem-row');
+      if (mr) mr.style.display = 'none';
+    }
+
+    // ── VPS1 ──────────────────────────────────────────────────
+    const v1 = data.vps1;
+    const noChainCard  = document.getElementById('infra-nochain-card');
+    const vps1Card     = document.getElementById('infra-vps1-card');
+
+    if (v1 !== null && v1 !== undefined) {
+      // VPS1 is configured
+      if (noChainCard)  noChainCard.style.display  = 'none';
+      if (vps1Card)     vps1Card.style.display      = '';
+      _setInfraDot('infra-vps1-dot', v1.online);
+
+      _setText('infra-vps1-host',   v1.host || '—');
+      _setText('infra-vps1-port',   v1.port != null ? String(v1.port) : '443');
+
+      if (v1.online) {
+        _setText('infra-vps1-status', '● ONLINE', 'var(--success)');
+        _setText('infra-vps1-rtt',    v1.rtt_ms != null ? v1.rtt_ms + ' ms' : '');
+        _setText('infra-vps1-rtt-val', v1.rtt_ms != null ? v1.rtt_ms + ' ms' : '—',
+                 v1.rtt_ms < 30 ? 'var(--success)' : v1.rtt_ms < 80 ? '' : 'var(--warn)');
+        const errRow = document.getElementById('infra-vps1-err-row');
+        if (errRow) errRow.style.display = 'none';
+        _setText('infra-vps1-note', '');
+      } else {
+        _setText('infra-vps1-status', '● OFFLINE', 'var(--danger)');
+        _setText('infra-vps1-rtt', '');
+        _setText('infra-vps1-rtt-val', '—');
+        const errRow = document.getElementById('infra-vps1-err-row');
+        if (errRow) errRow.style.display = '';
+        _setText('infra-vps1-err', v1.error || 'unreachable');
+        _setText('infra-vps1-note', 'TCP probe to port ' + (v1.port || 443) + ' failed');
+      }
+    } else {
+      // Not configured
+      if (noChainCard)  noChainCard.style.display  = '';
+      if (vps1Card)     vps1Card.style.display      = 'none';
+    }
+
+    // Last update time
+    const now = new Date();
+    const ts = now.getHours().toString().padStart(2,'0') + ':' +
+               now.getMinutes().toString().padStart(2,'0') + ':' +
+               now.getSeconds().toString().padStart(2,'0');
+    _setText('infra-last-update', t('infra_updated') + ' ' + ts);
+
+  } catch (e) {
+    _setInfraDot('infra-vps2-dot', false);
+    _setInfraDot('infra-vps1-dot', false);
+    console.warn('[INFRA] refreshInfraStatus error:', e);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function startInfraAutoRefresh() {
+  stopInfraAutoRefresh();
+  refreshInfraStatus();
+  _infraTimer = setInterval(() => {
+    if (state.connected) refreshInfraStatus();
+  }, 30000);
+}
+function stopInfraAutoRefresh() {
+  if (_infraTimer) { clearInterval(_infraTimer); _infraTimer = null; }
 }
 
 // ═══════════════════════════════════════════════════════════════

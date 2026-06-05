@@ -70,6 +70,11 @@ echo -e "${N}"
 echo -e "  Роль:             ${G}${W}ВПС2 (полный relay + веб-панель)${N}"
 echo -e "  IP этого сервера: ${C}${SERVER_IP}${N}"
 echo ""
+echo -e "  ${C}Мониторинг ВПС1 (необязательно):${N}"
+echo -e "  Если это ВПС2 в цепочке — введите IP или домен ВПС1 для мониторинга его состояния."
+echo -e "  Оставьте пустым если одиночный ВПС или если не нужен мониторинг ВПС1."
+read -rp "  IP/домен ВПС1 (Enter = пропустить): " VPS1_HOST
+echo ""
 read -rp "  Начать установку? [Y/n]: " CONFIRM
 [ "${CONFIRM,,}" = "n" ] && echo "Отменено." && exit 0
 echo ""
@@ -281,6 +286,7 @@ ExecStart=$VENV/bin/python3 $RELAY_DIR/server.py
 Restart=always
 RestartSec=3
 Environment=PYTHONUNBUFFERED=1
+$([ -n "$VPS1_HOST" ] && echo "Environment=RDP_CHAIN_VPS1_HOST=$VPS1_HOST")
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=rdp-relay
@@ -292,6 +298,7 @@ systemctl daemon-reload
 systemctl enable "$SERVICE_NAME" >/dev/null 2>&1
 systemctl restart "$SERVICE_NAME"
 ok "Сервис rdp-relay запущен"
+[ -n "$VPS1_HOST" ] && ok "Мониторинг ВПС1 включён: $VPS1_HOST"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  ШАГ 9: STUN/TURN (coturn)

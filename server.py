@@ -607,6 +607,82 @@ SSL_KEY  = os.environ.get("RDP_SSL_KEY", "")
 CHAIN_UPSTREAM  = os.environ.get("RDP_CHAIN_UPSTREAM", "").rstrip("/")
 CHAIN_SSL_VERIFY = os.environ.get("RDP_CHAIN_SSL_VERIFY", "1") != "0"
 
+# ─── Infra monitoring ────────────────────────────────────────────────────────
+# RDP_CHAIN_VPS1_HOST — host or IP of VPS1 (set on VPS2 to enable chain probe)
+# RDP_CHAIN_VPS1_PORT — port to probe (default 443)
+CHAIN_VPS1_HOST = os.environ.get("RDP_CHAIN_VPS1_HOST", "").strip()
+CHAIN_VPS1_PORT = int(os.environ.get("RDP_CHAIN_VPS1_PORT", "443"))
+SERVER_START_TIME = time.time()
+
+def _get_sys_stats() -> dict:
+    """Read basic system metrics from /proc (Linux). Silent on failure."""
+    s: dict = {}
+    try:
+        parts = Path("/proc/loadavg").read_text().split()
+        s["load_1m"]  = float(parts[0])
+        s["load_5m"]  = float(parts[1])
+        s["load_15m"] = float(parts[2])
+    except Exception:
+        pass
+    try:
+        mem: dict = {}
+        for line in Path("/proc/meminfo").read_text().splitlines():
+            if ":" in line:
+                k, v = line.split(":", 1)
+                mem[k.strip()] = int(v.split()[0])   # kB
+        total = mem.get("MemTotal", 0)
+        avail = mem.get("MemAvailable", 0)
+        if total:
+            s["mem_total_mb"] = total // 1024
+            s["mem_used_mb"]  = (total - avail) // 1024
+            s["mem_pct"]      = round((total - avail) / total * 100)
+    except Exception:
+        pass
+    try:
+        s["os_uptime_s"] = int(float(Path("/proc/uptime").read_text().split()[0]))
+    except Exception:
+        pass
+    return s
+
+def _get_node_info() -> dict:
+    """Return this server's own node status snapshot."""
+    total_hosts   = sum(1 for r in rooms.values() if r.host is not None)
+    total_clients = sum(len(r.clients) for r in rooms.values())
+    mode = "chain-relay" if CHAIN_UPSTREAM else "relay"
+    info: dict = {
+        "version":          SERVER_VERSION,
+        "mode":             mode,
+        "uptime_s":         int(time.time() - SERVER_START_TIME),
+        "rooms_active":     len(rooms),
+        "hosts_connected":  total_hosts,
+        "clients_connected": total_clients,
+        "server_time":      datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    if CHAIN_UPSTREAM:
+        info["chain_upstream"] = CHAIN_UPSTREAM
+    info.update(_get_sys_stats())
+    return info
+
+async def _probe_tcp(host: str, port: int, timeout: float = 5.0) -> dict:
+    """TCP-level probe: connect, measure RTT, close. Returns {online, rtt_ms, error?}."""
+    t0 = time.time()
+    try:
+        reader, writer = await asyncio.wait_for(
+            asyncio.open_connection(host, port),
+            timeout=timeout,
+        )
+        rtt_ms = int((time.time() - t0) * 1000)
+        try:
+            writer.close()
+            await writer.wait_closed()
+        except Exception:
+            pass
+        return {"online": True, "rtt_ms": rtt_ms}
+    except asyncio.TimeoutError:
+        return {"online": False, "error": "timeout", "rtt_ms": int(timeout * 1000)}
+    except Exception as exc:
+        return {"online": False, "error": str(exc), "rtt_ms": int((time.time() - t0) * 1000)}
+
 # ─── Data Structures ────────────────────────────────────────────────────────
 @dataclass
 class Connection:
@@ -1636,6 +1712,20 @@ async def handler(websocket, path: str):
                         }, ensure_ascii=False))
                         continue
 
+                    # infra_status: returns this VPS's own stats + optional VPS1 TCP probe
+                    if sc_cmd == "infra_status":
+                        vps2_info = _get_node_info()
+                        vps1_info: Optional[dict] = None
+                        if CHAIN_VPS1_HOST:
+                            vps1_info = await _probe_tcp(CHAIN_VPS1_HOST, CHAIN_VPS1_PORT)
+                            vps1_info["host"] = CHAIN_VPS1_HOST
+                            vps1_info["port"] = CHAIN_VPS1_PORT
+                        await websocket.send(json.dumps({
+                            "id": msg.get("id", ""), "ok": True,
+                            "data": {"vps2": vps2_info, "vps1": vps1_info}
+                        }, ensure_ascii=False))
+                        continue
+
                     # clients_list: handled by VPS (has full info about connected clients)
                     if sc_cmd == "clients_list":
                         now = time.time()
@@ -2364,7 +2454,24 @@ async def chain_proxy(local_ws):
 
 
 def _fix_connection_header(connection, request):
-    """If proxy sent Connection: keep-alive, set Connection: Upgrade so handshake passes (426 fix)."""
+    """Serve /health HTTP endpoint and fix Connection: keep-alive for WebSocket proxies."""
+    # ── /health — lightweight JSON status (no auth, used by VPS2 to probe VPS1) ──
+    try:
+        req_path = getattr(request, "path", "") or ""
+        if req_path == "/health" or req_path.startswith("/health?"):
+            import http
+            info = _get_node_info()
+            body = json.dumps(info, ensure_ascii=False).encode("utf-8")
+            from websockets.datastructures import Headers as _WsHeaders
+            h = _WsHeaders()
+            h["Content-Type"] = "application/json"
+            h["Content-Length"] = str(len(body))
+            h["Access-Control-Allow-Origin"] = "*"
+            h["Cache-Control"] = "no-store"
+            return http.HTTPStatus.OK, h, body
+    except Exception as _e:
+        log.debug("_fix_connection_header /health error: %s", _e)
+
     try:
         from websockets import headers as ws_headers
         headers = request.headers
