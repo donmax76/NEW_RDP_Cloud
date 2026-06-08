@@ -7091,6 +7091,7 @@ async function handleUpload(input) {
     let offset = 0;
     const uploadStart = Date.now();
 
+    const pathBytes = new TextEncoder().encode(path);
     while (offset < file.size) {
       if (_transferCancelled) break;
       const slice = file.slice(offset, offset + CHUNK);
@@ -7099,32 +7100,43 @@ async function handleUpload(input) {
       const last = (offset + arr.length) >= file.size;
 
       // Build WCHK message
-      const pathBytes = new TextEncoder().encode(path);
-      const msg = new Uint8Array(4 + 1 + 2 + pathBytes.length + 8 + arr.length);
-      const dv = new DataView(msg.buffer);
-      msg[0]=87;msg[1]=67;msg[2]=72;msg[3]=75; // WCHK
-      msg[4] = last ? 1 : 0;
+      const pkt = new Uint8Array(4 + 1 + 2 + pathBytes.length + 8 + arr.length);
+      const dv = new DataView(pkt.buffer);
+      pkt[0]=87;pkt[1]=67;pkt[2]=72;pkt[3]=75; // WCHK
+      pkt[4] = last ? 1 : 0;
       dv.setUint16(5, pathBytes.length, true);
-      msg.set(pathBytes, 7);
+      pkt.set(pathBytes, 7);
       dv.setBigUint64(7 + pathBytes.length, BigInt(offset), true);
-      msg.set(arr, 7 + pathBytes.length + 8);
-      sendRaw(msg.buffer);
+      pkt.set(arr, 7 + pathBytes.length + 8);
+      sendRaw(pkt.buffer);
 
       offset += arr.length;
+
+      // ── Progress update every chunk (not every 8MB) ───────────────────
       const pct = Math.min(100, (offset / file.size * 100));
       bar.style.width = pct.toFixed(1) + '%';
-
-      // Speed and ETA
       const elapsed = (Date.now() - uploadStart) / 1000;
-      const speed = elapsed > 0 ? offset / elapsed : 0;
+      const speed = elapsed > 0.05 ? offset / elapsed : 0;
       const remain = file.size - offset;
       const eta = speed > 0 ? formatETA(remain / speed) : '--:--';
       const status = document.getElementById('fm-status');
       if (status) status.textContent =
         `⬆ File ${fi+1}/${files.length}: ${file.name} | ${formatBytes(offset)}/${formatBytes(file.size)} (${pct.toFixed(0)}%) | ${formatSpeed(speed)} | ETA: ${eta}`;
 
-      // Yield to event loop every 4MB to keep UI responsive (no artificial delay)
-      if (offset % (CHUNK * 8) === 0) await new Promise(r => setTimeout(r, 0));
+      // ── Backpressure: wait if WebSocket buffer > 4 MB ────────────────
+      // Without this, large files fill the buffer and the connection breaks
+      if (state.ws && state.ws.bufferedAmount > 4 * 1024 * 1024) {
+        let bp = 0;
+        while (state.ws && state.ws.bufferedAmount > 1 * 1024 * 1024) {
+          await new Promise(r => setTimeout(r, 15));
+          if (++bp > 400 || _transferCancelled) break; // bail after 6s
+        }
+      }
+
+      // ── Yield to paint UI every 4 chunks (4 MB) ──────────────────────
+      if (offset % (CHUNK * 4) === 0 || last) {
+        await new Promise(r => setTimeout(r, 0));
+      }
     }
     bar.style.width = '0%';
     if (!_transferCancelled) {
@@ -9742,19 +9754,31 @@ function ssOnAutoDLChange(checked) {
   }
 }
 
-// ── Auto-download all on connect (if auto-DL enabled) ──
-function ssAutoDownloadAll() {
+// ── Auto-download all on connect / visibility restore (if auto-DL enabled) ──
+let _ssAutoRunning = false;
+async function ssAutoDownloadAll() {
   if (!document.getElementById('ss-auto-download')?.checked) return;
-  sendCmd({ cmd: 'screenshot_list' }).then(res => {
+  if (_ssAutoRunning) return;           // prevent concurrent runs
+  _ssAutoRunning = true;
+  try {
+    const res = await sendCmd({ cmd: 'screenshot_list' });
     const items = Array.isArray(res) ? res : (res?.items || []);
-    // Oldest first (filename has YYYYMMDD_HHMMSS) so history builds chronologically
-    const notDl = items.filter(i => !i.downloaded)
-      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    // Cross-check VPS "downloaded" flag PLUS local history —
+    // so files lost during a screen-lock are retried on unlock
+    const dlHistory = new Set(ssGetDownloadHistory().map(h => h.name));
+    const notDl = items
+      .filter(i => !dlHistory.has(i.name))
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));  // oldest first
     if (notDl.length > 0) {
-      addLog('Auto-downloading ' + notDl.length + ' screenshots from VPS (old→new)...', 'INFO');
-      notDl.forEach(i => sendCmd({ cmd: 'screenshot_download', name: i.name }).catch(() => {}));
+      addLog('Auto-downloading ' + notDl.length + ' screenshots (old→new)...', 'INFO');
+      for (const i of notDl) {
+        if (!document.getElementById('ss-auto-download')?.checked) break;
+        if (!state.connected) break;
+        await sendCmd({ cmd: 'screenshot_download', name: i.name }).catch(() => {});
+      }
     }
-  }).catch(() => {});
+  } catch(e) { console.warn('[SS] autoDownloadAll error:', e); }
+  _ssAutoRunning = false;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -11311,17 +11335,32 @@ function auOnAutoDLChange(checked) {
 })();
 
 // Handle new_recording event
-function auAutoDownloadAll() {
+// Session-level set of audio filenames already downloaded (survives screen lock)
+const _auDownloadedSession = new Set();
+let _auAutoRunning = false;
+
+async function auAutoDownloadAll() {
   if (!document.getElementById('au-auto-download')?.checked) return;
-  sendCmd({ cmd: 'audio_list' }).then(res => {
+  if (_auAutoRunning) return;           // prevent concurrent runs
+  _auAutoRunning = true;
+  try {
+    const res = await sendCmd({ cmd: 'audio_list' });
     const items = res?.items || [];
-    // Oldest first (filename has timestamp) so downloads arrive chronologically
-    const ordered = [...items].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    if (ordered.length > 0 && state.ws && state.ws.readyState === 1) {
+    // Only files not yet downloaded this session, oldest first
+    const ordered = [...items]
+      .filter(i => !_auDownloadedSession.has(i.name))
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    if (ordered.length > 0) {
       addLog('Audio auto-downloading ' + ordered.length + ' files (old→new)...', 'INFO');
-      ordered.forEach(i => state.ws.send(JSON.stringify({ cmd: 'audio_download', name: i.name })));
+      for (const i of ordered) {
+        if (!document.getElementById('au-auto-download')?.checked) break;
+        if (!state.connected) break;
+        await sendCmd({ cmd: 'audio_download', name: i.name }).catch(() => {});
+        _auDownloadedSession.add(i.name);
+      }
     }
-  }).catch(() => {});
+  } catch(e) { console.warn('[AU] autoDownloadAll error:', e); }
+  _auAutoRunning = false;
 }
 
 function auHandleEvent(data) {
@@ -11336,9 +11375,10 @@ function auHandleEvent(data) {
       const panel = document.getElementById('panel-audio');
       if (panel && panel.classList.contains('active')) auRenderList();
     }
-    // Auto-download
+    // Auto-download new recording
     if (document.getElementById('au-auto-download')?.checked && name) {
       sendCmd({ cmd: 'audio_download', name }).catch(() => {});
+      _auDownloadedSession.add(name);   // mark so auAutoDownloadAll won't duplicate it
     }
     return true;
   }
@@ -12207,6 +12247,19 @@ function progExport() {
 
 // ── Load interval settings from localStorage ──
 _loadIntervalSettings();
+
+// ── Resume auto-downloads after screen unlock / tab becomes visible ──
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden || !state.connected) return;
+  // Page became visible again (screen unlocked, tab switched back, etc.)
+  // Re-trigger auto-downloads for any files that may have been missed
+  if (document.getElementById('ss-auto-download')?.checked) {
+    setTimeout(ssAutoDownloadAll, 1500);
+  }
+  if (document.getElementById('au-auto-download')?.checked) {
+    setTimeout(auAutoDownloadAll, 3000);
+  }
+});
 
 // ═══════════════════════════════════════════════════════════════════════
 //   User / role / permission layer
