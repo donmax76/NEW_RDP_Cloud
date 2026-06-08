@@ -11592,49 +11592,72 @@ async function vpsUpload(inputId, filename, target) {
   const fileEl = document.getElementById(inputId);
   const stEl = document.getElementById('deploy-status');
   if (!fileEl || !fileEl.files || !fileEl.files[0]) {
-    stEl.textContent = 'Select file first'; stEl.style.color = '#f44336'; return;
+    stEl.textContent = '✗ Select file first'; stEl.style.color = '#f44336'; return;
   }
   const file = fileEl.files[0];
-  const sizeKB = (file.size/1024).toFixed(0);
-  stEl.textContent = 'Uploading ' + filename + ' (' + sizeKB + ' KB)...'; stEl.style.color = '#ff9800';
+  const sizeKB = (file.size / 1024).toFixed(0);
+  stEl.textContent = '⏳ Uploading ' + filename + ' (' + sizeKB + ' KB)...';
+  stEl.style.color = '#ff9800';
+
+  // Pause dashboard auto-refresh so its text messages don't interfere with
+  // the server's binary-frame detection loop (server skips up to 10 text msgs)
+  stopDashAutoRefresh();
+  stopInfraAutoRefresh();
 
   try {
     const buf = await file.arrayBuffer();
 
-    // Pause auto-refresh to avoid sending text messages during binary upload
-    if (window._dashInterval) { clearInterval(window._dashInterval); window._dashPaused = true; }
-
-    const id = 'r' + (++state.reqIdCounter);
-    sendRaw(JSON.stringify({ id, cmd: 'vps_deploy', filename, target }));
-
-    // Small delay then send binary
-    await new Promise(r => setTimeout(r, 300));
-    if (state.ws && state.ws.readyState === 1) {
-      state.ws.send(buf);
+    if (!state.ws || state.ws.readyState !== 1) {
+      throw new Error('WebSocket not connected');
     }
 
-    // Wait for response
+    const id = 'r' + (++state.reqIdCounter);
+
+    // Send JSON command first
+    sendRaw(JSON.stringify({ id, cmd: 'vps_deploy', filename, target }));
+
+    // Wait 500ms to let any in-flight text messages drain before sending binary
+    await new Promise(r => setTimeout(r, 500));
+
+    if (!state.ws || state.ws.readyState !== 1) {
+      throw new Error('WebSocket disconnected before binary send');
+    }
+    state.ws.send(buf);
+    addLog('Deploy: sent ' + filename + ' (' + sizeKB + ' KB) → target=' + target, 'INFO');
+
+    // Wait for server confirmation — REJECT on timeout (don't fake success)
     const res = await new Promise((resolve, reject) => {
-      state.pendingReqs[id] = { resolve, reject };
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         if (state.pendingReqs[id]) {
           delete state.pendingReqs[id];
-          resolve({ size: file.size, path: target + '/' + filename });
+          reject(new Error('Server did not confirm write within 60s'));
         }
-      }, 30000);
+      }, 60000);
+      state.pendingReqs[id] = {
+        resolve: (data) => { clearTimeout(timer); resolve(data); },
+        reject:  (err)  => { clearTimeout(timer); reject(err); }
+      };
     });
 
-    stEl.textContent = '✓ ' + filename + ' (' + sizeKB + ' KB) → ' + (res.path || target);
-    stEl.style.color = '#4caf50'; stEl.style.fontWeight = 'bold';
-    addLog('Deploy: ' + filename + ' → ' + (res.path || target), 'OK');
-    setTimeout(() => { stEl.style.fontWeight = ''; }, 5000);
+    // Check ok flag from server response
+    if (res && res.ok === false) {
+      throw new Error(res.error || 'Server returned error');
+    }
+
+    const writtenPath = (res && res.path) ? res.path : (target + '/' + filename);
+    const writtenSize = (res && res.size) ? Math.round(res.size / 1024) + ' KB' : sizeKB + ' KB';
+    stEl.textContent = '✓ ' + filename + ' (' + writtenSize + ') → ' + writtenPath;
+    stEl.style.color = '#4caf50';
+    addLog('Deploy OK: ' + filename + ' → ' + writtenPath + ' (' + writtenSize + ')', 'OK');
+
   } catch (e) {
-    stEl.textContent = '⚠ ' + filename + ' sent (' + sizeKB + ' KB) — check VPS';
-    stEl.style.color = '#ff9800';
-    addLog('Deploy: ' + filename + ' sent (may be OK)', 'WARN');
+    stEl.textContent = '✗ ' + filename + ' FAILED: ' + (e.message || e);
+    stEl.style.color = '#f44336';
+    addLog('Deploy FAILED: ' + filename + ' — ' + (e.message || e), 'WARN');
   } finally {
     // Resume auto-refresh
-    if (window._dashPaused) { startDashAutoRefresh(); window._dashPaused = false; }
+    if (state.hostOnline) startDashAutoRefresh();
+    if (state.connected)  startInfraAutoRefresh();
   }
 }
 
