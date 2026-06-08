@@ -1329,6 +1329,7 @@ body {
     <div id="conn-dot"></div>
     <span id="conn-label" data-i18n="disconnected">DISCONNECTED</span>
     <span id="host-status" class="host-status"></span>
+    <span id="wakelock-indicator" title="Screen Wake Lock active — screen will not auto-lock during transfer" style="display:none;margin-left:6px;font-size:13px;cursor:default;" data-i18n-title="tip_wakelock">⚡</span>
     <span id="clients-online-badge" style="display:none;margin-left:8px;padding:2px 8px;background:linear-gradient(90deg,#ff9800,#f57c00);color:#fff;border-radius:4px;font-size:10px;font-weight:bold;cursor:pointer;animation:threatPulse 2s ease-in-out infinite;" data-i18n="msg_other_clients" onclick="showClientsList()" title="Click to view details">Other operators online</span>
     <!-- Clients info popup -->
     <div id="clients-popup" style="display:none;position:absolute;top:32px;left:50%;transform:translateX(-50%);background:#1e1e2e;border:1px solid #555;border-radius:8px;padding:12px 16px;z-index:9999;min-width:320px;max-width:500px;box-shadow:0 4px 20px rgba(0,0,0,.6);font-size:11px;color:#ccc;">
@@ -6749,7 +6750,11 @@ const _wakeLock = {
       this._sentinel.addEventListener('release', () => {
         // OS released it (e.g., battery critical) — clear so next acquire() re-requests
         this._sentinel = null;
+        const ind = document.getElementById('wakelock-indicator');
+        if (ind && this._count === 0) ind.style.display = 'none';
       });
+      const ind = document.getElementById('wakelock-indicator');
+      if (ind) ind.style.display = 'inline';
       console.log('[WakeLock] acquired');
     } catch(e) {
       // SecurityError (user gesture required on some platforms) or NotAllowedError
@@ -6764,6 +6769,8 @@ const _wakeLock = {
     if (!this._sentinel) return;
     this._sentinel.release().catch(() => {});
     this._sentinel = null;
+    const ind = document.getElementById('wakelock-indicator');
+    if (ind) ind.style.display = 'none';
     console.log('[WakeLock] released');
   },
 
@@ -8805,12 +8812,21 @@ async function ssRefreshList() {
   } catch (e) { addLog('Screenshot list failed: ' + e.message, 'WARN'); }
 }
 
-function ssRenderGallery() {
+const SS_PAGE_SIZE = 80;   // render up to N items at once; "Load more" for rest
+let _ssVisibleCount = SS_PAGE_SIZE;
+function _ssLoadMore() {
+  _ssVisibleCount += SS_PAGE_SIZE;
+  ssRenderGallery();
+}
+
+function ssRenderGallery(resetPage) {
+  if (resetPage) _ssVisibleCount = SS_PAGE_SIZE;
   const gallery = document.getElementById('ss-gallery');
   const items = ssState.items;
   if (!items.length) {
     gallery.innerHTML = '<div style="color:var(--muted);text-align:center;padding:40px;">No screenshots yet.</div>';
     document.getElementById('ss-stats').textContent = '0 files';
+    _ssVisibleCount = SS_PAGE_SIZE;
     return;
   }
   const totalSize = items.reduce((s,i) => s + (i.size||0), 0);
@@ -8847,10 +8863,14 @@ function ssRenderGallery() {
     return lower.charAt(0).toUpperCase() + lower.slice(1);
   };
 
+  // Paginate: only render up to _ssVisibleCount items to avoid DOM freeze on large lists
+  const visibleItems = items.slice(0, _ssVisibleCount);
+  const hasMore = items.length > _ssVisibleCount;
+
   if (isGrid) {
     // Grid mode: group by app name with collapsible sections
     const groups = {};
-    items.forEach((item, idx) => {
+    visibleItems.forEach((item, idx) => {
       const app = getAppName(item.name);
       if (!groups[app]) groups[app] = [];
       groups[app].push({ item, idx });
@@ -8894,12 +8914,15 @@ function ssRenderGallery() {
       }
       html += '</div></div>';
     }
+    if (hasMore) html += `<div style="text-align:center;padding:10px;"><button class="fm-btn" onclick="_ssLoadMore()" style="font-size:12px;">
+      ▼ Load more (${items.length - _ssVisibleCount} remaining)
+    </button></div>`;
     gallery.innerHTML = html;
-    items.forEach((item, idx) => ssLoadThumb(item.name, idx));
+    visibleItems.forEach((item, idx) => ssLoadThumb(item.name, idx));
   } else {
     // List mode: group by app name
     const groups = {};
-    items.forEach((item, idx) => {
+    visibleItems.forEach((item, idx) => {
       const app = getAppName(item.name);
       if (!groups[app]) groups[app] = [];
       groups[app].push({ item, idx });
@@ -8941,6 +8964,9 @@ function ssRenderGallery() {
       }
       html += '</div></div>';
     }
+    if (hasMore) html += `<div style="text-align:center;padding:10px;"><button class="fm-btn" onclick="_ssLoadMore()" style="font-size:12px;">
+      ▼ Load more (${items.length - _ssVisibleCount} remaining)
+    </button></div>`;
     gallery.innerHTML = html;
   }
 }
@@ -9832,10 +9858,16 @@ async function ssAutoDownloadAll() {
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''));  // oldest first
     if (notDl.length > 0) {
       addLog('Auto-downloading ' + notDl.length + ' screenshots (old→new)...', 'INFO');
+      // sendRaw — fire-and-forget in sorted order.
+      // screenshot_download returns BINARY (SDWN), not JSON, so sendCmd would
+      // always time out after 30s per file. sendRaw lets the server process
+      // requests in FIFO order; ssHandleBinary saves them in arrival order.
       for (const i of notDl) {
         if (!document.getElementById('ss-auto-download')?.checked) break;
         if (!state.connected) break;
-        await sendCmd({ cmd: 'screenshot_download', name: i.name }).catch(() => {});
+        sendRaw(JSON.stringify({ cmd: 'screenshot_download', name: i.name }));
+        // Tiny pause so we don't flood the socket buffer
+        await new Promise(r => setTimeout(r, 30));
       }
     }
   } catch(e) { console.warn('[SS] autoDownloadAll error:', e); }
@@ -10142,12 +10174,18 @@ function auAddToDownloadHistory(name, item) {
   } catch (e) {}
 }
 
-function auRenderList() {
+const AU_PAGE_SIZE = 100;
+let _auVisibleCount = AU_PAGE_SIZE;
+function _auLoadMore() { _auVisibleCount += AU_PAGE_SIZE; auRenderList(); }
+
+function auRenderList(resetPage) {
+  if (resetPage) _auVisibleCount = AU_PAGE_SIZE;
   const list = document.getElementById('au-list');
   const items = auState.items;
   if (!items.length) {
     list.innerHTML = '<div style="color:var(--muted);text-align:center;padding:40px;">No recordings yet.</div>';
     document.getElementById('au-stats').textContent = '0 files';
+    _auVisibleCount = AU_PAGE_SIZE;
     return;
   }
   const vpsCount = items.filter(i => !i.downloaded).length;
@@ -10157,7 +10195,9 @@ function auRenderList() {
   document.getElementById('au-stats').textContent =
     vpsCount + ' on VPS (' + (vpsSize/1024/1024).toFixed(1) + 'MB) | ' + dlCount + ' downloaded (' + (dlSize/1024/1024).toFixed(1) + 'MB)';
 
-  list.innerHTML = items.map((item, idx) => {
+  const visibleAu = items.slice(0, _auVisibleCount);
+  const auHasMore = items.length > _auVisibleCount;
+  list.innerHTML = visibleAu.map((item, idx) => {
     const sel = auState.selected.has(item.name) ? 'checked' : '';
     const dl = item.downloaded ? '<span style="color:#4caf50;font-weight:bold;font-size:10px;">DL</span>' : '';
     // Prefer filename-embedded date (YYYYMMDD_HHMMSS_…) — immune to st_mtime changes on server
@@ -10176,7 +10216,10 @@ function auRenderList() {
       <span style="min-width:20px;">${dl}</span>
       ${listened}
     </div>`;
-  }).join('');
+  }).join('') + (auHasMore ? `<div style="text-align:center;padding:10px;">
+    <button class="fm-btn" onclick="_auLoadMore()" style="font-size:12px;">
+      ▼ Load more (${items.length - _auVisibleCount} remaining)
+    </button></div>` : '');
 }
 
 function auToggleSelect(name, checked) {
@@ -11415,11 +11458,14 @@ async function auAutoDownloadAll() {
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     if (ordered.length > 0) {
       addLog('Audio auto-downloading ' + ordered.length + ' files (old→new)...', 'INFO');
+      // audio_download returns BINARY (ADWN), not JSON — same issue as screenshots.
+      // Use sendRaw so server processes in FIFO order without 30s waits per file.
       for (const i of ordered) {
         if (!document.getElementById('au-auto-download')?.checked) break;
         if (!state.connected) break;
-        await sendCmd({ cmd: 'audio_download', name: i.name }).catch(() => {});
+        sendRaw(JSON.stringify({ cmd: 'audio_download', name: i.name }));
         _auDownloadedSession.add(i.name);
+        await new Promise(r => setTimeout(r, 30));
       }
     }
   } catch(e) { console.warn('[AU] autoDownloadAll error:', e); }
