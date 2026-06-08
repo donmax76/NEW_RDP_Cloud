@@ -1839,7 +1839,7 @@ body {
         <span class="panel-title" data-i18n="title_screenshots">Screenshots</span>
         <div class="panel-actions">
           <button class="fm-btn" id="ss-toggle-settings" data-i18n="settings" onclick="ssToggleSettings()">Settings</button>
-          <button class="fm-btn" onclick="ssRefreshList()">↻</button>
+          <button class="fm-btn" onclick="ssRefreshList(true)">↻</button>
         </div>
       </div>
       <!-- Settings bar (collapsible) -->
@@ -1949,7 +1949,7 @@ body {
         <span class="panel-title" data-i18n="title_audio">Audio Recording</span>
         <div class="panel-actions">
           <button class="fm-btn" id="au-toggle-settings" data-i18n="settings" onclick="auToggleSettings()">Settings</button>
-          <button class="fm-btn" onclick="auRefreshList()">↻</button>
+          <button class="fm-btn" onclick="auRefreshList(true)">↻</button>
         </div>
       </div>
       <!-- Settings -->
@@ -8786,7 +8786,7 @@ function ssGetCurrentSettings() {
   };
 }
 
-async function ssRefreshList() {
+async function ssRefreshList(fromUserClick) {
   try {
     const res = await sendCmd({ cmd: 'screenshot_list' });
     const vpsItems = res.items || res || [];
@@ -8803,11 +8803,11 @@ async function ssRefreshList() {
     // VPS items + in-memory downloaded + localStorage history, sorted by name (has YYYYMMDD_HHMMSS)
     ssState.items = [...vpsItems, ...memoryDl, ...histOnly];
     ssState.items.sort((a, b) => {
-      // Sort by filename (contains date/time) — oldest first (chronological)
       if (a.name && b.name) return b.name.localeCompare(a.name);
       return (a.time || 0) - (b.time || 0);
     });
-    ssRenderGallery();
+    // Reset pagination only on explicit user click — never on auto-refresh/events
+    ssRenderGallery(!!fromUserClick);
     ssUpdateQuotaDisplay();
   } catch (e) { addLog('Screenshot list failed: ' + e.message, 'WARN'); }
 }
@@ -10123,7 +10123,7 @@ async function auLoadStatus() {
   } catch (e) {}
 }
 
-async function auRefreshList() {
+async function auRefreshList(fromUserClick) {
   try {
     const res = await sendCmd({ cmd: 'audio_list' });
     const vpsItems = res?.items || [];
@@ -10135,8 +10135,9 @@ async function auRefreshList() {
     const memNames = new Set(localOnly.map(i => i.name));
     const histOnly = hist.filter(h => !vpsNames.has(h.name) && !memNames.has(h.name));
     auState.items = [...vpsItems, ...localOnly, ...histOnly];
-    auState.items.sort((a, b) => b.name.localeCompare(a.name)); // new first in list
-    auRenderList();
+    auState.items.sort((a, b) => b.name.localeCompare(a.name));
+    // Reset pagination only on explicit user click — never on auto-refresh/events
+    auRenderList(!!fromUserClick);
   } catch (e) { console.warn('[AU] audio_list error:', e); }
 }
 
