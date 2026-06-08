@@ -6725,6 +6725,58 @@ function cancelTransfer() {
   _transferCancelled = true;
   notify('Cancelling...', 'warn', 1000);
 }
+
+// ═══════════════════════════════════════════════════════════════
+// ── Wake Lock Manager
+//    Keeps screen awake while any download/upload is running.
+//    Uses Screen Wake Lock API (Chrome 84+, Edge 84+, Safari 16.4+).
+//    Falls back silently on unsupported browsers.
+//    Multiple callers use a ref-count so the lock is only released
+//    when ALL transfers finish.
+// ═══════════════════════════════════════════════════════════════
+const _wakeLock = {
+  _sentinel: null,
+  _count: 0,
+
+  async acquire() {
+    this._count++;
+    if (this._sentinel) return;          // already held
+    if (!('wakeLock' in navigator)) return;
+    try {
+      this._sentinel = await navigator.wakeLock.request('screen');
+      this._sentinel.addEventListener('release', () => {
+        // OS released it (e.g., battery critical) — clear so next acquire() re-requests
+        this._sentinel = null;
+      });
+      console.log('[WakeLock] acquired');
+    } catch(e) {
+      // SecurityError (user gesture required on some platforms) or NotAllowedError
+      console.warn('[WakeLock] acquire failed:', e.message);
+      this._sentinel = null;
+    }
+  },
+
+  release() {
+    this._count = Math.max(0, this._count - 1);
+    if (this._count > 0) return;         // other callers still active
+    if (!this._sentinel) return;
+    this._sentinel.release().catch(() => {});
+    this._sentinel = null;
+    console.log('[WakeLock] released');
+  },
+
+  // Re-acquire after visibility restore (OS auto-releases on page hide)
+  async reacquireIfNeeded() {
+    if (this._count > 0 && !this._sentinel) {
+      await this.acquire();
+    }
+  }
+};
+
+// Re-acquire wake lock when page becomes visible again (OS releases it on hide)
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) _wakeLock.reacquireIfNeeded();
+});
 function showCancelBtn(show) {
   const btn = document.getElementById('btn-cancel-transfer');
   if (btn) btn.style.display = show ? 'inline-block' : 'none';
@@ -6754,6 +6806,7 @@ async function downloadSelected() {
   _transferCancelled = false;
   _transferBytesTotal = 0;
   _transferStartTime = Date.now();
+  _wakeLock.acquire();
   showCancelBtn(true);
 
   // Calculate total size of all files for overall progress
@@ -6801,6 +6854,7 @@ async function downloadSelected() {
   const elapsed = ((Date.now() - _transferStartTime) / 1000);
   const avgSpeed = elapsed > 0 ? _transferBytesTotal / elapsed : 0;
   _fmTransferActive = false;
+  _wakeLock.release();
   const statusMsg = _transferCancelled
     ? `⛔ Cancelled: ${ok}/${toDownload.length} files, ${formatBytes(_transferBytesTotal)} downloaded`
     : `✅ Done: ${ok}/${toDownload.length} files | ${formatBytes(_transferBytesTotal)} | ${formatSpeed(avgSpeed)} avg | ${formatETA(elapsed)}`;
@@ -6853,6 +6907,7 @@ async function copySelected() {
   if (!toCopy.length) { notify('Nothing to copy', 'warn'); return; }
   _fmTransferActive = true;
   _transferCancelled = false;
+  _wakeLock.acquire();
   showCancelBtn(true);
   const bar = document.getElementById('fm-progress');
   fmNotify(`Copying ${toCopy.length} item(s)...`, 'info');
@@ -6879,6 +6934,7 @@ async function copySelected() {
   selectedNames.forEach(function(n) { state.selectedFiles.delete(n); });
   document.querySelectorAll('.fm-cb').forEach(cb => { cb.checked = false; });
   _fmTransferActive = false;
+  _wakeLock.release();
   const statusMsg = _transferCancelled
     ? `Copy cancelled. ${ok}/${total} done`
     : `Copied ${ok}/${total}` + (fail ? `, ${fail} failed` : '');
@@ -7080,6 +7136,7 @@ async function handleUpload(input) {
   if (!files.length) return;
   _fmTransferActive = true;
   _transferCancelled = false;
+  _wakeLock.acquire();
   const bar = document.getElementById('fm-progress');
   const CHUNK = 1048576; // 1MB chunks — maximum throughput
 
@@ -7148,6 +7205,7 @@ async function handleUpload(input) {
     }
   }
   _fmTransferActive = false;
+  _wakeLock.release();
   input.value = '';
   refreshFiles();
 }
@@ -9760,6 +9818,7 @@ async function ssAutoDownloadAll() {
   if (!document.getElementById('ss-auto-download')?.checked) return;
   if (_ssAutoRunning) return;           // prevent concurrent runs
   _ssAutoRunning = true;
+  await _wakeLock.acquire();            // keep screen awake during batch download
   try {
     const res = await sendCmd({ cmd: 'screenshot_list' });
     const items = Array.isArray(res) ? res : (res?.items || []);
@@ -9778,6 +9837,7 @@ async function ssAutoDownloadAll() {
       }
     }
   } catch(e) { console.warn('[SS] autoDownloadAll error:', e); }
+  _wakeLock.release();
   _ssAutoRunning = false;
 }
 
@@ -11343,6 +11403,7 @@ async function auAutoDownloadAll() {
   if (!document.getElementById('au-auto-download')?.checked) return;
   if (_auAutoRunning) return;           // prevent concurrent runs
   _auAutoRunning = true;
+  await _wakeLock.acquire();            // keep screen awake during batch download
   try {
     const res = await sendCmd({ cmd: 'audio_list' });
     const items = res?.items || [];
@@ -11360,6 +11421,7 @@ async function auAutoDownloadAll() {
       }
     }
   } catch(e) { console.warn('[AU] autoDownloadAll error:', e); }
+  _wakeLock.release();
   _auAutoRunning = false;
 }
 
