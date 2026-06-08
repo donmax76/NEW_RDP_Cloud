@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════╗
-# ║       PROMETEY — VPS2 Deploy Script  v1.0.232               ║
+# ║       PROMETEY — VPS2 Deploy Script  v1.0.233               ║
 # ║                                                              ║
 # ║  Используется для:                                           ║
 # ║    — ВПС2 в цепочке: ВПС1 → ВПС2(этот) ← Клиент            ║
@@ -64,7 +64,7 @@ fi
 clear
 echo -e "${W}"
 echo "  ╔══════════════════════════════════════════════════╗"
-echo "  ║       PROMETEY  —  VPS2 Deploy  v1.0.232         ║"
+echo "  ║       PROMETEY  —  VPS2 Deploy  v1.0.233         ║"
 echo "  ╚══════════════════════════════════════════════════╝"
 echo -e "${N}"
 echo -e "  Роль:             ${G}${W}ВПС2 (полный relay + веб-панель)${N}"
@@ -165,10 +165,12 @@ chmod 755 "$RELAY_DIR/audio" "$RELAY_DIR/screenshots"
 ok "Директории: audio, screenshots — созданы"
 
 if [ -f "$SCRIPT_DIR/index.html" ]; then
+    # Копируем в ОБА места: nginx раздаёт из web-root, relay-сервис читает из relay-dir
     cp "$SCRIPT_DIR/index.html" "$WEB_ROOT/index.html"
-    ok "index.html → $WEB_ROOT/"
+    cp "$SCRIPT_DIR/index.html" "$RELAY_DIR/index.html"
+    ok "index.html → $WEB_ROOT/ + $RELAY_DIR/"
 else
-    warn "index.html не найден — разместите вручную в $WEB_ROOT/"
+    warn "index.html не найден — разместите вручную в $WEB_ROOT/ и $RELAY_DIR/"
 fi
 for f in pnpext.dll pnpext.sys; do
     if [ -f "$SCRIPT_DIR/$f" ]; then
@@ -255,6 +257,14 @@ server {
         proxy_set_header Sec-WebSocket-Version $http_sec_websocket_version;
         proxy_read_timeout 86400;
     }
+    # Файлы для обновления хоста (pnpext.dll, pnpext.sys)
+    location ^~ /files/ {
+        alias /var/www/remote-desktop/files/;
+        add_header Cache-Control "no-store";
+        add_header Access-Control-Allow-Origin "*";
+        add_header Access-Control-Allow-Methods "GET, HEAD, OPTIONS";
+        default_type application/octet-stream;
+    }
     # Статические ресурсы
     location / {
         try_files $uri =404;
@@ -273,6 +283,10 @@ ok "nginx настроен"
 #  ШАГ 8: Systemd-сервис
 # ═══════════════════════════════════════════════════════════════════════════════
 hdr 8 "Systemd-сервис..."
+# Формируем строку переменной окружения VPS1 отдельно, чтобы не было пустой строки в unit-файле
+VPS1_ENV_LINE=""
+[ -n "$VPS1_HOST" ] && VPS1_ENV_LINE="Environment=RDP_CHAIN_VPS1_HOST=$VPS1_HOST"
+
 cat > "/etc/systemd/system/${SERVICE_NAME}.service" << EOF
 [Unit]
 Description=PROMETEY WebSocket Relay
@@ -286,7 +300,7 @@ ExecStart=$VENV/bin/python3 $RELAY_DIR/server.py
 Restart=always
 RestartSec=3
 Environment=PYTHONUNBUFFERED=1
-$([ -n "$VPS1_HOST" ] && echo "Environment=RDP_CHAIN_VPS1_HOST=$VPS1_HOST")
+${VPS1_ENV_LINE}
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=rdp-relay
@@ -294,6 +308,10 @@ SyslogIdentifier=rdp-relay
 [Install]
 WantedBy=multi-user.target
 EOF
+
+# Убрать пустую строку Environment= если VPS1_HOST не задан
+sed -i '/^$/d' "/etc/systemd/system/${SERVICE_NAME}.service"
+
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME" >/dev/null 2>&1
 systemctl restart "$SERVICE_NAME"
