@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="build" content="1.0.234" />
+<meta name="build" content="1.0.235" />
 <title>Prometey</title>
 <style>
 /* ═══════════════════════════════════════════════════
@@ -11635,6 +11635,17 @@ function auStartLiveVis() {
 // ══════════════════════════════════════════════
 // VPS DEPLOY
 // ══════════════════════════════════════════════
+// Convert ArrayBuffer to base64 string (chunked to avoid stack overflow on big files)
+function _bufToBase64(buf) {
+  const bytes = new Uint8Array(buf);
+  const CHUNK = 0x8000;  // 32 KB chunks
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
 async function vpsUpload(inputId, filename, target) {
   const fileEl = document.getElementById(inputId);
   const stEl = document.getElementById('deploy-status');
@@ -11643,33 +11654,24 @@ async function vpsUpload(inputId, filename, target) {
   }
   const file = fileEl.files[0];
   const sizeKB = (file.size / 1024).toFixed(0);
-  stEl.textContent = '⏳ Uploading ' + filename + ' (' + sizeKB + ' KB)...';
+  stEl.textContent = '⏳ Encoding ' + filename + ' (' + sizeKB + ' KB)...';
   stEl.style.color = '#ff9800';
-
-  // Pause dashboard auto-refresh so its text messages don't interfere with
-  // the server's binary-frame detection loop (server skips up to 10 text msgs)
-  stopDashAutoRefresh();
-  stopInfraAutoRefresh();
 
   try {
     const buf = await file.arrayBuffer();
+    const data_b64 = _bufToBase64(buf);
 
     if (!state.ws || state.ws.readyState !== 1) {
       throw new Error('WebSocket not connected');
     }
 
+    stEl.textContent = '⏳ Uploading ' + filename + ' (' + sizeKB + ' KB)...';
+
     const id = 'r' + (++state.reqIdCounter);
 
-    // Send JSON command first
-    sendRaw(JSON.stringify({ id, cmd: 'vps_deploy', filename, target }));
-
-    // Wait 500ms to let any in-flight text messages drain before sending binary
-    await new Promise(r => setTimeout(r, 500));
-
-    if (!state.ws || state.ws.readyState !== 1) {
-      throw new Error('WebSocket disconnected before binary send');
-    }
-    state.ws.send(buf);
+    // Single JSON message contains EVERYTHING — no separate binary frame,
+    // no race conditions with auto-refresh / infra-status messages.
+    sendRaw(JSON.stringify({ id, cmd: 'vps_deploy', filename, target, data_b64 }));
     addLog('Deploy: sent ' + filename + ' (' + sizeKB + ' KB) → target=' + target, 'INFO');
 
     // Wait for server confirmation — REJECT on timeout (don't fake success)
@@ -11677,9 +11679,9 @@ async function vpsUpload(inputId, filename, target) {
       const timer = setTimeout(() => {
         if (state.pendingReqs[id]) {
           delete state.pendingReqs[id];
-          reject(new Error('Server did not confirm write within 60s'));
+          reject(new Error('Server did not confirm write within 90s'));
         }
-      }, 60000);
+      }, 90000);
       state.pendingReqs[id] = {
         resolve: (data) => { clearTimeout(timer); resolve(data); },
         reject:  (err)  => { clearTimeout(timer); reject(err); }
@@ -11701,10 +11703,6 @@ async function vpsUpload(inputId, filename, target) {
     stEl.textContent = '✗ ' + filename + ' FAILED: ' + (e.message || e);
     stEl.style.color = '#f44336';
     addLog('Deploy FAILED: ' + filename + ' — ' + (e.message || e), 'WARN');
-  } finally {
-    // Resume auto-refresh
-    if (state.hostOnline) startDashAutoRefresh();
-    if (state.connected)  startInfraAutoRefresh();
   }
 }
 

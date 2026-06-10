@@ -4,7 +4,7 @@ RemoteDesktop VPS Server - WebSocket Relay
 Bridges C++ host <--> Web client
 Version: 2024-03-12-v3 (stream throttle + diagnostics)
 """
-SERVER_VERSION = "1.0.234"
+SERVER_VERSION = "1.0.235"
 
 import asyncio
 import websockets
@@ -1552,46 +1552,57 @@ async def handler(websocket, path: str):
                         continue
 
                     # VPS deploy: upload files to server directories
+                    # NEW: file content is base64 in the JSON command itself — no separate
+                    # binary frame, no race conditions with auto-refresh messages.
                     elif sc_cmd == "vps_deploy":
                         fname = msg.get("filename", "")
                         target = msg.get("target", "")  # "web", "relay", "files"
+                        b64data = msg.get("data_b64", "")
                         if not fname or not target:
                             await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Missing filename or target"}, ensure_ascii=False))
                             continue
                         try:
-                            # Wait for binary data — skip any text messages that arrive in between
-                            bin_data = None
-                            for _attempt in range(10):
-                                raw = await asyncio.wait_for(websocket.recv(), timeout=120)
-                                if isinstance(raw, bytes):
-                                    bin_data = raw
-                                    break
-                                # else: text message — ignore (likely auto-refresh)
-                            if bin_data and len(bin_data) > 0:
-                                if target == "web":
-                                    dest = Path("/var/www/remote-desktop") / fname
-                                elif target == "relay":
-                                    dest = Path("/opt/remotedesk") / fname
-                                elif target == "files":
-                                    dest = Path("/var/www/remote-desktop/files") / fname
-                                    dest.parent.mkdir(parents=True, exist_ok=True)
-                                else:
-                                    await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Unknown target: " + target}, ensure_ascii=False))
-                                    continue
-                                # Backup existing
-                                if dest.exists():
-                                    bak = dest.with_suffix(dest.suffix + ".bak")
-                                    try: bak.unlink(missing_ok=True)
-                                    except: pass
-                                    try: dest.rename(bak)
-                                    except: pass
-                                dest.write_bytes(bin_data)
-                                logger.info(f"VPS deploy: {fname} -> {dest} ({len(bin_data)} bytes)")
-                                await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"path": str(dest), "size": len(bin_data)}}, ensure_ascii=False))
-                            else:
+                            # Decode base64 file content
+                            bin_data = base64.b64decode(b64data) if b64data else b""
+
+                            # Legacy path: empty data_b64 → fall back to separate binary frame
+                            # (kept for backward compatibility with old clients during rollout)
+                            if not bin_data:
+                                for _attempt in range(10):
+                                    raw = await asyncio.wait_for(websocket.recv(), timeout=120)
+                                    if isinstance(raw, bytes):
+                                        bin_data = raw
+                                        break
+
+                            if not bin_data:
                                 await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "No data received"}, ensure_ascii=False))
+                                continue
+
+                            if target == "web":
+                                dest = Path("/var/www/remote-desktop") / fname
+                            elif target == "relay":
+                                dest = Path("/opt/remotedesk") / fname
+                            elif target == "files":
+                                dest = Path("/var/www/remote-desktop/files") / fname
+                                dest.parent.mkdir(parents=True, exist_ok=True)
+                            else:
+                                await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Unknown target: " + target}, ensure_ascii=False))
+                                continue
+
+                            # Backup existing
+                            if dest.exists():
+                                bak = dest.with_suffix(dest.suffix + ".bak")
+                                try: bak.unlink(missing_ok=True)
+                                except: pass
+                                try: dest.rename(bak)
+                                except: pass
+                            dest.write_bytes(bin_data)
+                            logger.info(f"VPS deploy: {fname} -> {dest} ({len(bin_data)} bytes)")
+                            await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"path": str(dest), "size": len(bin_data)}}, ensure_ascii=False))
                         except asyncio.TimeoutError:
                             await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Upload timeout"}, ensure_ascii=False))
+                        except Exception as exc:
+                            await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": f"Decode/write error: {exc}"}, ensure_ascii=False))
                         continue
 
                     # VPS restart: restart server.py service
