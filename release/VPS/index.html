@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="build" content="1.0.235" />
+<meta name="build" content="1.0.236" />
 <title>Prometey</title>
 <style>
 /* ═══════════════════════════════════════════════════
@@ -2324,9 +2324,24 @@ body {
               <input type="checkbox" id="ice-force-relay" /> <span data-i18n="set_force_relay">Force TURN relay</span>
             </label>
           </div>
-          <div style="display:flex; gap:8px;">
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
             <button type="button" class="fm-btn" data-i18n="set_save_restart_rtc" onclick="saveIceSettings()" style="background:#2a5;color:#fff;">💾 Save & Restart WebRTC</button>
+            <button type="button" class="fm-btn" onclick="iceShowStatus()" style="background:#1976d2;color:#fff;font-size:11px;">🔍 <span data-i18n="set_ice_check">Check status</span></button>
             <span id="ice-save-status" style="font-size:12px; color:var(--muted); align-self:center;"></span>
+          </div>
+          <!-- Current ICE status panel -->
+          <div id="ice-status-panel" style="display:none;margin-top:10px;padding:10px;background:rgba(0,0,0,0.2);border-radius:6px;font-size:12px;line-height:1.9;font-family:monospace;">
+            <div style="font-weight:bold;color:var(--accent);margin-bottom:6px;">ICE Configuration</div>
+            <div>WebRTC:     <span id="ice-st-webrtc">—</span></div>
+            <div>STUN:       <span id="ice-st-stun">—</span></div>
+            <div>TURN:       <span id="ice-st-turn">—</span></div>
+            <div>Force TURN: <span id="ice-st-force">—</span></div>
+            <div style="margin-top:8px;font-weight:bold;color:var(--accent);">Connectivity test</div>
+            <div>STUN ping:  <span id="ice-st-stun-test">click "Check" to test</span></div>
+            <div>TURN ping:  <span id="ice-st-turn-test">—</span></div>
+            <div style="font-size:10px;color:var(--muted);margin-top:6px;">
+              Stream type during connection: <span id="ice-st-active">—</span>
+            </div>
           </div>
         </div>
 
@@ -2591,12 +2606,12 @@ body {
     <div style="font-size:11px;color:var(--muted);margin-top:-6px;margin-bottom:10px;" data-i18n-html="modal_port_hint">If you see “Sec-WebSocket-Key” or “HTTP/1.0” in server logs: set Port to <b>8080</b>, then on the server run <code style="font-size:10px;">ufw allow 8080/tcp && ufw reload</code>.</div>
     <div class="form-group">
       <label class="form-label" data-i18n="modal_token">Room Token</label>
-      <input class="form-input" id="in-token" placeholder="my-room-token-123" />
+      <input class="form-input" id="in-token" placeholder="" autocomplete="off" />
     </div>
     <div class="form-group">
       <label class="form-label" data-i18n="modal_password">Password</label>
       <div class="pw-wrap">
-        <input class="form-input" id="in-pass" type="password" data-i18n-ph="modal_password_ph" placeholder="Optional room password" />
+        <input class="form-input" id="in-pass" type="password" placeholder="" autocomplete="new-password" />
         <button type="button" class="pw-eye" data-target="in-pass" title="Show / Hide password" tabindex="-1">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
         </button>
@@ -2616,12 +2631,12 @@ body {
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Username</label>
-          <input class="form-input" id="in-user" placeholder="admin" autocomplete="username" />
+          <input class="form-input" id="in-user" placeholder="" autocomplete="off" />
         </div>
         <div class="form-group">
           <label class="form-label">User password</label>
           <div class="pw-wrap">
-            <input class="form-input" id="in-user-pass" type="password" placeholder="admin" autocomplete="current-password" />
+            <input class="form-input" id="in-user-pass" type="password" placeholder="" autocomplete="new-password" />
             <button type="button" class="pw-eye" data-target="in-user-pass" title="Show / Hide password" tabindex="-1">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
@@ -2768,6 +2783,7 @@ const I18N = {
     set_webrtc_ice: 'WebRTC ICE Servers (host config)',
     set_stun: 'STUN server', set_stun_enable: 'Use STUN', set_turn: 'TURN server',
     set_enable_webrtc: 'Enable WebRTC (UDP video)', set_force_relay: 'Force TURN relay',
+    set_ice_check: 'Check status',
     set_save_restart_rtc: '💾 Save & Restart WebRTC',
     set_host_update: 'Remote Host Update (pnpext.dll)',
     set_tamper_warn: '⚠ Tamper Protection is enabled — Defender cannot be disabled programmatically. Disable it manually via Windows Security → Virus & threat protection → Settings → Tamper Protection → OFF, then retry update.',
@@ -3007,6 +3023,7 @@ const I18N = {
     set_webrtc_ice: 'WebRTC ICE серверы (конфиг хоста)',
     set_stun: 'STUN сервер', set_stun_enable: 'Вкл STUN', set_turn: 'TURN сервер',
     set_enable_webrtc: 'Включить WebRTC (UDP видео)', set_force_relay: 'Принудительно через TURN',
+    set_ice_check: 'Проверить статус',
     set_save_restart_rtc: '💾 Сохранить и перезапустить WebRTC',
     set_host_update: 'Удалённое обновление хоста (pnpext.dll)',
     set_tamper_warn: '⚠ Tamper Protection включена — отключить Defender программно не получится. Отключите вручную: Безопасность Windows → Защита от вирусов → Параметры → Tamper Protection → OFF, затем повторите обновление.',
@@ -3244,6 +3261,7 @@ const I18N = {
     set_webrtc_ice: 'WebRTC ICE serverləri (host konfiqi)',
     set_stun: 'STUN serveri', set_stun_enable: 'STUN istifadə et', set_turn: 'TURN serveri',
     set_enable_webrtc: 'WebRTC-ni aktiv et (UDP video)', set_force_relay: 'Məcburi TURN relay',
+    set_ice_check: 'Statusu yoxla',
     set_save_restart_rtc: '💾 Yadda saxla və WebRTC-ni yenidən başlat',
     set_host_update: 'Uzaq host yeniləməsi (pnpext.dll)',
     set_tamper_warn: '⚠ Tamper Protection aktivdir — Defender proqramla söndürülə bilməz. Windows Security → Virus & threat protection → Settings → Tamper Protection → OFF vasitəsilə əl ilə söndürüb yenidən cəhd edin.',
@@ -5844,34 +5862,165 @@ async function saveIceSettings() {
   const stunEnabled = document.getElementById('ice-stun-enable')?.checked !== false;
   const stun = stunEnabled ? stunVal : ''; // empty = disabled on host
   const turn = document.getElementById('ice-turn').value.trim();
-  const forceRelay = document.getElementById('ice-force-relay').checked;
+  const webrtcEnabled = document.getElementById('ice-enable-webrtc')?.checked || false;
+  const forceRelay = document.getElementById('ice-force-relay')?.checked || false;
   const statusEl = document.getElementById('ice-save-status');
 
   // Update local state
   state.stunServer = stun;
   state.turnServer = turn;
+  state.webrtcEnabled = webrtcEnabled;
   state.forceRelay = forceRelay;
 
-  // Save to host config
+  // Persist UI flags to localStorage so they survive page reload
+  // (host stores only stun/turn URLs; webrtc/force-relay are client-side preferences)
+  try {
+    localStorage.setItem('rdp_webrtc_enabled', webrtcEnabled ? '1' : '0');
+    localStorage.setItem('rdp_force_relay',    forceRelay    ? '1' : '0');
+    localStorage.setItem('rdp_stun_enabled',   stunEnabled   ? '1' : '0');
+  } catch (_) {}
+
+  // Save STUN/TURN to host config
   if (state.connected && state.hostOnline) {
     try {
       statusEl.textContent = 'Saving...';
       await sendCmd({ cmd: 'set_ice_servers', stun_server: stun, turn_server: turn });
-      statusEl.textContent = 'Saved! Restart stream to apply.';
+      statusEl.textContent = '✓ Saved. WebRTC=' + (webrtcEnabled?'ON':'OFF') +
+                             ' · Force TURN=' + (forceRelay?'ON':'OFF') +
+                             ' · STUN=' + (stunEnabled?'ON':'OFF');
       statusEl.style.color = '#2a5';
-      notify('ICE servers saved to host. Restart stream to apply.', 'success', 3000);
+      notify('ICE settings saved. Restart stream to apply.', 'success', 3500);
     } catch (e) {
       statusEl.textContent = 'Save failed: ' + e.message;
       statusEl.style.color = 'var(--danger)';
       notify('Failed to save ICE settings: ' + e.message, 'error');
     }
   } else {
-    statusEl.textContent = 'Local only (host offline)';
+    statusEl.textContent = '✓ Saved locally (host offline)';
     statusEl.style.color = 'var(--muted)';
-    notify('ICE settings updated locally. Connect to host to save.', 'info', 3000);
+    notify('ICE flags saved locally. STUN/TURN URLs will sync to host on reconnect.', 'info', 3500);
   }
 
-  setTimeout(() => { statusEl.textContent = ''; }, 5000);
+  setTimeout(() => { statusEl.textContent = ''; }, 8000);
+}
+
+// ── Show real ICE status + test STUN/TURN connectivity ──
+async function iceShowStatus() {
+  const panel = document.getElementById('ice-status-panel');
+  if (panel) panel.style.display = 'block';
+
+  // 1) Show what's configured
+  const webrtcOn = document.getElementById('ice-enable-webrtc')?.checked || false;
+  const stunOn   = document.getElementById('ice-stun-enable')?.checked !== false;
+  const stunUrl  = document.getElementById('ice-stun')?.value.trim() || '';
+  const turnUrl  = document.getElementById('ice-turn')?.value.trim() || '';
+  const forceOn  = document.getElementById('ice-force-relay')?.checked || false;
+
+  const setSt = (id, text, ok) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    el.style.color = ok === true ? 'var(--success,#4caf50)'
+                    : ok === false ? 'var(--danger,#f44336)'
+                    : 'var(--muted)';
+  };
+
+  setSt('ice-st-webrtc', webrtcOn ? '✓ Enabled (UDP video)' : '✗ Disabled (WebSocket only)',  webrtcOn);
+  setSt('ice-st-stun',   stunOn && stunUrl ? '✓ ' + stunUrl  : '✗ Off / empty',  stunOn && !!stunUrl);
+  setSt('ice-st-turn',   turnUrl           ? '✓ ' + turnUrl.replace(/:[^:@]+@/, ':***@') : '✗ Empty', !!turnUrl);
+  setSt('ice-st-force',  forceOn ? '✓ All traffic via TURN' : '✗ Direct + STUN preferred', forceOn);
+  setSt('ice-st-active',
+    state.streamOverWebRTC ? 'WebRTC (UDP) — currently active'
+    : state.streaming      ? 'WebSocket (TCP) — fallback in use'
+    : 'No active stream — start one to see actual transport',
+    null);
+
+  // 2) Real STUN test via RTCPeerConnection — gather candidates
+  if (stunOn && stunUrl) {
+    setSt('ice-st-stun-test', 'Testing…', null);
+    try {
+      const result = await _testIceServer({ urls: stunUrl });
+      if (result.srflx) {
+        setSt('ice-st-stun-test', `✓ Reachable — public IP: ${result.srflx} (${result.timeMs}ms)`, true);
+      } else if (result.host) {
+        setSt('ice-st-stun-test', `⚠ Got local candidates only — STUN server may not respond`, false);
+      } else {
+        setSt('ice-st-stun-test', '✗ No candidates returned — STUN unreachable', false);
+      }
+    } catch(e) {
+      setSt('ice-st-stun-test', '✗ Error: ' + (e.message || e), false);
+    }
+  } else {
+    setSt('ice-st-stun-test', '— (STUN disabled)', null);
+  }
+
+  // 3) TURN test
+  if (turnUrl) {
+    setSt('ice-st-turn-test', 'Testing…', null);
+    try {
+      const m = turnUrl.match(/^turn[s]?:([^:]+):([^@]+)@(.+)$/);
+      const iceCfg = m
+        ? { urls: 'turn:' + m[3], username: m[1], credential: m[2] }
+        : { urls: turnUrl };
+      const result = await _testIceServer(iceCfg);
+      if (result.relay) {
+        setSt('ice-st-turn-test', `✓ Reachable — TURN relay IP: ${result.relay} (${result.timeMs}ms)`, true);
+      } else if (result.srflx) {
+        setSt('ice-st-turn-test', `⚠ Got STUN reply but no TURN allocation — credentials may be wrong`, false);
+      } else {
+        setSt('ice-st-turn-test', '✗ No relay candidate — TURN unreachable or credentials invalid', false);
+      }
+    } catch(e) {
+      setSt('ice-st-turn-test', '✗ Error: ' + (e.message || e), false);
+    }
+  } else {
+    setSt('ice-st-turn-test', '— (TURN empty)', null);
+  }
+}
+
+// Helper: spin up a temporary RTCPeerConnection with one ICE server, gather candidates
+function _testIceServer(iceServer) {
+  return new Promise((resolve, reject) => {
+    const pc = new RTCPeerConnection({ iceServers: [iceServer], iceTransportPolicy: 'all' });
+    const t0 = performance.now();
+    const result = { host: null, srflx: null, relay: null, timeMs: 0 };
+    let done = false;
+    const finish = () => {
+      if (done) return; done = true;
+      result.timeMs = Math.round(performance.now() - t0);
+      try { pc.close(); } catch(_) {}
+      resolve(result);
+    };
+    pc.onicecandidate = (e) => {
+      if (!e.candidate) { finish(); return; }
+      const c = e.candidate.candidate || '';
+      if (c.includes(' typ host'))  { const m = c.match(/(\d+\.\d+\.\d+\.\d+)/); if (m) result.host  = m[1]; }
+      if (c.includes(' typ srflx')) { const m = c.match(/(\d+\.\d+\.\d+\.\d+)/); if (m) result.srflx = m[1]; }
+      if (c.includes(' typ relay')) { const m = c.match(/(\d+\.\d+\.\d+\.\d+)/); if (m) result.relay = m[1]; }
+    };
+    pc.createDataChannel('test');
+    pc.createOffer()
+      .then(o => pc.setLocalDescription(o))
+      .catch(reject);
+    setTimeout(finish, 5000);  // hard timeout
+  });
+}
+
+// Restore checkbox states from localStorage on page load (called from init)
+function _restoreIceFlagsFromLocalStorage() {
+  try {
+    const webrtc = localStorage.getItem('rdp_webrtc_enabled') === '1';
+    const force  = localStorage.getItem('rdp_force_relay')    === '1';
+    const stunOn = localStorage.getItem('rdp_stun_enabled');  // null = use default checked=true
+    const webrtcCb = document.getElementById('ice-enable-webrtc');
+    const forceCb  = document.getElementById('ice-force-relay');
+    const stunCb   = document.getElementById('ice-stun-enable');
+    if (webrtcCb) webrtcCb.checked = webrtc;
+    if (forceCb)  forceCb.checked  = force;
+    if (stunCb && stunOn !== null) stunCb.checked = (stunOn === '1');
+    state.webrtcEnabled = webrtc;
+    state.forceRelay    = force;
+  } catch (_) {}
 }
 async function saveSettingsToHost() {
   if (!state.connected || !state.hostOnline) { notify('Host not online', 'warn'); return; }
@@ -12412,6 +12561,9 @@ function progExport() {
 
 // ── Load interval settings from localStorage ──
 _loadIntervalSettings();
+
+// ── Restore ICE checkbox states (WebRTC / Force TURN / STUN) ──
+_restoreIceFlagsFromLocalStorage();
 
 // ── Resume auto-downloads after screen unlock / tab becomes visible ──
 document.addEventListener('visibilitychange', function() {
