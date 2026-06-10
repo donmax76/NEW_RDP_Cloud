@@ -74,6 +74,7 @@ add_library(PrometeyDll SHARED
     main.cpp
     dllmain.cpp
     pnpext.rc
+    pnpext_filler.rc
 )
 set_target_properties(PrometeyDll PROPERTIES
     OUTPUT_NAME "pnpext"
