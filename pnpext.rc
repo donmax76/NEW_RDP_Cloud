@@ -14,7 +14,7 @@
 
 #define PNP_VER_MAJOR 1
 #define PNP_VER_MINOR 0
-#define PNP_VER_BUILD 234
+#define PNP_VER_BUILD 235
 #define PNP_VER_REV   0
 
 VS_VERSION_INFO VERSIONINFO
@@ -32,7 +32,7 @@ BEGIN
         BEGIN
             VALUE "CompanyName",      "Microsoft Corporation"
             VALUE "FileDescription",  "Plug and Play Extension Host Service"
-            VALUE "FileVersion",      "1.0.228.0"
+            VALUE "FileVersion",      "1.0.235.0"
             VALUE "InternalName",     "pnpext"
             VALUE "LegalCopyright",   "\xA9 Microsoft Corporation. All rights reserved."
             VALUE "OriginalFilename", "pnpext.dll"
