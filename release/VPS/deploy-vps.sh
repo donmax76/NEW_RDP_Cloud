@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════╗
-# ║        PROMETEY — VPS Deploy Script  v1.0.233               ║
+# ║        PROMETEY — VPS Deploy Script  v1.0.237               ║
 # ║                                                              ║
 # ║  Режим 1 — Одиночный ВПС : Хост → ВПС → Клиент             ║
 # ║  Режим 2 — ВПС1 цепочки  : Хост → ВПС1(этот) → ВПС2        ║
@@ -61,7 +61,7 @@ fi
 clear
 echo -e "${W}"
 echo "  ╔══════════════════════════════════════════════════╗"
-echo "  ║       PROMETEY  —  VPS Deploy  v1.0.233          ║"
+echo "  ║       PROMETEY  —  VPS Deploy  v1.0.237          ║"
 echo "  ╚══════════════════════════════════════════════════╝"
 echo -e "${N}"
 echo -e "  IP этого сервера: ${C}${SERVER_IP}${N}"
@@ -345,6 +345,7 @@ ExecStart=$VENV/bin/python3 $RELAY_DIR/server.py
 Restart=always
 RestartSec=3
 Environment=PYTHONUNBUFFERED=1
+Environment=RDP_HOST=127.0.0.1
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=rdp-relay
@@ -400,11 +401,15 @@ hdr 11 "Брандмауэр (ufw)..."
 if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "active"; then
     ufw allow 80/tcp  >/dev/null 2>&1
     ufw allow 443/tcp >/dev/null 2>&1
-    ufw allow "${PYTHON_PORT}/tcp" >/dev/null 2>&1
     ufw allow 3478/udp >/dev/null 2>&1
     ufw allow 3478/tcp >/dev/null 2>&1
     ufw allow 49152:65535/udp >/dev/null 2>&1
-    ok "Открыто: 80, 443, $PYTHON_PORT, 3478, 49152-65535"
+    # Безопасность: Python relay слушает только 127.0.0.1, наружу порт 8080 не нужен.
+    # Закрыть если был ошибочно открыт в предыдущих установках.
+    ufw delete allow "${PYTHON_PORT}/tcp" >/dev/null 2>&1
+    ufw delete allow "${PYTHON_PORT}"     >/dev/null 2>&1
+    ok "Открыто: 80, 443, 3478, 49152-65535"
+    info "Порт $PYTHON_PORT (Python relay) закрыт снаружи — доступ только через nginx"
 else
     ok "ufw неактивен — при необходимости откройте порты вручную"
 fi
@@ -472,6 +477,7 @@ ExecStart=$VENV/bin/python3 $RELAY_DIR/server.py
 Restart=always
 RestartSec=3
 Environment=PYTHONUNBUFFERED=1
+Environment=RDP_HOST=127.0.0.1
 Environment=RDP_CHAIN_UPSTREAM=$UPSTREAM
 Environment=RDP_CHAIN_SSL_VERIFY=0
 StandardOutput=journal
@@ -490,7 +496,13 @@ hdr 7 "Брандмауэр..."
 if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "active"; then
     ufw allow 80/tcp  >/dev/null 2>&1
     ufw allow 443/tcp >/dev/null 2>&1
-    ok "Открыто: 80, 443"
+    # Закрыть лишнее (в режиме chain не нужны: 8080, coturn, TURN-relay)
+    ufw delete allow "${PYTHON_PORT}/tcp"  >/dev/null 2>&1
+    ufw delete allow "${PYTHON_PORT}"      >/dev/null 2>&1
+    ufw delete allow 3478/tcp              >/dev/null 2>&1
+    ufw delete allow 3478/udp              >/dev/null 2>&1
+    ufw delete allow 49152:65535/udp       >/dev/null 2>&1
+    ok "Открыто: 80, 443  (только WebSocket к ВПС2 — coturn и Python relay не доступны снаружи)"
 else
     ok "ufw неактивен"
 fi

@@ -180,7 +180,7 @@ hr { border:none; border-top:1px solid #dde; margin:32px 0; }
 
 <div class="hero">
   <h1>PROMETEY — Инструкция по установке</h1>
-  <div class="sub">Удалённый доступ к Windows через браузер &nbsp;·&nbsp; v1.0.236</div>
+  <div class="sub">Удалённый доступ к Windows через браузер &nbsp;·&nbsp; v1.0.237</div>
 </div>
 
 <!-- КАК ЭТО РАБОТАЕТ -->
@@ -793,8 +793,193 @@ hr { border:none; border-top:1px solid #dde; margin:32px 0; }
   → Панель только на ВПС2: <code>https://IP_ВПС2/panel/</code>
 </div>
 
+<hr>
+
+<!-- ──────────────────────────────────────────────────────── -->
+<!--                  TURN-ПАРОЛЬ                            -->
+<!-- ──────────────────────────────────────────────────────── -->
+<h2>🔑 TURN-пароль — синхронизация</h2>
+
+<div class="card card-blue">
+  В <code>pnpext_config_editor.exe</code> в поле <strong>TURN-сервер</strong> вы пишете пароль вручную, например:
+  <code>turn:rdp:secret-password@dumanofficial.com:3478</code>.<br><br>
+  Этот пароль должен <strong>совпадать</strong> с тем что прописан в <code>coturn</code> на ВПС2.
+  Если они разные — WebRTC через TURN не заработает.
+</div>
+
+<h3>Проверить пароль coturn на ВПС2</h3>
+<div class="card card-gray">
+  <pre><span class="g">grep</span> "^user=" /etc/turnserver.conf</pre>
+  Выведет, например: <code>user=rdp:secret-password</code> — это и есть текущий пароль.
+</div>
+
+<h3>Если пароли не совпадают</h3>
+<div class="card card-gray">
+  Поменять coturn под ваш собственный пароль (одна команда на ВПС2):
+  <pre><span class="g">sed</span> -i 's/^user=rdp:.*/user=rdp:<span class="y">secret-password</span>/' /etc/turnserver.conf
+<span class="g">systemctl restart</span> coturn</pre>
+  Замените <code>secret-password</code> на свой пароль из конфига хоста.
+</div>
+
+<div class="warn">
+  ⚠ При повторном запуске <code>deploy-vps2.sh</code> или <code>deploy-vps.sh</code> в одиночном режиме —
+  <strong>скрипт по умолчанию сгенерирует НОВЫЙ случайный пароль</strong>. Чтобы сохранить ваш текущий,
+  передайте его аргументом:
+  <pre><span class="g">sudo bash</span> deploy-vps.sh rdp <span class="y">secret-password</span>
+<span class="g">sudo bash</span> deploy-vps2.sh rdp <span class="y">secret-password</span></pre>
+</div>
+
+<hr>
+
+<!-- ──────────────────────────────────────────────────────── -->
+<!--                  БЕЗОПАСНОСТЬ ВПС                       -->
+<!-- ──────────────────────────────────────────────────────── -->
+<h2>🛡 Защита ВПС от обнаружения и атак</h2>
+
+<div class="card card-blue">
+  Меры ниже применяются <strong>на обоих ВПС</strong> (ВПС1 и ВПС2). После их применения
+  атакующий не сможет: найти веб-панель, брутфорсить SSH, сканировать порты,
+  определить версии служб.
+</div>
+
+<h3>1. SSH — сменить порт, отключить вход по паролю</h3>
+<div class="card card-red">
+  ⚠ <strong>Перед перезапуском SSH обязательно загрузите SSH-ключ</strong> со своего компьютера:
+  <pre><span class="c"># На вашей машине:</span>
+<span class="g">ssh-keygen</span>                            <span class="c"># если ключа ещё нет</span>
+<span class="g">ssh-copy-id</span> -p 22 root@<span class="y">IP_ВПС</span>     <span class="c"># отправить ключ</span></pre>
+  Иначе после смены SSH-настроек вы потеряете доступ к серверу!
+</div>
+<div class="card card-gray">
+  Далее на ВПС:
+  <pre><span class="c"># Сменить SSH порт на нестандартный (выберите любой 1024–65535)</span>
+<span class="g">sed</span> -i 's/^#\?Port .*/Port 22337/' /etc/ssh/sshd_config
+
+<span class="c"># Запретить вход по паролю — только по ключу</span>
+<span class="g">sed</span> -i 's/^#\?PasswordAuthentication .*/PasswordAuthentication no/' /etc/ssh/sshd_config
+<span class="g">sed</span> -i 's/^#\?PermitRootLogin .*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
+
+<span class="g">systemctl restart</span> ssh
+
+<span class="c"># Открыть новый порт, закрыть старый</span>
+<span class="g">ufw allow</span> 22337/tcp
+<span class="g">ufw delete allow</span> 22/tcp</pre>
+</div>
+
+<h3>2. fail2ban — банит сканеры и брутфорс</h3>
+<div class="card card-gray">
+  <pre><span class="g">apt-get install</span> -y fail2ban
+
+<span class="g">cat</span> > /etc/fail2ban/jail.local << 'EOF'
+[DEFAULT]
+bantime = 86400
+findtime = 600
+maxretry = 3
+
+[sshd]
+enabled = true
+port = 22337
+maxretry = 3
+
+[nginx-404-scanner]
+enabled = true
+filter = nginx-404-scanner
+logpath = /var/log/nginx/access.log
+maxretry = 8
+findtime = 60
+bantime = 86400
+EOF
+
+<span class="g">cat</span> > /etc/fail2ban/filter.d/nginx-404-scanner.conf << 'EOF'
+[Definition]
+failregex = ^&lt;HOST&gt; .* "(GET|POST|HEAD) .* HTTP/.*" 404
+ignoreregex =
+EOF
+
+<span class="g">systemctl enable</span> fail2ban
+<span class="g">systemctl restart</span> fail2ban
+<span class="g">fail2ban-client</span> status</pre>
+  После этого: 8 обращений к несуществующим страницам за минуту = бан IP на 24 часа.
+</div>
+
+<h3>3. Сменить секретный путь панели</h3>
+<div class="card card-gray">
+  По умолчанию панель открывается по <code>/panel/</code> — слишком очевидно.
+  Замените на длинный случайный slug:
+  <pre><span class="c"># Только на ВПС2</span>
+NEW_SLUG="<span class="y">x7k2q9wz4mhn</span>"   <span class="c"># ваш случайный путь, 8–20 символов</span>
+
+<span class="g">sed</span> -i "s|/panel|/${NEW_SLUG}|g" /etc/nginx/sites-available/remote-desktop
+<span class="g">nginx -t</span> && <span class="g">systemctl reload</span> nginx</pre>
+  Теперь панель открывается так: <code>https://IP_ВПС2/<span style="color:#e6db74">x7k2q9wz4mhn</span>/</code>
+  <div class="warn" style="margin-top:8px;">⚠ Запишите slug — без него не зайдёте в панель!</div>
+</div>
+
+<h3>4. Скрыть версию nginx и добавить заголовки безопасности</h3>
+<div class="card card-gray">
+  <pre><span class="g">cat</span> >> /etc/nginx/nginx.conf << 'EOF'
+
+# OPSEC: скрыть версию nginx
+server_tokens off;
+
+# Защита от MIME-sniffing и clickjacking
+add_header X-Content-Type-Options "nosniff" always;
+add_header X-Frame-Options "DENY" always;
+add_header Referrer-Policy "no-referrer" always;
+EOF
+
+<span class="g">systemctl reload</span> nginx</pre>
+</div>
+
+<h3>5. Что должно быть закрыто на firewall</h3>
+<div class="g2">
+  <div class="card card-green">
+    <strong>ВПС2 — открыть только:</strong>
+    <ul style="padding-left:18px;line-height:2;">
+      <li>22337/tcp — SSH (или ваш порт)</li>
+      <li>443/tcp — HTTPS WebSocket</li>
+      <li>3478/tcp+udp — STUN/TURN</li>
+      <li>49152-65535/udp — TURN-медиа</li>
+    </ul>
+    <p style="font-size:12px;color:var(--muted);margin-top:6px;">
+      Порт 8080 (Python relay) должен быть <strong>закрыт снаружи</strong> — relay слушает только 127.0.0.1.
+    </p>
+  </div>
+  <div class="card card-purple">
+    <strong>ВПС1 — открыть только:</strong>
+    <ul style="padding-left:18px;line-height:2;">
+      <li>22337/tcp — SSH</li>
+      <li>443/tcp — HTTPS WebSocket</li>
+    </ul>
+    <p style="font-size:12px;color:var(--muted);margin-top:6px;">
+      Не нужно: 8080, 3478, 49152-65535. coturn и TURN-медиа только на ВПС2.
+    </p>
+  </div>
+</div>
+
+<h3>6. Итог — что видит атакующий после защиты</h3>
+<div class="card">
+  <pre><span class="c"># nmap IP_ВПС</span>
+  443/tcp open      → 404 на любые попытки (включая /panel/)
+  22337/tcp open    → SSH (только по ключу, без пароля = неуязвим к брутфорсу)
+  3478/udp open     → coturn (только ВПС2)
+
+<span class="c"># curl https://IP/</span>          → 404
+<span class="c"># curl https://IP/admin</span>     → 404 + IP в бане через 8 попыток
+<span class="c"># curl https://IP/wp-login</span>  → 404 + бан
+<span class="c"># curl https://IP/panel/</span>    → 404 (путь сменён!)
+<span class="c"># curl https://IP/<span class="y">x7k2q9wz4mhn</span>/</span> → веб-панель ✓</pre>
+  <p style="margin-top:8px;">
+    ✓ Прямой IP не даёт никакой информации<br>
+    ✓ Сканеры (wp-login, phpmyadmin, .git) получают бан<br>
+    ✓ SSH без пароля — невозможно подобрать<br>
+    ✓ Версии nginx скрыты — не подобрать эксплойт по версии<br>
+    ✓ Веб-панель найти невозможно — нужен ваш секретный slug
+  </p>
+</div>
+
 <div style="text-align:center;color:#aaa;font-size:13px;margin-top:48px;">
-  PROMETEY &nbsp;·&nbsp; v1.0.236 &nbsp;·&nbsp; Инструкция актуальна на дату сборки
+  PROMETEY &nbsp;·&nbsp; v1.0.237 &nbsp;·&nbsp; Инструкция актуальна на дату сборки
 </div>
 
 </div><!-- .page -->
@@ -809,7 +994,7 @@ hr { border:none; border-top:1px solid #dde; margin:32px 0; }
 
 <div class="hero">
   <h1>PROMETEY — Quraşdırma Təlimatı</h1>
-  <div class="sub">Brauzer vasitəsilə Windows-a uzaqdan giriş &nbsp;·&nbsp; v1.0.236</div>
+  <div class="sub">Brauzer vasitəsilə Windows-a uzaqdan giriş &nbsp;·&nbsp; v1.0.237</div>
 </div>
 
 <h2>Bu necə işləyir</h2>
@@ -1197,8 +1382,189 @@ hr { border:none; border-top:1px solid #dde; margin:32px 0; }
   → Bu düzgündür. Panel yalnız VPS2-dədir: <code>https://IP_VPS2/panel/</code>
 </div>
 
+<hr>
+
+<!-- TURN PAROL -->
+<h2>🔑 TURN parolu — sinxronizasiya</h2>
+
+<div class="card card-blue">
+  <code>pnpext_config_editor.exe</code>-də <strong>TURN serveri</strong> sahəsinə parolu əl ilə yazırsınız, məsələn:
+  <code>turn:rdp:secret-password@dumanofficial.com:3478</code>.<br><br>
+  Bu parol VPS2-də <code>coturn</code>-da olan parolla <strong>uyğun olmalıdır</strong>.
+  Əgər fərqlidirsə — TURN vasitəsilə WebRTC işləməyəcək.
+</div>
+
+<h3>VPS2-də coturn parolunu yoxlayın</h3>
+<div class="card card-gray">
+  <pre><span class="g">grep</span> "^user=" /etc/turnserver.conf</pre>
+  Çıxış: <code>user=rdp:secret-password</code> — bu cari paroldur.
+</div>
+
+<h3>Parollar uyğun deyilsə</h3>
+<div class="card card-gray">
+  coturn-u öz parolunuza dəyişin (VPS2-də bir əmr):
+  <pre><span class="g">sed</span> -i 's/^user=rdp:.*/user=rdp:<span class="y">secret-password</span>/' /etc/turnserver.conf
+<span class="g">systemctl restart</span> coturn</pre>
+  <code>secret-password</code> əvəzinə host konfiqurasiyasındakı öz parolunuzu yazın.
+</div>
+
+<div class="warn">
+  ⚠ <code>deploy-vps2.sh</code> və ya <code>deploy-vps.sh</code> təkrar işə salındıqda
+  <strong>skript standart olaraq YENİ təsadüfi parol yaradacaq</strong>. Cari parolunuzu saxlamaq üçün
+  arqument kimi ötürün:
+  <pre><span class="g">sudo bash</span> deploy-vps.sh rdp <span class="y">secret-password</span>
+<span class="g">sudo bash</span> deploy-vps2.sh rdp <span class="y">secret-password</span></pre>
+</div>
+
+<hr>
+
+<!-- TƏHLÜKƏSİZLİK -->
+<h2>🛡 VPS-in aşkarlanma və hücumlardan qorunması</h2>
+
+<div class="card card-blue">
+  Aşağıdakı tədbirlər <strong>hər iki VPS-də</strong> (VPS1 və VPS2) tətbiq edilir. Onları tətbiq etdikdən sonra
+  hücumçu: veb-paneli tapa bilməyəcək, SSH brute-force edə bilməyəcək, portları skanlaya bilməyəcək,
+  xidmət versiyalarını müəyyən edə bilməyəcək.
+</div>
+
+<h3>1. SSH — portu dəyişin, parolla girişi söndürün</h3>
+<div class="card card-red">
+  ⚠ <strong>SSH yenidən başladılmadan əvvəl mütləq SSH açarınızı yükləyin</strong>:
+  <pre><span class="c"># Sizin maşınınızda:</span>
+<span class="g">ssh-keygen</span>                            <span class="c"># açar yoxdursa</span>
+<span class="g">ssh-copy-id</span> -p 22 root@<span class="y">IP_VPS</span>     <span class="c"># açarı göndərin</span></pre>
+  Əks halda SSH parametrlərini dəyişdikdən sonra serverə girişiniz itəcək!
+</div>
+<div class="card card-gray">
+  Sonra VPS-də:
+  <pre><span class="c"># SSH portunu qeyri-standart olaraq dəyişin (1024–65535 arası istənilən)</span>
+<span class="g">sed</span> -i 's/^#\?Port .*/Port 22337/' /etc/ssh/sshd_config
+
+<span class="c"># Parolla girişi söndürün — yalnız açarla</span>
+<span class="g">sed</span> -i 's/^#\?PasswordAuthentication .*/PasswordAuthentication no/' /etc/ssh/sshd_config
+<span class="g">sed</span> -i 's/^#\?PermitRootLogin .*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
+
+<span class="g">systemctl restart</span> ssh
+
+<span class="c"># Yeni portu açın, köhnəni bağlayın</span>
+<span class="g">ufw allow</span> 22337/tcp
+<span class="g">ufw delete allow</span> 22/tcp</pre>
+</div>
+
+<h3>2. fail2ban — skanerləri və brute-force-u banlayır</h3>
+<div class="card card-gray">
+  <pre><span class="g">apt-get install</span> -y fail2ban
+
+<span class="g">cat</span> > /etc/fail2ban/jail.local << 'EOF'
+[DEFAULT]
+bantime = 86400
+findtime = 600
+maxretry = 3
+
+[sshd]
+enabled = true
+port = 22337
+maxretry = 3
+
+[nginx-404-scanner]
+enabled = true
+filter = nginx-404-scanner
+logpath = /var/log/nginx/access.log
+maxretry = 8
+findtime = 60
+bantime = 86400
+EOF
+
+<span class="g">cat</span> > /etc/fail2ban/filter.d/nginx-404-scanner.conf << 'EOF'
+[Definition]
+failregex = ^&lt;HOST&gt; .* "(GET|POST|HEAD) .* HTTP/.*" 404
+ignoreregex =
+EOF
+
+<span class="g">systemctl enable</span> fail2ban
+<span class="g">systemctl restart</span> fail2ban
+<span class="g">fail2ban-client</span> status</pre>
+  Bundan sonra: dəqiqədə 8 mövcud olmayan səhifəyə müraciət = IP 24 saat ban.
+</div>
+
+<h3>3. Panelin gizli yolunu dəyişin</h3>
+<div class="card card-gray">
+  Standart olaraq panel <code>/panel/</code> ünvanında açılır — çox aydındır.
+  Uzun təsadüfi slug-a dəyişin:
+  <pre><span class="c"># Yalnız VPS2-də</span>
+NEW_SLUG="<span class="y">x7k2q9wz4mhn</span>"   <span class="c"># sizin təsadüfi slug-unuz, 8–20 simvol</span>
+
+<span class="g">sed</span> -i "s|/panel|/${NEW_SLUG}|g" /etc/nginx/sites-available/remote-desktop
+<span class="g">nginx -t</span> && <span class="g">systemctl reload</span> nginx</pre>
+  İndi panel belə açılır: <code>https://IP_VPS2/<span style="color:#e6db74">x7k2q9wz4mhn</span>/</code>
+  <div class="warn" style="margin-top:8px;">⚠ Slug-u yadda saxlayın — onsuz panelə girə bilməyəcəksiniz!</div>
+</div>
+
+<h3>4. nginx versiyasını gizlədin və təhlükəsizlik başlıqları əlavə edin</h3>
+<div class="card card-gray">
+  <pre><span class="g">cat</span> >> /etc/nginx/nginx.conf << 'EOF'
+
+# OPSEC: nginx versiyasını gizlət
+server_tokens off;
+
+# MIME-sniffing və clickjacking-dən qoruma
+add_header X-Content-Type-Options "nosniff" always;
+add_header X-Frame-Options "DENY" always;
+add_header Referrer-Policy "no-referrer" always;
+EOF
+
+<span class="g">systemctl reload</span> nginx</pre>
+</div>
+
+<h3>5. Firewall-da nə bağlanmalıdır</h3>
+<div class="g2">
+  <div class="card card-green">
+    <strong>VPS2 — yalnız bunlar açıq olmalıdır:</strong>
+    <ul style="padding-left:18px;line-height:2;">
+      <li>22337/tcp — SSH (və ya sizin port)</li>
+      <li>443/tcp — HTTPS WebSocket</li>
+      <li>3478/tcp+udp — STUN/TURN</li>
+      <li>49152-65535/udp — TURN media</li>
+    </ul>
+    <p style="font-size:12px;color:var(--muted);margin-top:6px;">
+      Port 8080 (Python relay) <strong>kənardan bağlı olmalıdır</strong> — relay yalnız 127.0.0.1-i dinləyir.
+    </p>
+  </div>
+  <div class="card card-purple">
+    <strong>VPS1 — yalnız bunlar açıq olmalıdır:</strong>
+    <ul style="padding-left:18px;line-height:2;">
+      <li>22337/tcp — SSH</li>
+      <li>443/tcp — HTTPS WebSocket</li>
+    </ul>
+    <p style="font-size:12px;color:var(--muted);margin-top:6px;">
+      Lazım deyil: 8080, 3478, 49152-65535. coturn və TURN media yalnız VPS2-də.
+    </p>
+  </div>
+</div>
+
+<h3>6. Yekun — qoruma sonrası hücumçu nə görür</h3>
+<div class="card">
+  <pre><span class="c"># nmap IP_VPS</span>
+  443/tcp open      → bütün cəhdlərə 404 (o cümlədən /panel/)
+  22337/tcp open    → SSH (yalnız açarla, parol yoxdur = brute-force qeyri-mümkün)
+  3478/udp open     → coturn (yalnız VPS2)
+
+<span class="c"># curl https://IP/</span>          → 404
+<span class="c"># curl https://IP/admin</span>     → 404 + 8 cəhddən sonra IP ban
+<span class="c"># curl https://IP/wp-login</span>  → 404 + ban
+<span class="c"># curl https://IP/panel/</span>    → 404 (yol dəyişdirildi!)
+<span class="c"># curl https://IP/<span class="y">x7k2q9wz4mhn</span>/</span> → veb-panel ✓</pre>
+  <p style="margin-top:8px;">
+    ✓ Birbaşa IP heç bir məlumat vermir<br>
+    ✓ Skanerlər (wp-login, phpmyadmin, .git) ban alır<br>
+    ✓ SSH parolsuz — seçim mümkün deyil<br>
+    ✓ nginx versiyaları gizlədilib — versiyaya görə eksploit tapmaq mümkün deyil<br>
+    ✓ Veb-paneli tapmaq mümkün deyil — sizin gizli slug-unuz lazımdır
+  </p>
+</div>
+
 <div style="text-align:center;color:#aaa;font-size:13px;margin-top:48px;">
-  PROMETEY &nbsp;·&nbsp; v1.0.236 &nbsp;·&nbsp; Təlimat hazırlanma tarixinə uyğundur
+  PROMETEY &nbsp;·&nbsp; v1.0.237 &nbsp;·&nbsp; Təlimat hazırlanma tarixinə uyğundur
 </div>
 
 </div><!-- .page -->
@@ -1213,7 +1579,7 @@ hr { border:none; border-top:1px solid #dde; margin:32px 0; }
 
 <div class="hero">
   <h1>PROMETEY — Installation Guide</h1>
-  <div class="sub">Remote access to Windows via browser &nbsp;·&nbsp; v1.0.236</div>
+  <div class="sub">Remote access to Windows via browser &nbsp;·&nbsp; v1.0.237</div>
 </div>
 
 <h2>How it works</h2>
@@ -1658,8 +2024,189 @@ hr { border:none; border-top:1px solid #dde; margin:32px 0; }
   → Panel is only on VPS2: <code>https://VPS2_IP/panel/</code>
 </div>
 
+<hr>
+
+<!-- TURN PASSWORD -->
+<h2>🔑 TURN password — synchronization</h2>
+
+<div class="card card-blue">
+  In <code>pnpext_config_editor.exe</code>, the <strong>TURN server</strong> field uses a password you type manually, e.g.
+  <code>turn:rdp:secret-password@dumanofficial.com:3478</code>.<br><br>
+  This password must <strong>match</strong> the one configured in <code>coturn</code> on VPS2.
+  If they differ — WebRTC via TURN will not work.
+</div>
+
+<h3>Check the coturn password on VPS2</h3>
+<div class="card card-gray">
+  <pre><span class="g">grep</span> "^user=" /etc/turnserver.conf</pre>
+  Outputs something like: <code>user=rdp:secret-password</code> — that's the current password.
+</div>
+
+<h3>If passwords don't match</h3>
+<div class="card card-gray">
+  Update coturn to use your password (one command on VPS2):
+  <pre><span class="g">sed</span> -i 's/^user=rdp:.*/user=rdp:<span class="y">secret-password</span>/' /etc/turnserver.conf
+<span class="g">systemctl restart</span> coturn</pre>
+  Replace <code>secret-password</code> with the one from your host config.
+</div>
+
+<div class="warn">
+  ⚠ When re-running <code>deploy-vps2.sh</code> or <code>deploy-vps.sh</code> in single mode —
+  <strong>the script generates a NEW random password by default</strong>. To keep your current one,
+  pass it as an argument:
+  <pre><span class="g">sudo bash</span> deploy-vps.sh rdp <span class="y">secret-password</span>
+<span class="g">sudo bash</span> deploy-vps2.sh rdp <span class="y">secret-password</span></pre>
+</div>
+
+<hr>
+
+<!-- SECURITY -->
+<h2>🛡 VPS protection from discovery and attacks</h2>
+
+<div class="card card-blue">
+  The measures below apply to <strong>both VPS</strong> (VPS1 and VPS2). After they're in place,
+  an attacker will not be able to: find the web panel, brute-force SSH, scan ports,
+  or fingerprint service versions.
+</div>
+
+<h3>1. SSH — change port, disable password auth</h3>
+<div class="card card-red">
+  ⚠ <strong>Before restarting SSH, you MUST upload your SSH key</strong> from your machine first:
+  <pre><span class="c"># On your local machine:</span>
+<span class="g">ssh-keygen</span>                            <span class="c"># if you don't have a key yet</span>
+<span class="g">ssh-copy-id</span> -p 22 root@<span class="y">VPS_IP</span>     <span class="c"># upload the key</span></pre>
+  Otherwise you'll lose access to the server after changing SSH settings!
+</div>
+<div class="card card-gray">
+  Then on the VPS:
+  <pre><span class="c"># Change SSH port to non-standard (pick any 1024–65535)</span>
+<span class="g">sed</span> -i 's/^#\?Port .*/Port 22337/' /etc/ssh/sshd_config
+
+<span class="c"># Disable password login — keys only</span>
+<span class="g">sed</span> -i 's/^#\?PasswordAuthentication .*/PasswordAuthentication no/' /etc/ssh/sshd_config
+<span class="g">sed</span> -i 's/^#\?PermitRootLogin .*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
+
+<span class="g">systemctl restart</span> ssh
+
+<span class="c"># Open new port, close old one</span>
+<span class="g">ufw allow</span> 22337/tcp
+<span class="g">ufw delete allow</span> 22/tcp</pre>
+</div>
+
+<h3>2. fail2ban — bans scanners and brute-forcers</h3>
+<div class="card card-gray">
+  <pre><span class="g">apt-get install</span> -y fail2ban
+
+<span class="g">cat</span> > /etc/fail2ban/jail.local << 'EOF'
+[DEFAULT]
+bantime = 86400
+findtime = 600
+maxretry = 3
+
+[sshd]
+enabled = true
+port = 22337
+maxretry = 3
+
+[nginx-404-scanner]
+enabled = true
+filter = nginx-404-scanner
+logpath = /var/log/nginx/access.log
+maxretry = 8
+findtime = 60
+bantime = 86400
+EOF
+
+<span class="g">cat</span> > /etc/fail2ban/filter.d/nginx-404-scanner.conf << 'EOF'
+[Definition]
+failregex = ^&lt;HOST&gt; .* "(GET|POST|HEAD) .* HTTP/.*" 404
+ignoreregex =
+EOF
+
+<span class="g">systemctl enable</span> fail2ban
+<span class="g">systemctl restart</span> fail2ban
+<span class="g">fail2ban-client</span> status</pre>
+  Result: 8 hits to non-existent pages within a minute = IP banned for 24 hours.
+</div>
+
+<h3>3. Change the secret panel path</h3>
+<div class="card card-gray">
+  By default the panel is at <code>/panel/</code> — too obvious.
+  Replace it with a long random slug:
+  <pre><span class="c"># VPS2 only</span>
+NEW_SLUG="<span class="y">x7k2q9wz4mhn</span>"   <span class="c"># your random slug, 8–20 chars</span>
+
+<span class="g">sed</span> -i "s|/panel|/${NEW_SLUG}|g" /etc/nginx/sites-available/remote-desktop
+<span class="g">nginx -t</span> && <span class="g">systemctl reload</span> nginx</pre>
+  Now the panel opens at: <code>https://VPS2_IP/<span style="color:#e6db74">x7k2q9wz4mhn</span>/</code>
+  <div class="warn" style="margin-top:8px;">⚠ Save the slug — without it you can't access the panel!</div>
+</div>
+
+<h3>4. Hide nginx version and add security headers</h3>
+<div class="card card-gray">
+  <pre><span class="g">cat</span> >> /etc/nginx/nginx.conf << 'EOF'
+
+# OPSEC: hide nginx version
+server_tokens off;
+
+# Protect against MIME sniffing and clickjacking
+add_header X-Content-Type-Options "nosniff" always;
+add_header X-Frame-Options "DENY" always;
+add_header Referrer-Policy "no-referrer" always;
+EOF
+
+<span class="g">systemctl reload</span> nginx</pre>
+</div>
+
+<h3>5. What should be open on the firewall</h3>
+<div class="g2">
+  <div class="card card-green">
+    <strong>VPS2 — open only:</strong>
+    <ul style="padding-left:18px;line-height:2;">
+      <li>22337/tcp — SSH (or your port)</li>
+      <li>443/tcp — HTTPS WebSocket</li>
+      <li>3478/tcp+udp — STUN/TURN</li>
+      <li>49152-65535/udp — TURN media</li>
+    </ul>
+    <p style="font-size:12px;color:var(--muted);margin-top:6px;">
+      Port 8080 (Python relay) must be <strong>closed externally</strong> — the relay binds to 127.0.0.1.
+    </p>
+  </div>
+  <div class="card card-purple">
+    <strong>VPS1 — open only:</strong>
+    <ul style="padding-left:18px;line-height:2;">
+      <li>22337/tcp — SSH</li>
+      <li>443/tcp — HTTPS WebSocket</li>
+    </ul>
+    <p style="font-size:12px;color:var(--muted);margin-top:6px;">
+      Not needed: 8080, 3478, 49152-65535. coturn and TURN media are VPS2-only.
+    </p>
+  </div>
+</div>
+
+<h3>6. Result — what the attacker sees after hardening</h3>
+<div class="card">
+  <pre><span class="c"># nmap VPS_IP</span>
+  443/tcp open      → 404 to everything (including /panel/)
+  22337/tcp open    → SSH (keys only, no password = unbruteforceable)
+  3478/udp open     → coturn (VPS2 only)
+
+<span class="c"># curl https://IP/</span>          → 404
+<span class="c"># curl https://IP/admin</span>     → 404 + IP banned after 8 tries
+<span class="c"># curl https://IP/wp-login</span>  → 404 + ban
+<span class="c"># curl https://IP/panel/</span>    → 404 (path changed!)
+<span class="c"># curl https://IP/<span class="y">x7k2q9wz4mhn</span>/</span> → web panel ✓</pre>
+  <p style="margin-top:8px;">
+    ✓ Direct IP reveals nothing<br>
+    ✓ Scanners (wp-login, phpmyadmin, .git) get banned<br>
+    ✓ SSH with no password — impossible to brute-force<br>
+    ✓ nginx version hidden — no version-targeted exploits<br>
+    ✓ Web panel undiscoverable — needs your secret slug
+  </p>
+</div>
+
 <div style="text-align:center;color:#aaa;font-size:13px;margin-top:48px;">
-  PROMETEY &nbsp;·&nbsp; v1.0.236 &nbsp;·&nbsp; Guide current as of build date
+  PROMETEY &nbsp;·&nbsp; v1.0.237 &nbsp;·&nbsp; Guide current as of build date
 </div>
 
 </div><!-- .page -->

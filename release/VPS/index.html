@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="build" content="1.0.236" />
+<meta name="build" content="1.0.237" />
 <title>Prometey</title>
 <style>
 /* ═══════════════════════════════════════════════════
@@ -1330,6 +1330,7 @@ body {
     <span id="conn-label" data-i18n="disconnected">DISCONNECTED</span>
     <span id="host-status" class="host-status"></span>
     <span id="wakelock-indicator" title="Screen Wake Lock active — screen will not auto-lock during transfer" style="display:none;margin-left:6px;font-size:13px;cursor:default;" data-i18n-title="tip_wakelock">⚡</span>
+    <span id="transport-indicator" style="display:none;margin-left:8px;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:bold;cursor:help;" title="Live stream transport — UDP=WebRTC working, TCP=WebSocket fallback"></span>
     <span id="clients-online-badge" style="display:none;margin-left:8px;padding:2px 8px;background:linear-gradient(90deg,#ff9800,#f57c00);color:#fff;border-radius:4px;font-size:10px;font-weight:bold;cursor:pointer;animation:threatPulse 2s ease-in-out infinite;" data-i18n="msg_other_clients" onclick="showClientsList()" title="Click to view details">Other operators online</span>
     <!-- Clients info popup -->
     <div id="clients-popup" style="display:none;position:absolute;top:32px;left:50%;transform:translateX(-50%);background:#1e1e2e;border:1px solid #555;border-radius:8px;padding:12px 16px;z-index:9999;min-width:320px;max-width:500px;box-shadow:0 4px 20px rgba(0,0,0,.6);font-size:11px;color:#ccc;">
@@ -5903,6 +5904,31 @@ async function saveIceSettings() {
 
   setTimeout(() => { statusEl.textContent = ''; }, 8000);
 }
+
+// ── Live transport indicator in topbar (updates whenever stream state changes) ──
+function updateTransportIndicator() {
+  const el = document.getElementById('transport-indicator');
+  if (!el) return;
+  if (!state.streaming) {
+    el.style.display = 'none';
+    return;
+  }
+  el.style.display = 'inline-block';
+  if (state.streamOverWebRTC) {
+    el.textContent = 'UDP · WebRTC';
+    el.style.background = 'var(--success,#4caf50)';
+    el.style.color = '#fff';
+    el.title = 'WebRTC over UDP — direct/STUN/TURN path active. Lower latency.';
+  } else {
+    el.textContent = 'TCP · WebSocket';
+    el.style.background = 'var(--warn,#ffc107)';
+    el.style.color = '#000';
+    el.title = 'WebSocket over TCP/443 — WebRTC fallback. ' +
+               'Open UDP 3478 + 49152-65535 in firewall to enable WebRTC.';
+  }
+}
+// Poll transport state every 1.5s while streaming (cheap — just reads bool)
+setInterval(updateTransportIndicator, 1500);
 
 // ── Show real ICE status + test STUN/TURN connectivity ──
 async function iceShowStatus() {

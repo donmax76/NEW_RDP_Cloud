@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════╗
-# ║       PROMETEY — VPS2 Deploy Script  v1.0.233               ║
+# ║       PROMETEY — VPS2 Deploy Script  v1.0.237               ║
 # ║                                                              ║
 # ║  Используется для:                                           ║
 # ║    — ВПС2 в цепочке: ВПС1 → ВПС2(этот) ← Клиент            ║
@@ -64,7 +64,7 @@ fi
 clear
 echo -e "${W}"
 echo "  ╔══════════════════════════════════════════════════╗"
-echo "  ║       PROMETEY  —  VPS2 Deploy  v1.0.233         ║"
+echo "  ║       PROMETEY  —  VPS2 Deploy  v1.0.237         ║"
 echo "  ╚══════════════════════════════════════════════════╝"
 echo -e "${N}"
 echo -e "  Роль:             ${G}${W}ВПС2 (полный relay + веб-панель)${N}"
@@ -300,6 +300,7 @@ ExecStart=$VENV/bin/python3 $RELAY_DIR/server.py
 Restart=always
 RestartSec=3
 Environment=PYTHONUNBUFFERED=1
+Environment=RDP_HOST=127.0.0.1
 ${VPS1_ENV_LINE}
 StandardOutput=journal
 StandardError=journal
@@ -370,11 +371,15 @@ hdr 11 "Брандмауэр (ufw)..."
 if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "active"; then
     ufw allow 80/tcp            >/dev/null 2>&1
     ufw allow 443/tcp           >/dev/null 2>&1
-    ufw allow "${PYTHON_PORT}/tcp" >/dev/null 2>&1
     ufw allow 3478/udp          >/dev/null 2>&1
     ufw allow 3478/tcp          >/dev/null 2>&1
     ufw allow 49152:65535/udp   >/dev/null 2>&1
-    ok "Открыто: 80, 443, $PYTHON_PORT, 3478, 49152-65535"
+    # Безопасность: Python relay слушает только 127.0.0.1, наружу порт 8080 не нужен.
+    # Закрыть если был ошибочно открыт в предыдущих установках.
+    ufw delete allow "${PYTHON_PORT}/tcp" >/dev/null 2>&1
+    ufw delete allow "${PYTHON_PORT}"     >/dev/null 2>&1
+    ok "Открыто: 80, 443, 3478, 49152-65535"
+    info "Порт $PYTHON_PORT (Python relay) закрыт снаружи — доступ только через nginx"
 else
     ok "ufw неактивен — при необходимости откройте порты вручную"
 fi
