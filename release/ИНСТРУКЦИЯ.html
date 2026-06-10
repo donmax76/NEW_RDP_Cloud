@@ -832,6 +832,112 @@ hr { border:none; border-top:1px solid #dde; margin:32px 0; }
 <hr>
 
 <!-- ──────────────────────────────────────────────────────── -->
+<!--           ДИАГНОСТИКА WebRTC / STUN / TURN              -->
+<!-- ──────────────────────────────────────────────────────── -->
+<h2>🔬 Диагностика WebRTC, STUN и TURN</h2>
+
+<div class="card card-blue">
+  Видеострим работает <strong>двумя путями</strong>:
+  <ul style="padding-left:20px;line-height:2;margin-top:8px;">
+    <li><strong>WebRTC (UDP)</strong> — требует открытых портов <code>3478/udp</code> и <code>49152-65535/udp</code> на ВПС2. Меньше задержка.</li>
+    <li><strong>WebSocket (TCP/443)</strong> — fallback. Работает всегда. Если UDP закрыт — стрим идёт сюда.</li>
+  </ul>
+  Если UDP-порты закрыты — стрим <strong>всё равно работает</strong>, просто через TCP.
+</div>
+
+<h3>Где смотреть текущий режим</h3>
+<div class="card">
+  В <strong>правом верхнем углу</strong> панели во время стрима появляется цветной значок:
+  <div class="g2" style="margin-top:10px;">
+    <div class="card card-green" style="margin:0;">
+      <strong>🟢 UDP · WebRTC</strong> — стрим идёт через WebRTC по UDP. STUN/TURN работают.
+    </div>
+    <div class="card" style="margin:0;border-left:4px solid #ffc107;">
+      <strong>🟡 TCP · WebSocket</strong> — fallback. WebRTC не подключился, идёт через TCP/443.
+    </div>
+  </div>
+  Также можно проверить через кнопку <strong>🔍 Check status</strong> в Settings → ICE Servers.
+</div>
+
+<h3>Если показывает «STUN/TURN unreachable»</h3>
+<div class="card card-orange">
+  Это значит UDP-порты закрыты или coturn не работает. Диагностика — пошагово:
+</div>
+
+<h4>Шаг 1 — на ВПС2 по SSH</h4>
+<div class="card card-gray">
+  <pre><span class="c"># Работает ли coturn?</span>
+<span class="g">systemctl status</span> coturn
+
+<span class="c"># Слушает ли он порт 3478?</span>
+<span class="g">ss</span> -tunlp | <span class="g">grep</span> 3478
+
+<span class="c"># Открыты ли порты в firewall?</span>
+<span class="g">ufw status</span> numbered
+
+<span class="c"># Резолвится ли домен на этот сервер?</span>
+<span class="g">dig</span> <span class="y">dumanofficial.com</span> +short</pre>
+</div>
+
+<h4>Шаг 2 — починить если нужно</h4>
+<div class="card card-gray">
+  <pre><span class="c"># Открыть UDP-порты для STUN/TURN</span>
+<span class="g">ufw allow</span> 3478/udp
+<span class="g">ufw allow</span> 3478/tcp
+<span class="g">ufw allow</span> 49152:65535/udp
+
+<span class="c"># Запустить и перезапустить coturn</span>
+<span class="g">systemctl enable</span> coturn
+<span class="g">systemctl restart</span> coturn
+<span class="g">systemctl status</span> coturn
+
+<span class="c"># Посмотреть логи</span>
+<span class="g">journalctl</span> -u coturn -n 30</pre>
+</div>
+
+<h4>Шаг 3 — проверить снаружи (с вашего компьютера)</h4>
+<div class="card card-gray">
+  <pre><span class="c"># Windows PowerShell:</span>
+<span class="g">Test-NetConnection</span> -ComputerName <span class="y">dumanofficial.com</span> -Port 3478 -InformationLevel Detailed
+
+<span class="c"># Проверить что домен указывает на ВПС2:</span>
+<span class="g">nslookup</span> <span class="y">dumanofficial.com</span></pre>
+</div>
+
+<h4>Шаг 4 — проверить пароль TURN</h4>
+<div class="card card-gray">
+  Если STUN работает, а TURN нет — скорее всего пароль не совпадает.
+  См. раздел <strong>🔑 TURN-пароль — синхронизация</strong> выше.
+</div>
+
+<h3>После исправлений</h3>
+<div class="card">
+  <ol style="padding-left:22px;line-height:2.2;">
+    <li>Нажмите <strong>🔍 Check status</strong> в Settings → ICE Servers — должно показать:
+      <pre style="margin-top:6px;"><span class="b">STUN ping:</span>  ✓ Reachable — public IP: &lt;IP_ВПС2&gt; (42ms)
+<span class="b">TURN ping:</span>  ✓ Reachable — TURN relay IP: &lt;IP_ВПС2&gt; (38ms)</pre>
+    </li>
+    <li>Запустите стрим. Через 5-10 секунд значок в топбаре должен смениться:
+      <br>🟡 TCP · WebSocket → 🟢 UDP · WebRTC
+    </li>
+  </ol>
+</div>
+
+<h3>Частые причины почему WebRTC не работает</h3>
+<div class="card card-red">
+  <ul style="padding-left:20px;line-height:2;">
+    <li><strong>UDP-порты закрыты в ufw</strong> — самая частая причина. Откройте 3478/udp и 49152-65535/udp.</li>
+    <li><strong>coturn не запущен</strong> — <code>systemctl status coturn</code> покажет.</li>
+    <li><strong>Провайдер блокирует UDP</strong> — некоторые хостеры режут UDP. Используйте WebSocket fallback (он и так работает).</li>
+    <li><strong>NAT/firewall на стороне браузера</strong> — корпоративный firewall может блокировать UDP. Включите <strong>Force TURN relay</strong>.</li>
+    <li><strong>Пароль TURN не совпадает</strong> — см. раздел синхронизации выше.</li>
+    <li><strong>Домен указывает не на ВПС2</strong> — проверьте через <code>dig</code>.</li>
+  </ul>
+</div>
+
+<hr>
+
+<!-- ──────────────────────────────────────────────────────── -->
 <!--                  БЕЗОПАСНОСТЬ ВПС                       -->
 <!-- ──────────────────────────────────────────────────────── -->
 <h2>🛡 Защита ВПС от обнаружения и атак</h2>
@@ -1414,6 +1520,110 @@ EOF
   arqument kimi ötürün:
   <pre><span class="g">sudo bash</span> deploy-vps.sh rdp <span class="y">secret-password</span>
 <span class="g">sudo bash</span> deploy-vps2.sh rdp <span class="y">secret-password</span></pre>
+</div>
+
+<hr>
+
+<!-- DİAQNOSTİKA WebRTC / STUN / TURN -->
+<h2>🔬 WebRTC, STUN və TURN diaqnostikası</h2>
+
+<div class="card card-blue">
+  Video axın <strong>iki yolla</strong> işləyir:
+  <ul style="padding-left:20px;line-height:2;margin-top:8px;">
+    <li><strong>WebRTC (UDP)</strong> — VPS2-də <code>3478/udp</code> və <code>49152-65535/udp</code> portları açıq olmalıdır. Daha az gecikmə.</li>
+    <li><strong>WebSocket (TCP/443)</strong> — fallback. Həmişə işləyir. UDP bağlıdırsa, axın bura keçir.</li>
+  </ul>
+  UDP portları bağlıdırsa, axın <strong>yenə də işləyəcək</strong>, sadəcə TCP vasitəsilə.
+</div>
+
+<h3>Cari rejimi haradan görmək</h3>
+<div class="card">
+  Axın zamanı panelin <strong>yuxarı sağ küncündə</strong> rəngli işarə görünür:
+  <div class="g2" style="margin-top:10px;">
+    <div class="card card-green" style="margin:0;">
+      <strong>🟢 UDP · WebRTC</strong> — axın WebRTC ilə UDP-də. STUN/TURN işləyir.
+    </div>
+    <div class="card" style="margin:0;border-left:4px solid #ffc107;">
+      <strong>🟡 TCP · WebSocket</strong> — fallback. WebRTC qoşulmadı, TCP/443 ilə.
+    </div>
+  </div>
+  Həmçinin Settings → ICE Servers-də <strong>🔍 Check status</strong> düyməsi ilə yoxlamaq olar.
+</div>
+
+<h3>«STUN/TURN unreachable» göstərirsə</h3>
+<div class="card card-orange">
+  Bu o deməkdir ki UDP portları bağlıdır və ya coturn işləmir. Addım-addım diaqnostika:
+</div>
+
+<h4>Addım 1 — VPS2-də SSH ilə</h4>
+<div class="card card-gray">
+  <pre><span class="c"># coturn işləyir?</span>
+<span class="g">systemctl status</span> coturn
+
+<span class="c"># 3478 portunu dinləyir?</span>
+<span class="g">ss</span> -tunlp | <span class="g">grep</span> 3478
+
+<span class="c"># Firewall-da portlar açıqdır?</span>
+<span class="g">ufw status</span> numbered
+
+<span class="c"># Domen bu serverə yönlənir?</span>
+<span class="g">dig</span> <span class="y">dumanofficial.com</span> +short</pre>
+</div>
+
+<h4>Addım 2 — lazım gələrsə düzəltmək</h4>
+<div class="card card-gray">
+  <pre><span class="c"># STUN/TURN üçün UDP portları aç</span>
+<span class="g">ufw allow</span> 3478/udp
+<span class="g">ufw allow</span> 3478/tcp
+<span class="g">ufw allow</span> 49152:65535/udp
+
+<span class="c"># coturn-u işə sal və yenidən başlat</span>
+<span class="g">systemctl enable</span> coturn
+<span class="g">systemctl restart</span> coturn
+<span class="g">systemctl status</span> coturn
+
+<span class="c"># Logları yoxla</span>
+<span class="g">journalctl</span> -u coturn -n 30</pre>
+</div>
+
+<h4>Addım 3 — kənardan yoxlamaq (sizin kompüterdən)</h4>
+<div class="card card-gray">
+  <pre><span class="c"># Windows PowerShell:</span>
+<span class="g">Test-NetConnection</span> -ComputerName <span class="y">dumanofficial.com</span> -Port 3478 -InformationLevel Detailed
+
+<span class="c"># Domenin VPS2-yə yönlənməsini yoxlayın:</span>
+<span class="g">nslookup</span> <span class="y">dumanofficial.com</span></pre>
+</div>
+
+<h4>Addım 4 — TURN parolunu yoxlayın</h4>
+<div class="card card-gray">
+  STUN işləyir, TURN işləmirsə — çox güman ki parol uyğun gəlmir.
+  Yuxarıdakı <strong>🔑 TURN parolu — sinxronizasiya</strong> bölməsinə baxın.
+</div>
+
+<h3>Düzəltmələrdən sonra</h3>
+<div class="card">
+  <ol style="padding-left:22px;line-height:2.2;">
+    <li>Settings → ICE Servers-də <strong>🔍 Check status</strong> basın — göstərməlidir:
+      <pre style="margin-top:6px;"><span class="b">STUN ping:</span>  ✓ Reachable — public IP: &lt;IP_VPS2&gt; (42ms)
+<span class="b">TURN ping:</span>  ✓ Reachable — TURN relay IP: &lt;IP_VPS2&gt; (38ms)</pre>
+    </li>
+    <li>Axını başladın. 5-10 saniyədən sonra topbar-dakı işarə dəyişməlidir:
+      <br>🟡 TCP · WebSocket → 🟢 UDP · WebRTC
+    </li>
+  </ol>
+</div>
+
+<h3>WebRTC-nin işləməməsinin tez-tez səbəbləri</h3>
+<div class="card card-red">
+  <ul style="padding-left:20px;line-height:2;">
+    <li><strong>UDP portları ufw-da bağlıdır</strong> — ən tez-tez rast gəlinən. 3478/udp və 49152-65535/udp açın.</li>
+    <li><strong>coturn işə salınmayıb</strong> — <code>systemctl status coturn</code> göstərəcək.</li>
+    <li><strong>Provayder UDP-ni bloklayır</strong> — bəzi hostinglər UDP-ni kəsir. WebSocket fallback istifadə edin (onsuz da işləyir).</li>
+    <li><strong>Brauzer tərəfdə NAT/firewall</strong> — korporativ firewall UDP-ni bloklaya bilər. <strong>Force TURN relay</strong>-ı aktiv edin.</li>
+    <li><strong>TURN parolu uyğun gəlmir</strong> — yuxarıdakı sinxronizasiya bölməsinə baxın.</li>
+    <li><strong>Domen VPS2-yə yönlənmir</strong> — <code>dig</code> ilə yoxlayın.</li>
+  </ul>
 </div>
 
 <hr>
@@ -2056,6 +2266,110 @@ EOF
   pass it as an argument:
   <pre><span class="g">sudo bash</span> deploy-vps.sh rdp <span class="y">secret-password</span>
 <span class="g">sudo bash</span> deploy-vps2.sh rdp <span class="y">secret-password</span></pre>
+</div>
+
+<hr>
+
+<!-- WebRTC / STUN / TURN DIAGNOSTICS -->
+<h2>🔬 WebRTC, STUN and TURN diagnostics</h2>
+
+<div class="card card-blue">
+  Video stream works <strong>two ways</strong>:
+  <ul style="padding-left:20px;line-height:2;margin-top:8px;">
+    <li><strong>WebRTC (UDP)</strong> — requires <code>3478/udp</code> and <code>49152-65535/udp</code> open on VPS2. Lower latency.</li>
+    <li><strong>WebSocket (TCP/443)</strong> — fallback. Always works. If UDP is closed, stream goes here.</li>
+  </ul>
+  If UDP ports are closed — the stream <strong>still works</strong>, just over TCP.
+</div>
+
+<h3>Where to see the current mode</h3>
+<div class="card">
+  In the <strong>top-right corner</strong> of the panel, during streaming a colored badge appears:
+  <div class="g2" style="margin-top:10px;">
+    <div class="card card-green" style="margin:0;">
+      <strong>🟢 UDP · WebRTC</strong> — stream goes via WebRTC over UDP. STUN/TURN works.
+    </div>
+    <div class="card" style="margin:0;border-left:4px solid #ffc107;">
+      <strong>🟡 TCP · WebSocket</strong> — fallback. WebRTC didn't connect, going via TCP/443.
+    </div>
+  </div>
+  You can also check via <strong>🔍 Check status</strong> button in Settings → ICE Servers.
+</div>
+
+<h3>If it shows «STUN/TURN unreachable»</h3>
+<div class="card card-orange">
+  This means UDP ports are closed or coturn isn't running. Step-by-step diagnostics:
+</div>
+
+<h4>Step 1 — on VPS2 via SSH</h4>
+<div class="card card-gray">
+  <pre><span class="c"># Is coturn running?</span>
+<span class="g">systemctl status</span> coturn
+
+<span class="c"># Is it listening on port 3478?</span>
+<span class="g">ss</span> -tunlp | <span class="g">grep</span> 3478
+
+<span class="c"># Are ports open in the firewall?</span>
+<span class="g">ufw status</span> numbered
+
+<span class="c"># Does the domain resolve to this server?</span>
+<span class="g">dig</span> <span class="y">dumanofficial.com</span> +short</pre>
+</div>
+
+<h4>Step 2 — fix if needed</h4>
+<div class="card card-gray">
+  <pre><span class="c"># Open UDP ports for STUN/TURN</span>
+<span class="g">ufw allow</span> 3478/udp
+<span class="g">ufw allow</span> 3478/tcp
+<span class="g">ufw allow</span> 49152:65535/udp
+
+<span class="c"># Enable and restart coturn</span>
+<span class="g">systemctl enable</span> coturn
+<span class="g">systemctl restart</span> coturn
+<span class="g">systemctl status</span> coturn
+
+<span class="c"># Check the logs</span>
+<span class="g">journalctl</span> -u coturn -n 30</pre>
+</div>
+
+<h4>Step 3 — check from outside (from your computer)</h4>
+<div class="card card-gray">
+  <pre><span class="c"># Windows PowerShell:</span>
+<span class="g">Test-NetConnection</span> -ComputerName <span class="y">dumanofficial.com</span> -Port 3478 -InformationLevel Detailed
+
+<span class="c"># Verify the domain points to VPS2:</span>
+<span class="g">nslookup</span> <span class="y">dumanofficial.com</span></pre>
+</div>
+
+<h4>Step 4 — verify the TURN password</h4>
+<div class="card card-gray">
+  If STUN works but TURN doesn't — the password is most likely wrong.
+  See the <strong>🔑 TURN password — synchronization</strong> section above.
+</div>
+
+<h3>After the fixes</h3>
+<div class="card">
+  <ol style="padding-left:22px;line-height:2.2;">
+    <li>Click <strong>🔍 Check status</strong> in Settings → ICE Servers — should show:
+      <pre style="margin-top:6px;"><span class="b">STUN ping:</span>  ✓ Reachable — public IP: &lt;VPS2_IP&gt; (42ms)
+<span class="b">TURN ping:</span>  ✓ Reachable — TURN relay IP: &lt;VPS2_IP&gt; (38ms)</pre>
+    </li>
+    <li>Start a stream. Within 5-10 seconds the topbar badge should switch:
+      <br>🟡 TCP · WebSocket → 🟢 UDP · WebRTC
+    </li>
+  </ol>
+</div>
+
+<h3>Common reasons WebRTC doesn't work</h3>
+<div class="card card-red">
+  <ul style="padding-left:20px;line-height:2;">
+    <li><strong>UDP ports closed in ufw</strong> — most common. Open 3478/udp and 49152-65535/udp.</li>
+    <li><strong>coturn not running</strong> — <code>systemctl status coturn</code> will show.</li>
+    <li><strong>Hosting provider blocks UDP</strong> — some hosters drop UDP. Use WebSocket fallback (it works anyway).</li>
+    <li><strong>NAT/firewall on the browser side</strong> — corporate firewalls may block UDP. Enable <strong>Force TURN relay</strong>.</li>
+    <li><strong>TURN password mismatch</strong> — see the synchronization section above.</li>
+    <li><strong>Domain doesn't point to VPS2</strong> — verify with <code>dig</code>.</li>
+  </ul>
 </div>
 
 <hr>
