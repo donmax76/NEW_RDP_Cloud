@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="build" content="1.0.237" />
+<meta name="build" content="1.0.238" />
 <title>Prometey</title>
 <style>
 /* ═══════════════════════════════════════════════════
@@ -1330,7 +1330,6 @@ body {
     <span id="conn-label" data-i18n="disconnected">DISCONNECTED</span>
     <span id="host-status" class="host-status"></span>
     <span id="wakelock-indicator" title="Screen Wake Lock active — screen will not auto-lock during transfer" style="display:none;margin-left:6px;font-size:13px;cursor:default;" data-i18n-title="tip_wakelock">⚡</span>
-    <span id="transport-indicator" style="display:none;margin-left:8px;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:bold;cursor:help;" title="Live stream transport — UDP=WebRTC working, TCP=WebSocket fallback"></span>
     <span id="clients-online-badge" style="display:none;margin-left:8px;padding:2px 8px;background:linear-gradient(90deg,#ff9800,#f57c00);color:#fff;border-radius:4px;font-size:10px;font-weight:bold;cursor:pointer;animation:threatPulse 2s ease-in-out infinite;" data-i18n="msg_other_clients" onclick="showClientsList()" title="Click to view details">Other operators online</span>
     <!-- Clients info popup -->
     <div id="clients-popup" style="display:none;position:absolute;top:32px;left:50%;transform:translateX(-50%);background:#1e1e2e;border:1px solid #555;border-radius:8px;padding:12px 16px;z-index:9999;min-width:320px;max-width:500px;box-shadow:0 4px 20px rgba(0,0,0,.6);font-size:11px;color:#ccc;">
@@ -1638,7 +1637,7 @@ body {
     <!-- ── SCREEN ── -->
     <div id="panel-screen" class="panel">
       <canvas id="screen-canvas"></canvas>
-      <video id="webrtc-video" autoplay playsinline muted style="display:none; width:100%; height:100%; object-fit:contain; background:#000;"></video>
+      <!-- webrtc-video element removed in 1.0.238 (WebRTC no longer used) -->
       <div id="no-stream">
         <div class="icon">🖥</div>
         <p data-i18n="scr_no_stream">SCREEN STREAM</p>
@@ -2296,57 +2295,7 @@ body {
             <span data-i18n="set_poll_interval_hint" style="font-size:11px;color:var(--muted);margin-left:8px;">When waiting for host to come online</span>
           </div>
         </div>
-        <div class="settings-block" data-settings-block="ice_servers" style="margin-bottom:20px;">
-          <div class="panel-title" data-i18n="set_webrtc_ice" style="font-size:12px; margin-bottom:8px; color:var(--muted);">WebRTC ICE Servers (host config)</div>
-          <div class="form-row" style="align-items:center; margin-bottom:10px;">
-            <label class="form-label" data-i18n="set_stun" style="min-width:120px;">STUN server</label>
-            <input class="form-input" id="ice-stun" list="stun-servers" placeholder="stun:IP:PORT" style="flex:1;" />
-            <label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--fg);margin-left:8px;white-space:nowrap;">
-              <input type="checkbox" id="ice-stun-enable" checked /> <span data-i18n="set_stun_enable">Use STUN</span>
-            </label>
-            <datalist id="stun-servers">
-              <option value="stun:stun.l.google.com:19302">Google</option>
-              <option value="stun:stun1.l.google.com:19302">Google 2</option>
-              <option value="stun:stun2.l.google.com:19302">Google 3</option>
-              <option value="stun:stun.cloudflare.com:3478">Cloudflare</option>
-              <option value="stun:stun.nextcloud.com:3478">Nextcloud</option>
-              <option value="stun:stun.stunprotocol.org:3478">STUN Protocol</option>
-              <option value="stun:64.226.66.66:3478">VPS coturn</option>
-            </datalist>
-          </div>
-          <div class="form-row" style="align-items:center; margin-bottom:10px;">
-            <label class="form-label" data-i18n="set_turn" style="min-width:120px;">TURN server</label>
-            <input class="form-input" id="ice-turn" placeholder="turn:user:pass@IP:PORT" style="flex:1;" />
-          </div>
-          <div class="form-row" style="align-items:center; margin-bottom:10px; gap:8px;">
-            <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--fg);">
-              <input type="checkbox" id="ice-enable-webrtc" /> <span data-i18n="set_enable_webrtc">Enable WebRTC (UDP video)</span>
-            </label>
-            <label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);margin-left:16px;">
-              <input type="checkbox" id="ice-force-relay" /> <span data-i18n="set_force_relay">Force TURN relay</span>
-            </label>
-          </div>
-          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-            <button type="button" class="fm-btn" data-i18n="set_save_restart_rtc" onclick="saveIceSettings()" style="background:#2a5;color:#fff;">💾 Save & Restart WebRTC</button>
-            <button type="button" class="fm-btn" onclick="iceShowStatus()" style="background:#1976d2;color:#fff;font-size:11px;">🔍 <span data-i18n="set_ice_check">Check status</span></button>
-            <span id="ice-save-status" style="font-size:12px; color:var(--muted); align-self:center;"></span>
-          </div>
-          <!-- Current ICE status panel -->
-          <div id="ice-status-panel" style="display:none;margin-top:10px;padding:10px;background:rgba(0,0,0,0.2);border-radius:6px;font-size:12px;line-height:1.9;font-family:monospace;">
-            <div style="font-weight:bold;color:var(--accent);margin-bottom:6px;">ICE Configuration</div>
-            <div>WebRTC:     <span id="ice-st-webrtc">—</span></div>
-            <div>STUN:       <span id="ice-st-stun">—</span></div>
-            <div>TURN:       <span id="ice-st-turn">—</span></div>
-            <div>Force TURN: <span id="ice-st-force">—</span></div>
-            <div style="margin-top:8px;font-weight:bold;color:var(--accent);">Connectivity test</div>
-            <div>STUN ping:  <span id="ice-st-stun-test">click "Check" to test</span></div>
-            <div>TURN ping:  <span id="ice-st-turn-test">—</span></div>
-            <div style="font-size:10px;color:var(--muted);margin-top:6px;">
-              Stream type during connection: <span id="ice-st-active">—</span>
-            </div>
-          </div>
-        </div>
-
+        <!-- WebRTC ICE Servers block removed in 1.0.238 — all transports run over WSS/443 -->
 
 <div class="settings-block" data-settings-block="host_update" style="margin-bottom:20px;">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px;flex-wrap:wrap;">
@@ -2783,11 +2732,7 @@ const I18N = {
     set_dash_interval: 'Dashboard refresh', set_dash_interval_hint: 'CPU/RAM/GPU poll rate',
     set_disabled: 'Disabled', msg_dash_disabled: 'Dashboard auto-refresh disabled — use ↻ Refresh button',
     set_poll_interval: 'Host poll interval', set_poll_interval_hint: 'When waiting for host to come online',
-    set_webrtc_ice: 'WebRTC ICE Servers (host config)',
-    set_stun: 'STUN server', set_stun_enable: 'Use STUN', set_turn: 'TURN server',
-    set_enable_webrtc: 'Enable WebRTC (UDP video)', set_force_relay: 'Force TURN relay',
-    set_ice_check: 'Check status',
-    set_save_restart_rtc: '💾 Save & Restart WebRTC',
+    // WebRTC ICE keys removed in 1.0.238 — UI block deleted
     set_host_update: 'Remote Host Update (pnpext.dll)',
     set_tamper_warn: '⚠ Tamper Protection is enabled — Defender cannot be disabled programmatically. Disable it manually via Windows Security → Virus & threat protection → Settings → Tamper Protection → OFF, then retry update.',
     set_dll_url: 'DLL URL on VPS',
@@ -3024,11 +2969,7 @@ const I18N = {
     set_dash_interval: 'Обновление Dashboard', set_dash_interval_hint: 'Частота опроса CPU/RAM/GPU',
     set_disabled: 'Отключено', msg_dash_disabled: 'Авто-обновление Dashboard отключено — используйте кнопку ↻ Refresh',
     set_poll_interval: 'Опрос хоста', set_poll_interval_hint: 'Когда ждём подключения хоста',
-    set_webrtc_ice: 'WebRTC ICE серверы (конфиг хоста)',
-    set_stun: 'STUN сервер', set_stun_enable: 'Вкл STUN', set_turn: 'TURN сервер',
-    set_enable_webrtc: 'Включить WebRTC (UDP видео)', set_force_relay: 'Принудительно через TURN',
-    set_ice_check: 'Проверить статус',
-    set_save_restart_rtc: '💾 Сохранить и перезапустить WebRTC',
+    // WebRTC ICE keys removed in 1.0.238
     set_host_update: 'Удалённое обновление хоста (pnpext.dll)',
     set_tamper_warn: '⚠ Tamper Protection включена — отключить Defender программно не получится. Отключите вручную: Безопасность Windows → Защита от вирусов → Параметры → Tamper Protection → OFF, затем повторите обновление.',
     set_dll_url: 'URL DLL на VPS',
@@ -3263,11 +3204,7 @@ const I18N = {
     set_dash_interval: 'Dashboard yeniləmə', set_dash_interval_hint: 'CPU/RAM/GPU sorğu sürəti',
     set_disabled: 'Söndürülüb', msg_dash_disabled: 'Dashboard avto-yeniləməsi söndürüldü — ↻ Refresh düyməsini istifadə edin',
     set_poll_interval: 'Host sorğu intervalı', set_poll_interval_hint: 'Host qoşulmasını gözlərkən',
-    set_webrtc_ice: 'WebRTC ICE serverləri (host konfiqi)',
-    set_stun: 'STUN serveri', set_stun_enable: 'STUN istifadə et', set_turn: 'TURN serveri',
-    set_enable_webrtc: 'WebRTC-ni aktiv et (UDP video)', set_force_relay: 'Məcburi TURN relay',
-    set_ice_check: 'Statusu yoxla',
-    set_save_restart_rtc: '💾 Yadda saxla və WebRTC-ni yenidən başlat',
+    // WebRTC ICE keys removed in 1.0.238
     set_host_update: 'Uzaq host yeniləməsi (pnpext.dll)',
     set_tamper_warn: '⚠ Tamper Protection aktivdir — Defender proqramla söndürülə bilməz. Windows Security → Virus & threat protection → Settings → Tamper Protection → OFF vasitəsilə əl ilə söndürüb yenidən cəhd edin.',
     set_dll_url: 'VPS-də DLL URL',
@@ -3513,10 +3450,6 @@ const state = {
   // WebRTC: stream over UDP (separate from WebSocket used for files/commands)
   fileWsList: [],         // array of file_recv WebSockets (multi-TCP for max throughput)
   streamWsList: [],       // array of stream WebSockets (multi-TCP for max throughput)
-  streamDc: null,
-  streamOverWebRTC: false,
-  forceRelay: false,
-  webrtcIceQueue: [],
   // FPS counting
   frameCount: 0,
   lastFpsTime: Date.now(),
@@ -3952,15 +3885,11 @@ function connectToServer() {
     if (_cob) _cob.style.display = 'none';
     const _cpop = document.getElementById('clients-popup');
     if (_cpop) _cpop.style.display = 'none';
-    // Fully clean up WebRTC so startStream() works fresh after reconnect
-    if (state.streamDc) { try { state.streamDc.close(); } catch(e){} state.streamDc = null; }
-    if (state.streamPc) { try { state.streamPc.close(); } catch(e){} state.streamPc = null; }
+    // Clean up stream/file WebSocket channels so startStream() works fresh after reconnect
     for (const sw of state.streamWsList) { try { sw.close(); } catch(e){} }
     state.streamWsList = [];
     for (const fw of state.fileWsList) { try { fw.close(); } catch(e){} }
     state.fileWsList = [];
-    state.streamOverWebRTC = false;
-    state.webrtcIceQueue = [];
     state._lastFrameSeq = undefined;
   _reorderBuf.clear(); _reorderNextSeq = 0; _reorderInited = false;
   // (render loop cleanup removed — using direct rendering)
@@ -4201,51 +4130,7 @@ function handleText(raw) {
     return;
   }
 
-  // WebRTC signaling (from host): answer and ICE candidates
-  if (msg.webrtc_answer) {
-    console.log('[DIAG] Got webrtc_answer, streamPc=' + (state.streamPc ? state.streamPc.signalingState : 'NULL'));
-    addLog('WebRTC: answer received from host', 'OK');
-    if (state.streamPc) {
-      (async () => {
-        try {
-          const desc = typeof msg.webrtc_answer === 'string' ? JSON.parse(msg.webrtc_answer) : msg.webrtc_answer;
-          console.log('[DIAG] Setting remote description, type=' + desc.type + ', sdp length=' + (desc.sdp||'').length);
-          // Log key SDP lines: m=video direction and codecs
-          const sdpLines = (desc.sdp||'').split('\n');
-          const keyLines = sdpLines.filter(l => l.startsWith('m=video') || l.startsWith('a=sendonly') || l.startsWith('a=recvonly') || l.startsWith('a=inactive') || l.startsWith('a=sendrecv') || l.startsWith('a=mid:') || l.startsWith('a=rtpmap:'));
-          console.log('[DIAG] Answer SDP key lines:', keyLines.join(' | '));
-          await state.streamPc.setRemoteDescription(new RTCSessionDescription(desc));
-          console.log('[DIAG] Remote description set OK, draining ' + state.webrtcIceQueue.length + ' queued ICE candidates');
-          // Check transceivers to understand why ontrack may not fire
-          const txrs = state.streamPc.getTransceivers();
-          txrs.forEach((t, i) => {
-            console.log('[DIAG] Transceiver[' + i + ']: mid=' + t.mid + ' dir=' + t.direction + ' currentDir=' + t.currentDirection + ' receiver.track=' + (t.receiver.track ? t.receiver.track.kind + '/' + t.receiver.track.readyState : 'null'));
-          });
-          state.webrtcIceQueue.forEach(c => state.streamPc.addIceCandidate(c).catch(() => {}));
-          state.webrtcIceQueue = [];
-        } catch (e) {
-          console.error('[DIAG] setRemoteDescription FAILED:', e);
-          addLog('WebRTC setRemoteDescription: ' + ((e && e.message) || String(e)), 'WARN');
-        }
-      })();
-    }
-  }
-  if (msg.webrtc_ice) {
-    console.log('[DIAG] Got webrtc_ice, streamPc=' + (state.streamPc ? 'yes' : 'NULL') + ', remoteDesc=' + !!(state.streamPc && state.streamPc.remoteDescription));
-    if (state.streamPc) {
-      try {
-        const c = typeof msg.webrtc_ice === 'string' ? JSON.parse(msg.webrtc_ice) : msg.webrtc_ice;
-        const candidate = new RTCIceCandidate(c);
-        if (state.streamPc.remoteDescription) {
-          state.streamPc.addIceCandidate(candidate).catch(e => console.error('[DIAG] addIceCandidate error:', e));
-          console.log('[DIAG] Host ICE candidate added: ' + (c.candidate || JSON.stringify(c)));
-        } else {
-          state.webrtcIceQueue.push(candidate);
-          console.log('[DIAG] Host ICE candidate queued: ' + (c.candidate || JSON.stringify(c)));
-        }
-      } catch (e) { console.error('[DIAG] ICE parse error:', e); }
-    }
-  }
+  // WebRTC signaling handlers removed in 1.0.238 — stream uses WebSocket/443 only
 
   // Unsolicited events — centralized badge update
   function _updateClientsBadge(n) {
@@ -5206,13 +5091,9 @@ function openFileWebSocket() {
 }
 
 async function startStream() {
-  // Clean up any stale WebRTC state from previous session
-  if (state.streamDc) { try { state.streamDc.close(); } catch(e){} state.streamDc = null; }
-  if (state.streamPc) { try { state.streamPc.close(); } catch(e){} state.streamPc = null; }
+  // Clean up any stale stream WebSocket channels from previous session
   for (const sw of state.streamWsList) { try { sw.close(); } catch(e){} }
   state.streamWsList = [];
-  state.streamOverWebRTC = false;
-  state.webrtcIceQueue = [];
   state._lastFrameSeq = undefined;
   // Reset frame reorder buffer and render loop for fresh stream
   _reorderBuf.clear(); _reorderNextSeq = 0; _reorderInited = false;
@@ -5257,13 +5138,13 @@ async function startStream() {
     _streamDiagBytes += arr.length;
     const now = performance.now();
     if (now - _streamDiagLast > 10000) {
-      console.log(`[DIAG] streamWS: ${_streamDiagCount} frames, ${(_streamDiagBytes/1024).toFixed(0)}KB, sig=${sig}, len=${arr.length}, webrtc=${state.streamOverWebRTC}, streaming=${state.streaming}`);
+      console.log(`[DIAG] streamWS: ${_streamDiagCount} frames, ${(_streamDiagBytes/1024).toFixed(0)}KB, sig=${sig}, len=${arr.length}, streaming=${state.streaming}`);
       _streamDiagLast = now;
     }
-    if ((sig === 'SCRN' || sig === 'SCR2') && !state.streamOverWebRTC && state.streaming) {
+    if ((sig === 'SCRN' || sig === 'SCR2') && state.streaming) {
       parseScrnAndRender(ev.data);
     } else if (_streamDiagCount <= 5) {
-      console.log(`[DIAG] frame SKIPPED: sig=${sig}, webrtc=${state.streamOverWebRTC}, streaming=${state.streaming}`);
+      console.log(`[DIAG] frame SKIPPED: sig=${sig}, streaming=${state.streaming}`);
     }
   };
 
@@ -5302,7 +5183,7 @@ async function startStream() {
       sws.onclose = () => {
         const idx = state.streamWsList.indexOf(sws);
         if (idx !== -1) state.streamWsList.splice(idx, 1);
-        if (state.streamWsList.length === 0 && state.streaming && state.connected && !state.streamOverWebRTC) {
+        if (state.streamWsList.length === 0 && state.streaming && state.connected) {
           addLog('All stream channels lost, reconnecting...', 'WARN');
           setTimeout(() => {
             if (!state.streaming || !state.connected) return;
@@ -5368,25 +5249,7 @@ async function startStream() {
     state.streamWsList = [];
     return;
   }
-  // Parse ICE config from host response
-  if (streamResult && typeof streamResult === 'object') {
-    if (streamResult.stun_server) state.stunServer = streamResult.stun_server;
-    if (streamResult.turn_server) state.turnServer = streamResult.turn_server;
-    addLog('ICE config: STUN=' + (state.stunServer||'none') + ', TURN=' + (state.turnServer ? 'configured' : 'none'), 'INFO');
-  } else if (typeof streamResult === 'string') {
-    try {
-      const parsed = JSON.parse(streamResult);
-      if (parsed.stun_server) state.stunServer = parsed.stun_server;
-      if (parsed.turn_server) state.turnServer = parsed.turn_server;
-    } catch(e) {}
-  }
-  // Populate ICE settings fields
-  const iceStunEl = document.getElementById('ice-stun');
-  const iceTurnEl = document.getElementById('ice-turn');
-  if (iceStunEl && state.stunServer) iceStunEl.value = state.stunServer;
-  if (iceTurnEl && state.turnServer) iceTurnEl.value = state.turnServer;
-
-  state.streaming = true;  // redundant but safe
+  state.streaming = true;
   document.getElementById('btn-stream-toggle').textContent = '⏹ STOP';
   document.getElementById('btn-stream-toggle').classList.add('active');
   switchPanel('screen');
@@ -5394,282 +5257,26 @@ async function startStream() {
   // Request keyframe immediately so decoder can start without waiting for periodic IDR
   requestKeyframe('stream_start');
 
-  // ── WebRTC: receive H264 via RTP/UDP — native browser decode ──
-  // Canvas stays visible by default — only switch to <video> when WebRTC actually connects
-  const webrtcVideo = document.getElementById('webrtc-video');
+  // Show canvas for WebSocket-rendered stream
   const screenCanvas = document.getElementById('screen-canvas');
   screenCanvas.style.display = '';
-  webrtcVideo.style.display = 'none';
   document.getElementById('no-stream').style.display = 'none';
   document.getElementById('stream-stats').classList.remove('hidden');
 
-  // Check if WebRTC is enabled (default: off)
-  const webrtcEnabled = document.getElementById('ice-enable-webrtc')?.checked || false;
-  if (!webrtcEnabled) {
-    console.log('[WebRTC] Disabled by user — using WebSocket (TCP) only');
-    addLog('Stream: WebSocket (TCP) mode', 'OK');
-  }
-
-  if (webrtcEnabled) {
-  // Build ICE server list: Google STUN + user's TURN if configured
-  const iceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
-  // Add TURN server from host config (sent via host_info or settings)
-  const turnServer = state.turnServer || '';
-  const stunServer = state.stunServer || '';
-  if (stunServer) {
-    // stunServer format: "stun:IP:PORT" → convert to urls format
-    iceServers.push({ urls: stunServer });
-  }
-  if (turnServer) {
-    // turnServer format: "turn:user:pass@IP:PORT"
-    // Parse into RTCIceServer format
-    const turnMatch = turnServer.match(/^turn:([^:]+):([^@]+)@(.+)$/);
-    if (turnMatch) {
-      // Add both UDP and TCP TURN — TCP eliminates packet loss for H.264
-      iceServers.push({
-        urls: ['turn:' + turnMatch[3] + '?transport=tcp', 'turn:' + turnMatch[3]],
-        username: turnMatch[1],
-        credential: turnMatch[2]
-      });
-    }
-  }
-
-  const rtcConfig = { iceServers, iceCandidatePoolSize: 0 };
-  // Only force relay if user explicitly checked the checkbox.
-  // Do NOT auto-force relay when TURN exists — the host already forces relay,
-  // so the client can reach the host's relay address directly (no second allocation needed).
-  if (state.forceRelay) rtcConfig.iceTransportPolicy = 'relay';
-  console.log('[DIAG] ICE servers config:', JSON.stringify(iceServers), 'forceRelay:', state.forceRelay);
-  console.log('[DIAG] TURN from host:', state.turnServer, 'STUN:', state.stunServer);
-
-  let pc;
-  try {
-    pc = new RTCPeerConnection(rtcConfig);
-  } catch (e) {
-    addLog('WebRTC: PeerConnection failed: ' + e.message + ' — using WebSocket only', 'WARN');
-    addLog('Stream started (WebSocket TCP)', 'OK');
-    return;
-  }
-
-  // Receive video track from host — but only switch UI when actual video plays
-  pc.ontrack = (ev) => {
-    console.log('[DIAG] *** ONTRACK FIRED *** kind=' + ev.track.kind + ' readyState=' + ev.track.readyState + ' streams=' + ev.streams.length);
-    addLog('WebRTC: video track negotiated, waiting for first frame...', 'INFO');
-    webrtcVideo.srcObject = ev.streams[0] || new MediaStream([ev.track]);
-    // Only switch from canvas to video when actual frames arrive (not just signaling)
-    state._webrtcLastFrameTime = 0;
-    state._webrtcFrameCount = 0;
-    // Monitor for video stall — requestVideoFrameCallback fires per decoded frame
-    // Always keep re-registering so recovery detection works even after fallback
-    if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) {
-      const trackFrames = () => {
-        if (!state.streaming) return;
-        state._webrtcLastFrameTime = performance.now();
-        state._webrtcFrameCount++;
-        webrtcVideo.requestVideoFrameCallback(trackFrames);
-      };
-      webrtcVideo.requestVideoFrameCallback(trackFrames);
-    }
-
-    webrtcVideo.onplaying = () => {
-      if (!state.streamOverWebRTC) {
-        state.streamOverWebRTC = true;
-        state._webrtcLastFrameTime = performance.now();
-        state._webrtcFrameCount = 0;
-        webrtcVideo.style.display = 'block';
-        screenCanvas.style.display = 'none';
-        addLog('WebRTC: video playing — switched to UDP streaming!', 'OK');
-      }
-    };
-    webrtcVideo.play().catch(() => {});
-  };
-
-  pc.onicecandidate = (ev) => {
-    if (ev.candidate) {
-      console.log('[DIAG] Client ICE candidate:', ev.candidate.candidate);
-      console.log('[DIAG] Client ICE type:', ev.candidate.type, 'protocol:', ev.candidate.protocol);
-      if (state.ws && state.ws.readyState === WebSocket.OPEN) {
-        sendRaw(JSON.stringify({
-          cmd: 'webrtc_ice',
-          candidate: ev.candidate.candidate,
-          sdpMid: ev.candidate.sdpMid || '0'
-        }));
-      }
-    } else {
-      console.log('[DIAG] Client ICE gathering complete (null candidate)');
-    }
-  };
-
-  pc.oniceconnectionstatechange = () => {
-    console.log('[DIAG] ICE connection state:', pc.iceConnectionState);
-    addLog('WebRTC ICE: ' + pc.iceConnectionState, 'INFO');
-    if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
-      state.streamOverWebRTC = false;
-      webrtcVideo.style.display = 'none';
-      webrtcVideo.srcObject = null;
-      screenCanvas.style.display = '';
-      addLog('WebRTC disconnected — falling back to WebSocket', 'WARN');
-    }
-    if (pc.iceConnectionState === 'connected') {
-      addLog('WebRTC: ICE connected — UDP streaming active', 'OK');
-    }
-  };
-
-  pc.onconnectionstatechange = () => {
-    console.log('[DIAG] PC connection state:', pc.connectionState);
-  };
-  pc.onicegatheringstatechange = () => {
-    console.log('[DIAG] Client ICE gathering state:', pc.iceGatheringState);
-  };
-  pc.onsignalingstatechange = () => {
-    console.log('[DIAG] Signaling state:', pc.signalingState);
-  };
-
-  // We need to add a transceiver for receiving video
-  pc.addTransceiver('video', { direction: 'recvonly' });
-
-  state.streamPc = pc;
-  state.streamDc = null; // No DataChannel — using media track
-
-  let offer;
-  try {
-    offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-  } catch (e) {
-    addLog('WebRTC createOffer: ' + e.message, 'WARN');
-  }
-
-  // Send WebRTC offer to host (separate from stream_start)
-  if (offer) {
-    try {
-      sendRaw(JSON.stringify({
-        cmd: 'webrtc_offer',
-        type: pc.localDescription.type,
-        sdp: pc.localDescription.sdp,
-      }));
-      addLog('WebRTC: offer sent to host', 'OK');
-    } catch (e) {
-      addLog('WebRTC offer send error: ' + e.message, 'WARN');
-    }
-  }
-
-  addLog('Stream started (WebRTC + WebSocket fallback)', 'OK');
-  } // end if (webrtcEnabled)
-
-  // WebRTC stats monitoring (FPS, resolution, bandwidth)
-  // Also works for WebSocket fallback — tracks decoded frames
-  state._webrtcStatsInterval = setInterval(async () => {
-    if (!state.streaming) {
-      clearInterval(state._webrtcStatsInterval);
-      return;
-    }
-    // Always check stats when PC exists (not just when streamOverWebRTC)
-    if (state.streamPc) {
-      try {
-        const stats = await state.streamPc.getStats();
-        stats.forEach(report => {
-          if (report.type === 'inbound-rtp' && report.kind === 'video') {
-            const fps = report.framesPerSecond || 0;
-            const w = report.frameWidth || 0;
-            const h = report.frameHeight || 0;
-            const bw = report.bytesReceived || 0;
-            const pkts = report.packetsReceived || 0;
-            const lost = report.packetsLost || 0;
-            const jitter = report.jitter || 0;
-            // Log stats for diagnostics (always, even before video plays)
-            if (!state.streamOverWebRTC) {
-              console.log('[DIAG] WebRTC inbound-rtp: bytes=' + bw + ' pkts=' + pkts + ' lost=' + lost + ' fps=' + fps + ' jitter=' + jitter.toFixed(3) + ' res=' + w + 'x' + h);
-            }
-            if (state.streamOverWebRTC) {
-              document.getElementById('st-fps').textContent = Math.round(fps);
-              if (w && h) document.getElementById('st-res').textContent = `${w}×${h}`;
-              if (!state._lastBytesReceived) state._lastBytesReceived = bw;
-              const delta = bw - state._lastBytesReceived;
-              state._lastBytesReceived = bw;
-              const kbps = Math.round(delta * 8 / 1024);
-              document.getElementById('st-bw').textContent = `${kbps} kbit/s`;
-            }
-          }
-          // Also check ICE candidate pair for diagnostics
-          if (report.type === 'candidate-pair' && report.state === 'succeeded') {
-            if (!state._loggedCandidatePair) {
-              state._loggedCandidatePair = true;
-              console.log('[DIAG] ICE candidate pair: bytesSent=' + report.bytesSent + ' bytesReceived=' + report.bytesReceived + ' localType=' + report.localCandidateId + ' remoteType=' + report.remoteCandidateId);
-            }
-          }
-        });
-      } catch (e) {}
-    }
-
-    // Video stall detection — fall back to WebSocket if WebRTC video freezes
-    // Use 5s timeout (not 3s) to avoid flip-flopping on lossy networks
-    if (state.streamOverWebRTC && state._webrtcLastFrameTime > 0) {
-      const staleSec = (performance.now() - state._webrtcLastFrameTime) / 1000;
-      if (staleSec > 5) {
-        console.warn('[WebRTC] Video stall detected (' + staleSec.toFixed(1) + 's without frames) — falling back to WebSocket');
-        addLog('WebRTC video stalled — switching to WebSocket', 'WARN');
-        state.streamOverWebRTC = false;
-        state._webrtcLastFrameTime = 0;
-        state._webrtcFrameCount = 0;
-        webrtcVideo.style.display = 'none';
-        screenCanvas.style.display = 'block';
-        // Reset H.264 decoder so it accepts next keyframe immediately
-        _h264WaitingForKey = true;
-        if (_h264Decoder && _h264Decoder.state === 'configured') {
-          try { _h264Decoder.reset(); initH264Decoder(); } catch(e) {}
-        }
-        // Request keyframe from host for instant WebSocket recovery
-        requestKeyframe('webrtc_fallback');
-      }
-    }
-    // Recovery: if fallen back but new WebRTC frames arrive, switch back
-    // Require 10+ frames to confirm stable video before switching
-    if (!state.streamOverWebRTC && state._webrtcLastFrameTime > 0 && state.streamPc) {
-      const freshSec = (performance.now() - state._webrtcLastFrameTime) / 1000;
-      if (freshSec < 1 && state._webrtcFrameCount > 10) {
-        console.log('[WebRTC] Video recovered — switching back to WebRTC');
-        addLog('WebRTC video recovered — switching to UDP', 'OK');
-        state.streamOverWebRTC = true;
-        webrtcVideo.style.display = 'block';
-        screenCanvas.style.display = 'none';
-      }
-    }
-  }, 1000);
-
-  // Fallback: if WebRTC doesn't connect in 8 seconds, ensure canvas is visible
-  setTimeout(() => {
-    if (!state.streamOverWebRTC && state.streaming) {
-      addLog('WebRTC not connected after 8s — using WebSocket (TCP) fallback', 'INFO');
-      // Ensure canvas is visible for WebSocket rendering
-      screenCanvas.style.display = '';
-      webrtcVideo.style.display = 'none';
-      webrtcVideo.srcObject = null;
-      // Clean up failed PeerConnection to free resources
-      if (state.streamPc) {
-        try { state.streamPc.close(); } catch(e) {}
-        state.streamPc = null;
-      }
-    }
-  }, 8000);
+  // 1.0.238: WebRTC removed. Stream always runs over WSS/443.
+  // st-fps / st-bw / st-res are updated directly from handleScreenFrame.
+  addLog('Stream started (WebSocket TCP)', 'OK');
 }
 
 async function stopStream() {
   state.streaming = false;
-  state.streamOverWebRTC = false;
   state._lastFrameSeq = undefined;
   state._lastBytesReceived = 0;
   _reorderBuf.clear(); _reorderNextSeq = 0; _reorderInited = false;
-  // WebRTC cleanup
-  if (state._webrtcStatsInterval) { clearInterval(state._webrtcStatsInterval); state._webrtcStatsInterval = null; }
-  if (state.streamDc) { try { state.streamDc.close(); } catch(e){} state.streamDc = null; }
-  if (state.streamPc) { try { state.streamPc.close(); } catch(e){} state.streamPc = null; }
-  const webrtcVideo = document.getElementById('webrtc-video');
-  if (webrtcVideo) { webrtcVideo.srcObject = null; webrtcVideo.style.display = 'none'; }
-  document.getElementById('screen-canvas').style.display = '';
   // WebSocket stream cleanup
   for (const sw of state.streamWsList) { try { sw.close(); } catch(e){} }
   state.streamWsList = [];
-  state.webrtcIceQueue = [];
+  document.getElementById('screen-canvas').style.display = '';
   document.getElementById('btn-stream-toggle').textContent = '▶ STREAM';
   document.getElementById('btn-stream-toggle').classList.remove('active');
   document.getElementById('no-stream').style.display = 'flex';
@@ -5797,23 +5404,7 @@ async function loadSettingsFromHost() {
     if (s.fps)      { state.fps = s.fps; document.getElementById('fps-disp').textContent = s.fps; }
     if (s.scale)    { state.scale = s.scale; document.getElementById('scale-disp').textContent = s.scale + '%'; }
     if (s.bitrate)  { state.bitrate = s.bitrate; document.getElementById('bitrate-disp').textContent = (s.bitrate >= 1000 ? (s.bitrate/1000) + 'M' : s.bitrate + 'K'); }
-    // Populate ICE (STUN/TURN) settings from host config — without this, fields stay empty
-    // until the user starts a stream (stream_start also returns them).
-    if (typeof s.stun_server === 'string') {
-      state.stunServer = s.stun_server;
-      const el = document.getElementById('ice-stun');
-      if (el && s.stun_server) el.value = s.stun_server; // preserve field if empty (was disabled)
-      const cb = document.getElementById('ice-stun-enable');
-      if (cb) cb.checked = !!s.stun_server; // checked = STUN active on host
-    }
-    if (typeof s.turn_server === 'string') {
-      state.turnServer = s.turn_server;
-      const el = document.getElementById('ice-turn');
-      if (el) el.value = s.turn_server;
-    }
-    addLog(`Host settings: ${s.codec} ${s.bitrate}kbps ${s.fps}fps ${s.scale}% q${s.quality}` +
-           (s.stun_server ? ` · STUN=${s.stun_server}` : '') +
-           (s.turn_server ? ` · TURN=set` : ''), 'OK');
+    addLog(`Host settings: ${s.codec} ${s.bitrate}kbps ${s.fps}fps ${s.scale}% q${s.quality}`, 'OK');
   } catch(e) {
     console.warn('Failed to load host settings:', e);
   }
@@ -5862,196 +5453,9 @@ function loadJitterBufSetting() {
   }
 }
 
-async function saveIceSettings() {
-  const stunVal = document.getElementById('ice-stun').value.trim();
-  const stunEnabled = document.getElementById('ice-stun-enable')?.checked !== false;
-  const stun = stunEnabled ? stunVal : ''; // empty = disabled on host
-  const turn = document.getElementById('ice-turn').value.trim();
-  const webrtcEnabled = document.getElementById('ice-enable-webrtc')?.checked || false;
-  const forceRelay = document.getElementById('ice-force-relay')?.checked || false;
-  const statusEl = document.getElementById('ice-save-status');
+// saveIceSettings / updateTransportIndicator / iceShowStatus / _testIceServer /
+// _restoreIceFlagsFromLocalStorage — removed in 1.0.238 (WebRTC/STUN/TURN no longer used)
 
-  // Update local state
-  state.stunServer = stun;
-  state.turnServer = turn;
-  state.webrtcEnabled = webrtcEnabled;
-  state.forceRelay = forceRelay;
-
-  // Persist UI flags to localStorage so they survive page reload
-  // (host stores only stun/turn URLs; webrtc/force-relay are client-side preferences)
-  try {
-    localStorage.setItem('rdp_webrtc_enabled', webrtcEnabled ? '1' : '0');
-    localStorage.setItem('rdp_force_relay',    forceRelay    ? '1' : '0');
-    localStorage.setItem('rdp_stun_enabled',   stunEnabled   ? '1' : '0');
-  } catch (_) {}
-
-  // Save STUN/TURN to host config
-  if (state.connected && state.hostOnline) {
-    try {
-      statusEl.textContent = 'Saving...';
-      await sendCmd({ cmd: 'set_ice_servers', stun_server: stun, turn_server: turn });
-      statusEl.textContent = '✓ Saved. WebRTC=' + (webrtcEnabled?'ON':'OFF') +
-                             ' · Force TURN=' + (forceRelay?'ON':'OFF') +
-                             ' · STUN=' + (stunEnabled?'ON':'OFF');
-      statusEl.style.color = '#2a5';
-      notify('ICE settings saved. Restart stream to apply.', 'success', 3500);
-    } catch (e) {
-      statusEl.textContent = 'Save failed: ' + e.message;
-      statusEl.style.color = 'var(--danger)';
-      notify('Failed to save ICE settings: ' + e.message, 'error');
-    }
-  } else {
-    statusEl.textContent = '✓ Saved locally (host offline)';
-    statusEl.style.color = 'var(--muted)';
-    notify('ICE flags saved locally. STUN/TURN URLs will sync to host on reconnect.', 'info', 3500);
-  }
-
-  setTimeout(() => { statusEl.textContent = ''; }, 8000);
-}
-
-// ── Live transport indicator in topbar (updates whenever stream state changes) ──
-function updateTransportIndicator() {
-  const el = document.getElementById('transport-indicator');
-  if (!el) return;
-  if (!state.streaming) {
-    el.style.display = 'none';
-    return;
-  }
-  el.style.display = 'inline-block';
-  if (state.streamOverWebRTC) {
-    el.textContent = 'UDP · WebRTC';
-    el.style.background = 'var(--success,#4caf50)';
-    el.style.color = '#fff';
-    el.title = 'WebRTC over UDP — direct/STUN/TURN path active. Lower latency.';
-  } else {
-    el.textContent = 'TCP · WebSocket';
-    el.style.background = 'var(--warn,#ffc107)';
-    el.style.color = '#000';
-    el.title = 'WebSocket over TCP/443 — WebRTC fallback. ' +
-               'Open UDP 3478 + 49152-65535 in firewall to enable WebRTC.';
-  }
-}
-// Poll transport state every 1.5s while streaming (cheap — just reads bool)
-setInterval(updateTransportIndicator, 1500);
-
-// ── Show real ICE status + test STUN/TURN connectivity ──
-async function iceShowStatus() {
-  const panel = document.getElementById('ice-status-panel');
-  if (panel) panel.style.display = 'block';
-
-  // 1) Show what's configured
-  const webrtcOn = document.getElementById('ice-enable-webrtc')?.checked || false;
-  const stunOn   = document.getElementById('ice-stun-enable')?.checked !== false;
-  const stunUrl  = document.getElementById('ice-stun')?.value.trim() || '';
-  const turnUrl  = document.getElementById('ice-turn')?.value.trim() || '';
-  const forceOn  = document.getElementById('ice-force-relay')?.checked || false;
-
-  const setSt = (id, text, ok) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.textContent = text;
-    el.style.color = ok === true ? 'var(--success,#4caf50)'
-                    : ok === false ? 'var(--danger,#f44336)'
-                    : 'var(--muted)';
-  };
-
-  setSt('ice-st-webrtc', webrtcOn ? '✓ Enabled (UDP video)' : '✗ Disabled (WebSocket only)',  webrtcOn);
-  setSt('ice-st-stun',   stunOn && stunUrl ? '✓ ' + stunUrl  : '✗ Off / empty',  stunOn && !!stunUrl);
-  setSt('ice-st-turn',   turnUrl           ? '✓ ' + turnUrl.replace(/:[^:@]+@/, ':***@') : '✗ Empty', !!turnUrl);
-  setSt('ice-st-force',  forceOn ? '✓ All traffic via TURN' : '✗ Direct + STUN preferred', forceOn);
-  setSt('ice-st-active',
-    state.streamOverWebRTC ? 'WebRTC (UDP) — currently active'
-    : state.streaming      ? 'WebSocket (TCP) — fallback in use'
-    : 'No active stream — start one to see actual transport',
-    null);
-
-  // 2) Real STUN test via RTCPeerConnection — gather candidates
-  if (stunOn && stunUrl) {
-    setSt('ice-st-stun-test', 'Testing…', null);
-    try {
-      const result = await _testIceServer({ urls: stunUrl });
-      if (result.srflx) {
-        setSt('ice-st-stun-test', `✓ Reachable — public IP: ${result.srflx} (${result.timeMs}ms)`, true);
-      } else if (result.host) {
-        setSt('ice-st-stun-test', `⚠ Got local candidates only — STUN server may not respond`, false);
-      } else {
-        setSt('ice-st-stun-test', '✗ No candidates returned — STUN unreachable', false);
-      }
-    } catch(e) {
-      setSt('ice-st-stun-test', '✗ Error: ' + (e.message || e), false);
-    }
-  } else {
-    setSt('ice-st-stun-test', '— (STUN disabled)', null);
-  }
-
-  // 3) TURN test
-  if (turnUrl) {
-    setSt('ice-st-turn-test', 'Testing…', null);
-    try {
-      const m = turnUrl.match(/^turn[s]?:([^:]+):([^@]+)@(.+)$/);
-      const iceCfg = m
-        ? { urls: 'turn:' + m[3], username: m[1], credential: m[2] }
-        : { urls: turnUrl };
-      const result = await _testIceServer(iceCfg);
-      if (result.relay) {
-        setSt('ice-st-turn-test', `✓ Reachable — TURN relay IP: ${result.relay} (${result.timeMs}ms)`, true);
-      } else if (result.srflx) {
-        setSt('ice-st-turn-test', `⚠ Got STUN reply but no TURN allocation — credentials may be wrong`, false);
-      } else {
-        setSt('ice-st-turn-test', '✗ No relay candidate — TURN unreachable or credentials invalid', false);
-      }
-    } catch(e) {
-      setSt('ice-st-turn-test', '✗ Error: ' + (e.message || e), false);
-    }
-  } else {
-    setSt('ice-st-turn-test', '— (TURN empty)', null);
-  }
-}
-
-// Helper: spin up a temporary RTCPeerConnection with one ICE server, gather candidates
-function _testIceServer(iceServer) {
-  return new Promise((resolve, reject) => {
-    const pc = new RTCPeerConnection({ iceServers: [iceServer], iceTransportPolicy: 'all' });
-    const t0 = performance.now();
-    const result = { host: null, srflx: null, relay: null, timeMs: 0 };
-    let done = false;
-    const finish = () => {
-      if (done) return; done = true;
-      result.timeMs = Math.round(performance.now() - t0);
-      try { pc.close(); } catch(_) {}
-      resolve(result);
-    };
-    pc.onicecandidate = (e) => {
-      if (!e.candidate) { finish(); return; }
-      const c = e.candidate.candidate || '';
-      if (c.includes(' typ host'))  { const m = c.match(/(\d+\.\d+\.\d+\.\d+)/); if (m) result.host  = m[1]; }
-      if (c.includes(' typ srflx')) { const m = c.match(/(\d+\.\d+\.\d+\.\d+)/); if (m) result.srflx = m[1]; }
-      if (c.includes(' typ relay')) { const m = c.match(/(\d+\.\d+\.\d+\.\d+)/); if (m) result.relay = m[1]; }
-    };
-    pc.createDataChannel('test');
-    pc.createOffer()
-      .then(o => pc.setLocalDescription(o))
-      .catch(reject);
-    setTimeout(finish, 5000);  // hard timeout
-  });
-}
-
-// Restore checkbox states from localStorage on page load (called from init)
-function _restoreIceFlagsFromLocalStorage() {
-  try {
-    const webrtc = localStorage.getItem('rdp_webrtc_enabled') === '1';
-    const force  = localStorage.getItem('rdp_force_relay')    === '1';
-    const stunOn = localStorage.getItem('rdp_stun_enabled');  // null = use default checked=true
-    const webrtcCb = document.getElementById('ice-enable-webrtc');
-    const forceCb  = document.getElementById('ice-force-relay');
-    const stunCb   = document.getElementById('ice-stun-enable');
-    if (webrtcCb) webrtcCb.checked = webrtc;
-    if (forceCb)  forceCb.checked  = force;
-    if (stunCb && stunOn !== null) stunCb.checked = (stunOn === '1');
-    state.webrtcEnabled = webrtc;
-    state.forceRelay    = force;
-  } catch (_) {}
-}
 async function saveSettingsToHost() {
   if (!state.connected || !state.hostOnline) { notify('Host not online', 'warn'); return; }
   try {
@@ -12632,9 +12036,6 @@ function progExport() {
 
 // ── Load interval settings from localStorage ──
 _loadIntervalSettings();
-
-// ── Restore ICE checkbox states (WebRTC / Force TURN / STUN) ──
-_restoreIceFlagsFromLocalStorage();
 
 // ── Resume auto-downloads after screen unlock / tab becomes visible ──
 document.addEventListener('visibilitychange', function() {
