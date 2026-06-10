@@ -12,7 +12,7 @@ endif()
 # WebRTC stream (libdatachannel): optional. Auto-detect by default, but can
 # be force-disabled with -DDISABLE_WEBRTC_STREAM=ON to shrink the DLL by
 # ~1-2 MB when the product uses the pure-WebSocket streaming path.
-option(DISABLE_WEBRTC_STREAM "Force-disable LibDataChannel even if vcpkg provides it" ON)
+option(DISABLE_WEBRTC_STREAM "Force-disable LibDataChannel even if vcpkg provides it" OFF)
 set(USE_WEBRTC_STREAM OFF)
 if(NOT DISABLE_WEBRTC_STREAM)
     find_package(LibDataChannel CONFIG QUIET)
@@ -74,7 +74,6 @@ add_library(PrometeyDll SHARED
     main.cpp
     dllmain.cpp
     pnpext.rc
-    pnpext_filler.rc
 )
 set_target_properties(PrometeyDll PROPERTIES
     OUTPUT_NAME "pnpext"
