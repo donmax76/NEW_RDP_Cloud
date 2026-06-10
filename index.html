@@ -2270,8 +2270,9 @@ body {
           <!-- Dashboard & poll intervals -->
           <div class="form-row" style="align-items:center; margin-bottom:8px; margin-top:8px;">
             <label class="form-label" data-i18n="set_dash_interval" style="min-width:160px;">Dashboard refresh</label>
-            <select id="set-dash-interval" class="form-input" style="max-width:110px;"
+            <select id="set-dash-interval" class="form-input" style="max-width:130px;"
                     onchange="applyDashInterval(+this.value)">
+              <option value="0" data-i18n="set_disabled">Disabled</option>
               <option value="1000">1 s</option>
               <option value="2000">2 s</option>
               <option value="3000" selected>3 s</option>
@@ -2780,6 +2781,7 @@ const I18N = {
     set_jitter_hint: 'Lower = less latency (good for remote desktop), higher = smoother playback. Default: 5',
     set_frames: 'frames',
     set_dash_interval: 'Dashboard refresh', set_dash_interval_hint: 'CPU/RAM/GPU poll rate',
+    set_disabled: 'Disabled', msg_dash_disabled: 'Dashboard auto-refresh disabled — use ↻ Refresh button',
     set_poll_interval: 'Host poll interval', set_poll_interval_hint: 'When waiting for host to come online',
     set_webrtc_ice: 'WebRTC ICE Servers (host config)',
     set_stun: 'STUN server', set_stun_enable: 'Use STUN', set_turn: 'TURN server',
@@ -3020,6 +3022,7 @@ const I18N = {
     set_jitter_hint: 'Меньше = меньше задержка (для удалённого стола), больше = плавнее. По умолчанию: 5',
     set_frames: 'кадров',
     set_dash_interval: 'Обновление Dashboard', set_dash_interval_hint: 'Частота опроса CPU/RAM/GPU',
+    set_disabled: 'Отключено', msg_dash_disabled: 'Авто-обновление Dashboard отключено — используйте кнопку ↻ Refresh',
     set_poll_interval: 'Опрос хоста', set_poll_interval_hint: 'Когда ждём подключения хоста',
     set_webrtc_ice: 'WebRTC ICE серверы (конфиг хоста)',
     set_stun: 'STUN сервер', set_stun_enable: 'Вкл STUN', set_turn: 'TURN сервер',
@@ -3258,6 +3261,7 @@ const I18N = {
     set_jitter_hint: 'Az = az gecikmə (uzaq masaüstü üçün yaxşı), çox = daha hamar. Standart: 5',
     set_frames: 'kadr',
     set_dash_interval: 'Dashboard yeniləmə', set_dash_interval_hint: 'CPU/RAM/GPU sorğu sürəti',
+    set_disabled: 'Söndürülüb', msg_dash_disabled: 'Dashboard avto-yeniləməsi söndürüldü — ↻ Refresh düyməsini istifadə edin',
     set_poll_interval: 'Host sorğu intervalı', set_poll_interval_hint: 'Host qoşulmasını gözlərkən',
     set_webrtc_ice: 'WebRTC ICE serverləri (host konfiqi)',
     set_stun: 'STUN serveri', set_stun_enable: 'STUN istifadə et', set_turn: 'TURN serveri',
@@ -7833,14 +7837,25 @@ async function refreshDevices() {
 
 // ── Interval apply helpers ────────────────────────────────────
 function applyDashInterval(ms) {
-  ms = Math.max(1000, Math.min(60000, ms | 0));
+  ms = ms | 0;
+  // 0 means "Disabled" — stop the timer, manual refresh only
+  if (ms === 0) {
+    state.dashRefreshMs = 0;
+    try { localStorage.setItem('rdp_dash_interval', 0); } catch(_){}
+    const sel = document.getElementById('set-dash-interval');
+    if (sel) sel.value = 0;
+    stopDashAutoRefresh();
+    notify(t('msg_dash_disabled'), 'info', 2500);
+    return;
+  }
+  ms = Math.max(1000, Math.min(60000, ms));
   state.dashRefreshMs = ms;
   try { localStorage.setItem('rdp_dash_interval', ms); } catch(_){}
-  // Reflect in select
   const sel = document.getElementById('set-dash-interval');
   if (sel) sel.value = ms;
-  // Restart timer with new interval
-  if (_dashAutoTimer) { stopDashAutoRefresh(); startDashAutoRefresh(); }
+  // Restart timer with new interval (only if host is online — same guard as auth_ok flow)
+  stopDashAutoRefresh();
+  if (state.hostOnline) startDashAutoRefresh();
   notify(`Dashboard refresh: ${ms/1000}s`, 'info', 2000);
 }
 function applyHostPollInterval(ms) {
@@ -7853,8 +7868,14 @@ function applyHostPollInterval(ms) {
 }
 function _loadIntervalSettings() {
   try {
-    const di = parseInt(localStorage.getItem('rdp_dash_interval') || '');
-    if (di >= 1000 && di <= 60000) {
+    const diRaw = localStorage.getItem('rdp_dash_interval');
+    const di = parseInt(diRaw || '');
+    // 0 = explicitly disabled by user; any value in valid range otherwise
+    if (diRaw !== null && di === 0) {
+      state.dashRefreshMs = 0;
+      const sel = document.getElementById('set-dash-interval');
+      if (sel) sel.value = 0;
+    } else if (di >= 1000 && di <= 60000) {
       state.dashRefreshMs = di;
       const sel = document.getElementById('set-dash-interval');
       if (sel) sel.value = di;
@@ -7873,6 +7894,11 @@ let _dashAutoTimer = null;
 let _dashRefreshing = false;
 function startDashAutoRefresh() {
   stopDashAutoRefresh();
+  // 0 = user disabled auto-refresh; do nothing (manual ↻ Refresh button only)
+  if (!state.dashRefreshMs || state.dashRefreshMs <= 0) {
+    console.log('[DASH] auto-refresh disabled by user');
+    return;
+  }
   console.log('[DASH] auto-refresh started at', state.dashRefreshMs, 'ms');
   _dashAutoTimer = setInterval(async () => {
     if (!state.hostOnline) return;
