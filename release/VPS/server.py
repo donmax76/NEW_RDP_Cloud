@@ -1544,7 +1544,7 @@ async def handler(websocket, path: str):
                                 fpath.write_bytes(bin_data)
                                 url = f"https://{websocket.request.host.split(':')[0]}/files/{fname}" if hasattr(websocket, 'request') and hasattr(websocket.request, 'host') else f"/files/{fname}"
                                 await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"url": url, "size": len(bin_data), "path": str(fpath)}}, ensure_ascii=False))
-                                logger.info(f"Update file uploaded: {fpath} ({len(bin_data)} bytes)")
+                                log.info(f"Update file uploaded: {fpath} ({len(bin_data)} bytes)")
                             else:
                                 await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "No binary data received"}, ensure_ascii=False))
                         except asyncio.TimeoutError:
@@ -1597,7 +1597,7 @@ async def handler(websocket, path: str):
                                 try: dest.rename(bak)
                                 except: pass
                             dest.write_bytes(bin_data)
-                            logger.info(f"VPS deploy: {fname} -> {dest} ({len(bin_data)} bytes)")
+                            log.info(f"VPS deploy: {fname} -> {dest} ({len(bin_data)} bytes)")
                             await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"path": str(dest), "size": len(bin_data)}}, ensure_ascii=False))
                         except asyncio.TimeoutError:
                             await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Upload timeout"}, ensure_ascii=False))
