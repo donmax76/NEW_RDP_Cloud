@@ -2554,7 +2554,6 @@ body {
         <input class="form-input" id="in-port" placeholder="80" data-i18n-title="modal_port_title" title="80 via nginx; 8080 = direct (use if connection fails)" />
       </div>
     </div>
-    <div style="font-size:11px;color:var(--muted);margin-top:-6px;margin-bottom:10px;" data-i18n-html="modal_port_hint">If you see “Sec-WebSocket-Key” or “HTTP/1.0” in server logs: set Port to <b>8080</b>, then on the server run <code style="font-size:10px;">ufw allow 8080/tcp && ufw reload</code>.</div>
     <div class="form-group">
       <label class="form-label" data-i18n="modal_token">Room Token</label>
       <input class="form-input" id="in-token" placeholder="" autocomplete="off" />
@@ -2811,7 +2810,7 @@ const I18N = {
     // Connect modal
     modal_server: 'Server (same as page address)', modal_server_ph: 'IP or hostname',
     modal_port: 'Port', modal_port_title: '80 via nginx; 8080 = direct (use if connection fails)',
-    modal_port_hint: 'If you see “Sec-WebSocket-Key” or “HTTP/1.0” in server logs: set Port to <b>8080</b>, then on the server run <code style="font-size:10px;">ufw allow 8080/tcp && ufw reload</code>.',
+    // modal_port_hint removed in 1.0.238 — no longer relevant (port 8080 closed)
     modal_token: 'Room Token',
     modal_password: 'Password', modal_password_ph: 'Optional room password',
     modal_use_wss: 'Use WSS (SSL)',
@@ -3047,7 +3046,7 @@ const I18N = {
     // Connect modal
     modal_server: 'Сервер (тот же что в адресе страницы)', modal_server_ph: 'IP или имя хоста',
     modal_port: 'Порт', modal_port_title: '80 через nginx; 8080 = напрямую (если не соединяется)',
-    modal_port_hint: 'Если в логах сервера видно «Sec-WebSocket-Key» или «HTTP/1.0»: укажи порт <b>8080</b>, затем на сервере: <code style="font-size:10px;">ufw allow 8080/tcp && ufw reload</code>.',
+    // modal_port_hint removed in 1.0.238
     modal_token: 'Токен комнаты',
     modal_password: 'Пароль', modal_password_ph: 'Пароль комнаты (необязательно)',
     modal_use_wss: 'WSS (SSL)',
@@ -3282,7 +3281,7 @@ const I18N = {
     // Connect modal
     modal_server: 'Server (səhifə ünvanı ilə eyni)', modal_server_ph: 'IP və ya host adı',
     modal_port: 'Port', modal_port_title: '80 nginx vasitəsilə; 8080 = birbaşa (əlaqə alınmırsa)',
-    modal_port_hint: 'Server loqlarında «Sec-WebSocket-Key» və ya «HTTP/1.0» görsəniz: Port-u <b>8080</b>-ə keçirin, sonra serverdə: <code style="font-size:10px;">ufw allow 8080/tcp && ufw reload</code>.',
+    // modal_port_hint removed in 1.0.238
     modal_token: 'Otaq tokeni',
     modal_password: 'Şifrə', modal_password_ph: 'Otaq şifrəsi (opsional)',
     modal_use_wss: 'WSS (SSL)',

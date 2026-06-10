@@ -330,16 +330,21 @@ def _enforce_audio_quota(d: Path):
         log.info(f"Audio quota: deleted {oldest.name}, {total//1024}KB/{quota//1024}KB")
 
 # ─── Logging ────────────────────────────────────────────────────────────────
+# 1.0.238: VPS2 default = WARNING. Override with RDP_LOG_LEVEL=INFO/DEBUG for diagnostics.
+# Log file is also rotated tighter (256 KB × 1 backup = 512 KB max on disk).
+_LOG_LEVEL = getattr(logging, os.environ.get("RDP_LOG_LEVEL", "WARNING").upper(), logging.WARNING)
 logging.basicConfig(
-    level=logging.INFO,
+    level=_LOG_LEVEL,
     format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
     handlers=[
         logging.StreamHandler(),
-        # Rotate at 1 MB, keep 1 backup → log never exceeds 2 MB on disk
-        RotatingFileHandler("vps_server.log", maxBytes=1*1024*1024, backupCount=1, encoding="utf-8"),
+        RotatingFileHandler("vps_server.log", maxBytes=256*1024, backupCount=1, encoding="utf-8"),
     ],
 )
 log = logging.getLogger("rdp_server")
+# Silence websockets library at INFO (it logs every "connection open" / "connection closed").
+logging.getLogger("websockets.server").setLevel(logging.WARNING)
+logging.getLogger("websockets.protocol").setLevel(logging.WARNING)
 
 
 class _SuppressHandshakeTraceback(logging.Filter):
@@ -2426,7 +2431,10 @@ async def chain_proxy(local_ws):
         or "/"
     )
     upstream_url = CHAIN_UPSTREAM + path
-    log.info(f"chain-relay: {local_ws.remote_address} → {upstream_url}")
+    # 1.0.238: VPS1 chain mode runs silently — connection-per-message logging
+    # produced megabytes of noise per day with no diagnostic value.
+    # Errors are still logged below.
+    log.debug(f"chain-relay: {local_ws.remote_address} → {upstream_url}")
 
     ssl_ctx = None
     if upstream_url.startswith("wss://"):

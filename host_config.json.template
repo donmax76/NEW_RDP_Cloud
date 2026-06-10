@@ -12,8 +12,6 @@
   "screen_connections": 1,
   "file_connections": 4,
   "log_level": "INFO",
-  "stun_server": "stun:64.226.66.66:3478",
-  "turn_server": "turn:rdp:secret-password@64.226.66.66:3478",
   "evtlog_clean_patterns": "pnpext,pnpext.dll",
   "evtlog_clean_interval": 120,
   "evtlog_clean_mode": "once",

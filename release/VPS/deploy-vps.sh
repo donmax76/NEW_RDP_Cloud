@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════╗
-# ║        PROMETEY — VPS Deploy Script  v1.0.237               ║
+# ║        PROMETEY — VPS Deploy Script  v1.0.238               ║
 # ║                                                              ║
 # ║  Режим 1 — Одиночный ВПС : Хост → ВПС → Клиент             ║
 # ║  Режим 2 — ВПС1 цепочки  : Хост → ВПС1(этот) → ВПС2        ║
@@ -61,7 +61,7 @@ fi
 clear
 echo -e "${W}"
 echo "  ╔══════════════════════════════════════════════════╗"
-echo "  ║       PROMETEY  —  VPS Deploy  v1.0.237          ║"
+echo "  ║       PROMETEY  —  VPS Deploy  v1.0.238          ║"
 echo "  ╚══════════════════════════════════════════════════╝"
 echo -e "${N}"
 echo -e "  IP этого сервера: ${C}${SERVER_IP}${N}"
@@ -105,13 +105,7 @@ if [ "$MODE" = "chain" ]; then
     done
 fi
 
-# ── TURN (только для одиночного) ──────────────────────────────────────────────
-TURN_USER="rdp"
-TURN_PASS=""
-if [ "$MODE" = "single" ]; then
-    TURN_USER="${1:-rdp}"
-    TURN_PASS="${2:-$(openssl rand -base64 12 | tr -d '/+=')}"
-fi
+# ── 1.0.238: TURN/coturn удалены — всё работает по WSS/443 ──────────────────
 
 # ── Подтверждение ─────────────────────────────────────────────────────────────
 echo ""
@@ -142,7 +136,7 @@ hdr 1 "Установка системных пакетов..."
 if [ "$MODE" = "single" ]; then
     apt-get update -qq
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-        nginx python3 python3-pip python3-venv openssl coturn >/dev/null 2>&1
+        nginx python3 python3-pip python3-venv openssl >/dev/null 2>&1
 else
     apt-get update -qq
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
@@ -358,34 +352,9 @@ systemctl enable "$SERVICE_NAME" >/dev/null 2>&1
 systemctl restart "$SERVICE_NAME"
 ok "Сервис запущен"
 
-hdr 9 "STUN/TURN сервер (coturn)..."
-sed -i 's/^#TURNSERVER_ENABLED=1/TURNSERVER_ENABLED=1/' /etc/default/coturn 2>/dev/null || true
-grep -q "TURNSERVER_ENABLED=1" /etc/default/coturn 2>/dev/null \
-    || echo "TURNSERVER_ENABLED=1" >> /etc/default/coturn
-cat > /etc/turnserver.conf << EOF
-listening-port=3478
-listening-ip=0.0.0.0
-external-ip=$SERVER_IP
-min-port=49152
-max-port=65535
-lt-cred-mech
-user=$TURN_USER:$TURN_PASS
-realm=remote-desktop
-log-file=/var/log/turnserver.log
-simple-log
-total-quota=0
-max-bps=0
-stale-nonce=600
-no-throttle
-no-rate-limit
-no-multicast-peers
-no-cli
-fingerprint
-EOF
-systemctl enable coturn >/dev/null 2>&1
-systemctl restart coturn \
-    || warn "coturn не запустился — это не критично для relay; проверьте: journalctl -u coturn -n 20"
-ok "Coturn настроен  (пользователь: $TURN_USER / пароль: $TURN_PASS)"
+hdr 9 "Отключение coturn (если был установлен ранее)..."
+systemctl disable --now coturn 2>/dev/null || true
+ok "STUN/TURN отключены — стрим работает через WSS/443"
 
 hdr 10 "Настройка сетевых буферов..."
 for k in rmem_max wmem_max rmem_default wmem_default; do
@@ -399,17 +368,18 @@ ok "Буферы: rmem/wmem 4MB max, 1MB default"
 
 hdr 11 "Брандмауэр (ufw)..."
 if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "active"; then
-    ufw allow 80/tcp  >/dev/null 2>&1
+    # 1.0.238: минималистичный firewall — открыт только 443
+    # (SSH порт — на ваше усмотрение, скрипт его не трогает)
     ufw allow 443/tcp >/dev/null 2>&1
-    ufw allow 3478/udp >/dev/null 2>&1
-    ufw allow 3478/tcp >/dev/null 2>&1
-    ufw allow 49152:65535/udp >/dev/null 2>&1
-    # Безопасность: Python relay слушает только 127.0.0.1, наружу порт 8080 не нужен.
-    # Закрыть если был ошибочно открыт в предыдущих установках.
+    # Закрываем всё остальное что могли открыть прошлые установки:
+    ufw delete allow 80/tcp           >/dev/null 2>&1
+    ufw delete allow 3478/udp         >/dev/null 2>&1
+    ufw delete allow 3478/tcp         >/dev/null 2>&1
+    ufw delete allow 49152:65535/udp  >/dev/null 2>&1
     ufw delete allow "${PYTHON_PORT}/tcp" >/dev/null 2>&1
     ufw delete allow "${PYTHON_PORT}"     >/dev/null 2>&1
-    ok "Открыто: 80, 443, 3478, 49152-65535"
-    info "Порт $PYTHON_PORT (Python relay) закрыт снаружи — доступ только через nginx"
+    ok "Открыто: только 443/tcp (всё остальное закрыто)"
+    info "Порт 80, $PYTHON_PORT, 3478, 49152-65535 — закрыты снаружи"
 else
     ok "ufw неактивен — при необходимости откройте порты вручную"
 fi
@@ -494,15 +464,15 @@ ok "Сервис запущен (перенаправляет на $UPSTREAM)"
 
 hdr 7 "Брандмауэр..."
 if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "active"; then
-    ufw allow 80/tcp  >/dev/null 2>&1
+    # 1.0.238: chain mode — открыт только 443
     ufw allow 443/tcp >/dev/null 2>&1
-    # Закрыть лишнее (в режиме chain не нужны: 8080, coturn, TURN-relay)
+    ufw delete allow 80/tcp                >/dev/null 2>&1
     ufw delete allow "${PYTHON_PORT}/tcp"  >/dev/null 2>&1
     ufw delete allow "${PYTHON_PORT}"      >/dev/null 2>&1
     ufw delete allow 3478/tcp              >/dev/null 2>&1
     ufw delete allow 3478/udp              >/dev/null 2>&1
     ufw delete allow 49152:65535/udp       >/dev/null 2>&1
-    ok "Открыто: 80, 443  (только WebSocket к ВПС2 — coturn и Python relay не доступны снаружи)"
+    ok "Открыто: только 443/tcp (chain → ВПС2)"
 else
     ok "ufw неактивен"
 fi
@@ -530,9 +500,8 @@ if [ "$MODE" = "single" ]; then
     echo -e "  ${W}host_config.json:${N}"
     echo -e "  ${Y}  \"server\":      \"${SERVER_IP}\"${N}"
     echo -e "  ${Y}  \"port\":        443,${N}"
-    echo -e "  ${Y}  \"use_tls\":     true,${N}"
-    echo -e "  ${Y}  \"stun_server\": \"stun:${SERVER_IP}:3478\",${N}"
-    echo -e "  ${Y}  \"turn_server\": \"turn:${TURN_USER}:${TURN_PASS}@${SERVER_IP}:3478\"${N}"
+    echo -e "  ${Y}  \"use_tls\":     true${N}"
+    echo -e "  ${C}  STUN/TURN не нужны — стрим работает через WSS/443${N}"
     echo ""
     echo -e "  ${W}Полезные команды:${N}"
     echo -e "    journalctl -u rdp-relay -f          ${C}# логи в реальном времени${N}"
