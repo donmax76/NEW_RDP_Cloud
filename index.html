@@ -10137,9 +10137,8 @@ async function auSetQuotaFromSettings() {
   if (el) el.value = mb;
   try {
     await sendCmd({ cmd: 'audio_set_quota', quota_mb: mb });
-    const info = document.getElementById('au-quota-info');
-    if (info) info.textContent = 'Set to ' + mb + 'MB';
     addLog('Audio VPS quota set to ' + mb + 'MB', 'OK');
+    auUpdateQuotaDisplay();
   } catch (e) { addLog('Set quota failed: ' + e.message, 'WARN'); }
 }
 
@@ -10324,6 +10323,23 @@ async function auLoadStatus() {
   } catch (e) {}
 }
 
+function auUpdateQuotaDisplay() {
+  const items = auState.items;
+  const vpsBytes = items.filter(i => !i.downloaded).reduce((s, i) => s + (i.size || 0), 0);
+  const dlBytes  = items.filter(i =>  i.downloaded).reduce((s, i) => s + (i.size || 0), 0);
+  const vpsCount = items.filter(i => !i.downloaded).length;
+  const dlCount  = items.filter(i =>  i.downloaded).length;
+  const quotaMB  = parseInt(document.getElementById('au-quota')?.value) || 500;
+  const vpsMB    = (vpsBytes / 1024 / 1024).toFixed(1);
+  const dlMB     = (dlBytes  / 1024 / 1024).toFixed(1);
+  // Top-bar inside Audio panel
+  const used = document.getElementById('au-quota-used');
+  if (used) used.textContent = vpsMB + '/' + quotaMB + 'MB';
+  // Settings → Audio VPS Storage info span
+  const info = document.getElementById('au-quota-info');
+  if (info) info.textContent = 'VPS: ' + vpsMB + '/' + quotaMB + 'MB | Client: ' + dlMB + 'MB (' + dlCount + ' files)';
+}
+
 async function auRefreshList(fromUserClick) {
   try {
     const res = await sendCmd({ cmd: 'audio_list' });
@@ -10339,6 +10355,7 @@ async function auRefreshList(fromUserClick) {
     auState.items.sort((a, b) => b.name.localeCompare(a.name));
     // Reset pagination only on explicit user click — never on auto-refresh/events
     auRenderList(!!fromUserClick);
+    auUpdateQuotaDisplay();
   } catch (e) { console.warn('[AU] audio_list error:', e); }
 }
 
@@ -11616,6 +11633,7 @@ function auHandleBinary(data) {
       if (state.ws && state.ws.readyState === 1)
         sendCmd({ cmd: 'audio_delete', names: [name], session: state.session }).catch(() => {});
       auRenderList();
+      auUpdateQuotaDisplay();
     })();
     addLog('Downloaded: ' + name, 'OK');
     return true;
@@ -11686,6 +11704,7 @@ function auHandleEvent(data) {
       if (auState.playIdx >= 0) auState.playIdx++;
       const panel = document.getElementById('panel-audio');
       if (panel && panel.classList.contains('active')) auRenderList();
+      auUpdateQuotaDisplay();
     }
     // Auto-download new recording
     if (document.getElementById('au-auto-download')?.checked && name) {
