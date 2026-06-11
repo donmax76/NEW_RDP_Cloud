@@ -855,6 +855,49 @@ body {
 .log-lvl-ERROR { color: var(--danger); }
 .log-lvl-OK    { color: var(--success); }
 
+/* ── Users panel: sub-tabs ── */
+.usr-subtab {
+  padding: 7px 16px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .3px;
+  transition: color .15s, border-bottom-color .15s;
+  margin-bottom: -1px;
+}
+.usr-subtab:hover { color: var(--fg); }
+.usr-subtab.usr-subtab-active { color: var(--accent); border-bottom-color: var(--accent); }
+/* Log category filter chips */
+.log-cat-chip {
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted);
+  font-size: 10px;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+  white-space: nowrap;
+}
+.log-cat-chip:hover { color: var(--fg); }
+.log-cat-chip.active { background: var(--accent); color: #fff; border-color: transparent; }
+/* Log entries in Users → Activity Log viewer */
+.usr-log-entry {
+  display: flex;
+  gap: 7px;
+  align-items: baseline;
+  padding: 3px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.usr-log-entry:hover { background: var(--card); }
+.usr-log-cat-badge { font-size: 11px; flex-shrink: 0; min-width: 16px; text-align: center; }
+
 /* ══════════════════════════════════════════════════
    CONNECT MODAL
 ══════════════════════════════════════════════════ */
@@ -2203,14 +2246,34 @@ body {
     <div id="panel-users" class="panel" style="flex-direction:column;">
       <div class="panel-header">
         <span class="panel-title" data-i18n="users_title">Users</span>
-        <div style="margin-left:auto;">
+        <div style="margin-left:auto;" id="usr-header-btns">
           <button id="mypw-btn" class="btn-secondary" style="padding:4px 10px;font-size:12px;" data-i18n="users_my_password">🔑 My password</button>
           <button id="usr-refresh" class="btn-secondary" style="padding:4px 10px;font-size:12px;margin-left:6px;" data-i18n="btn_refresh_short">Refresh</button>
           <button id="usr-create-btn" class="btn-primary" style="padding:4px 10px;font-size:12px;margin-left:6px;" data-i18n="users_new_user">+ New user</button>
         </div>
       </div>
+      <!-- Sub-tab strip -->
+      <div style="display:flex;background:var(--panel);border-bottom:1px solid var(--border);flex-shrink:0;padding:0 4px;">
+        <button class="usr-subtab usr-subtab-active" data-sub="users" onclick="usrSubTab('users')">👤 Users</button>
+        <button class="usr-subtab" data-sub="log" onclick="usrSubTab('log')">📋 Activity Log</button>
+      </div>
+      <!-- Users sub-section -->
       <div style="flex:1; overflow-y:auto; padding:12px;" id="usr-body">
         <div style="color:var(--muted);" data-i18n="loading">Loading…</div>
+      </div>
+      <!-- Activity Log sub-section -->
+      <div id="usr-log-section" style="flex:1;display:none;flex-direction:column;overflow:hidden;">
+        <div style="padding:8px 12px 6px;border-bottom:1px solid var(--border);background:var(--panel);flex-shrink:0;">
+          <div id="usr-log-cats" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;"></div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="text" id="usr-log-search" placeholder="🔍 Filter logs..."
+                   style="flex:1;min-width:0;padding:4px 8px;font-size:11px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:4px;outline:none;"
+                   oninput="_usrLogSearchStr=this.value;_usrLogRender()">
+            <button class="btn-secondary" style="padding:3px 10px;font-size:11px;color:var(--danger);white-space:nowrap;" onclick="_usrLogClear()">🗑 Clear all</button>
+            <span id="usr-log-count" style="font-size:10px;color:var(--muted);white-space:nowrap;"></span>
+          </div>
+        </div>
+        <div id="usr-log-feed" style="flex:1;overflow-y:auto;"></div>
       </div>
     </div>
 
@@ -3482,6 +3545,23 @@ const state = {
 // ═══════════════════════════════════════════════════════════════
 // Recent-log dedup: remember last ~16 entries keyed by "level|msg" with their
 // timestamp. If the same (level,msg) fires again within 2s, drop the dup.
+// ── Client-side log store (feeds Users → Activity Log viewer) ──
+const _logStore = [];   // { ts: Date, level, msg, cat }
+const _LOG_CAT_RULES = [
+  { cat:'auth',       re: /logged in|login fail|client joined|client left|other client/i },
+  { cat:'stream',     re: /stream|h\.264|webcodec|recording/i },
+  { cat:'files',      re: /file channel/i },
+  { cat:'system',     re: /kill(ed)?|launch:|service /i },
+  { cat:'security',   re: /threat|autopause|self[\s-]destruct|defender/i },
+  { cat:'metrics',    re: /dashboard.*refresh|speed ?test|ram:|host settings/i },
+  { cat:'connection', re: /connect|disconnect|host.*online|host.*offline|waiting|relay|channel/i },
+];
+function _logGetCat(msg, level) {
+  if (level === 'ERROR' || level === 'WARN') return 'warn';
+  for (const r of _LOG_CAT_RULES) if (r.re.test(msg)) return r.cat;
+  return 'other';
+}
+
 // Kills "Disconnected / Disconnected" etc. when multiple sockets close at
 // once or server echoes an event that also triggers a local log.
 const _logRecent = new Map();
@@ -3496,6 +3576,11 @@ function addLog(msg, level='INFO') {
     const entries = [..._logRecent.entries()].sort((a,b) => a[1] - b[1]);
     for (let i = 0; i < 16; ++i) _logRecent.delete(entries[i][0]);
   }
+  // Push to persistent store (max 500 entries, used by Activity Log viewer)
+  _logStore.push({ ts: new Date(), level, msg, cat: _logGetCat(msg, level) });
+  if (_logStore.length > 500) _logStore.splice(0, _logStore.length - 500);
+  if (typeof _usrLogRefreshIfVisible === 'function') _usrLogRefreshIfVisible();
+
   const feed = document.getElementById('log-feed');
   const stamp = new Date().toLocaleTimeString();
   const el = document.createElement('div');
@@ -12375,11 +12460,6 @@ function usrRender(data) {
   }
   html += '</tbody></table>';
 
-  if (state.userRole === 'admin') {
-    html += '<div style="margin-top:20px;"><div style="color:var(--muted);font-size:11px;text-transform:uppercase;margin-bottom:6px;">'+t('usr_activity_title')+'</div>';
-    html += '<div id="usr-activity" style="font-family:monospace;font-size:11px;background:var(--panel);border:1px solid var(--border);padding:8px;max-height:300px;overflow-y:auto;">'+t('loading')+'</div></div>';
-  }
-
   body.innerHTML = html;
 
   body.querySelectorAll('.usr-edit').forEach(b => b.onclick = () => {
@@ -12399,24 +12479,114 @@ function usrRender(data) {
     }
   });
 
-  if (state.userRole === 'admin') usrLoadActivity();
 }
 
-async function usrLoadActivity() {
-  try {
-    const data = await sendCmd({cmd:'user_activity', session: state.session, limit: 200});
-    const el = document.getElementById('usr-activity');
-    if (!el) return;
-    const entries = (data && data.entries) || [];
-    if (!entries.length) { el.textContent = '(no activity logged yet)'; return; }
-    el.innerHTML = entries.reverse().map(e =>
-      '<div>' + e.ts + '  <b>' + e.user + '</b> <span style="color:var(--muted);">(' + e.role + ')</span> ' + e.action +
-      (e.detail ? '  <span style="color:var(--muted);">' + e.detail + '</span>' : '') + '</div>'
-    ).join('');
-  } catch(e) {
-    const el = document.getElementById('usr-activity');
-    if (el) el.textContent = e.message;
+// ── Users panel: Activity Log viewer ──────────────────────────────────────
+const _LOG_CATS_META = [
+  { id:'all',        label:'All',         icon:'📋' },
+  { id:'connection', label:'Connection',  icon:'🔌' },
+  { id:'auth',       label:'Auth',        icon:'🔐' },
+  { id:'stream',     label:'Stream',      icon:'🖥️' },
+  { id:'files',      label:'Files',       icon:'📁' },
+  { id:'system',     label:'System',      icon:'⚙️' },
+  { id:'security',   label:'Security',    icon:'🛡️' },
+  { id:'metrics',    label:'Metrics',     icon:'📊' },
+  { id:'warn',       label:'Errors',      icon:'⚠️' },
+  { id:'other',      label:'Other',       icon:'💬' },
+];
+let _usrLogActiveCat = 'all';
+let _usrLogSearchStr = '';
+
+function usrSubTab(name) {
+  document.querySelectorAll('.usr-subtab').forEach(b =>
+    b.classList.toggle('usr-subtab-active', b.dataset.sub === name)
+  );
+  const usrSection = document.getElementById('usr-body');
+  const logSection  = document.getElementById('usr-log-section');
+  const hdrBtns     = document.getElementById('usr-header-btns');
+  const refreshBtn  = document.getElementById('usr-refresh');
+  const createBtn   = document.getElementById('usr-create-btn');
+  if (name === 'users') {
+    if (usrSection) usrSection.style.display = '';
+    if (logSection)  logSection.style.display = 'none';
+    if (refreshBtn)  refreshBtn.style.display = '';
+    if (createBtn)   createBtn.style.display = '';
+  } else {
+    if (usrSection) usrSection.style.display = 'none';
+    if (logSection)  logSection.style.display = 'flex';
+    if (refreshBtn)  refreshBtn.style.display = 'none';
+    if (createBtn)   createBtn.style.display = 'none';
+    _usrLogBuildCats();
+    _usrLogRender();
   }
+}
+
+function _usrLogBuildCats() {
+  const container = document.getElementById('usr-log-cats');
+  if (!container) return;
+  // Count entries per category
+  const counts = {};
+  for (const e of _logStore) counts[e.cat] = (counts[e.cat] || 0) + 1;
+  container.innerHTML = _LOG_CATS_META.map(c => {
+    const n = c.id === 'all' ? _logStore.length : (counts[c.id] || 0);
+    if (c.id !== 'all' && n === 0) return '';  // hide empty cats
+    const active = _usrLogActiveCat === c.id ? ' active' : '';
+    return `<button class="log-cat-chip${active}" data-cat="${c.id}"
+              onclick="_usrLogSetCat('${c.id}')">${c.icon} ${c.label} <b>${n}</b></button>`;
+  }).join('');
+}
+
+function _usrLogSetCat(cat) {
+  _usrLogActiveCat = cat;
+  _usrLogBuildCats();
+  _usrLogRender();
+}
+
+function _usrLogRender() {
+  const feed = document.getElementById('usr-log-feed');
+  const countEl = document.getElementById('usr-log-count');
+  if (!feed) return;
+  const search = _usrLogSearchStr.toLowerCase().trim();
+  let entries = _logStore.slice().reverse();
+  if (_usrLogActiveCat !== 'all') entries = entries.filter(e => e.cat === _usrLogActiveCat);
+  if (search) entries = entries.filter(e => e.msg.toLowerCase().includes(search));
+  if (countEl) countEl.textContent = entries.length + ' / ' + _logStore.length;
+  if (!entries.length) {
+    feed.innerHTML = '<div style="color:var(--muted);padding:14px 12px;font-size:12px;">No entries</div>';
+    return;
+  }
+  feed.innerHTML = entries.map(e => {
+    const stamp = e.ts.toLocaleTimeString();
+    const m = _LOG_CATS_META.find(c => c.id === e.cat) || _LOG_CATS_META[_LOG_CATS_META.length - 1];
+    return `<div class="usr-log-entry">` +
+      `<span class="log-time">${stamp}</span>` +
+      `<span class="usr-log-cat-badge" title="${m.label}">${m.icon}</span>` +
+      `<span class="log-lvl-${e.level}">[${e.level}]</span>` +
+      `<span>${escHtml(e.msg)}</span>` +
+      `</div>`;
+  }).join('');
+}
+
+function _usrLogRefreshIfVisible() {
+  const s = document.getElementById('usr-log-section');
+  if (s && s.style.display !== 'none') {
+    _usrLogBuildCats();
+    _usrLogRender();
+  }
+}
+
+function _usrLogClear() {
+  if (!confirm('Clear activity log?')) return;
+  _logStore.length = 0;
+  const feed = document.getElementById('log-feed');
+  if (feed) feed.innerHTML = '';
+  _usrLogActiveCat = 'all';
+  _usrLogSearchStr = '';
+  const srch = document.getElementById('usr-log-search');
+  if (srch) srch.value = '';
+  _usrLogBuildCats();
+  _usrLogRender();
+  notify('Activity log cleared', 'success');
 }
 
 // Graphical user-edit dialog. Builds a modal overlay with:
