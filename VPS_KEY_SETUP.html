@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VPS — Настройка ключа шифрования</title>
+<style>
+  :root {
+    --bg:#0d1117; --bg2:#161b22; --bg3:#21262d;
+    --accent:#58a6ff; --accent2:#3fb950; --accent3:#f78166;
+    --accent4:#d2a8ff; --accent5:#ffa657;
+    --fg:#e6edf3; --muted:#8b949e; --bd:#30363d;
+    --danger:#f85149; --warn:#e3b341;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html{scroll-behavior:smooth;}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--fg);line-height:1.5;}
+
+  .nav{position:fixed;top:0;left:0;right:0;z-index:999;background:rgba(13,17,23,.96);border-bottom:1px solid var(--bd);backdrop-filter:blur(8px);display:flex;align-items:center;height:52px;padding:0 20px;gap:8px;}
+  .nav-logo{font-size:14px;font-weight:800;color:var(--accent);letter-spacing:.5px;white-space:nowrap;}
+  .nav-sub{font-size:12px;color:var(--muted);padding-left:12px;border-left:1px solid var(--bd);}
+  .nav-badge{margin-left:auto;padding:3px 10px;border-radius:20px;background:rgba(248,81,73,.15);border:1px solid rgba(248,81,73,.3);color:var(--danger);font-size:10px;font-weight:700;letter-spacing:.5px;}
+
+  .page{display:flex;min-height:100vh;}
+  .sidebar{width:230px;flex-shrink:0;position:fixed;top:52px;left:0;bottom:0;overflow-y:auto;border-right:1px solid var(--bd);background:var(--bg2);padding:16px 0;}
+  .sb-section{padding:10px 16px 4px;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);font-weight:700;}
+  .sb-link{display:flex;align-items:center;gap:8px;padding:6px 16px 6px 20px;font-size:12px;color:var(--muted);text-decoration:none;transition:all .15s;border-left:2px solid transparent;margin:1px 0;}
+  .sb-link:hover{color:var(--fg);background:rgba(255,255,255,.03);}
+  .sb-link.active{color:var(--accent);border-left-color:var(--accent);background:rgba(88,166,255,.06);}
+  .sb-icon{width:16px;text-align:center;flex-shrink:0;}
+
+  .content{margin-left:230px;padding:76px 48px 100px;max-width:900px;}
+
+  .hero{margin-bottom:40px;}
+  .hero-eyebrow{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--accent);font-weight:700;margin-bottom:8px;}
+  .hero-title{font-size:clamp(24px,3vw,36px);font-weight:800;letter-spacing:-1px;margin-bottom:10px;}
+  .hero-lead{font-size:14px;color:var(--muted);line-height:1.75;max-width:680px;}
+
+  h2{font-size:19px;font-weight:700;margin:48px 0 14px;padding-bottom:10px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px;}
+  h2 .h2-icon{font-size:20px;}
+  h3{font-size:14px;font-weight:700;margin:24px 0 10px;color:var(--accent4);}
+  p{font-size:13px;color:var(--muted);line-height:1.75;margin-bottom:10px;}
+  p b,p strong{color:var(--fg);}
+  hr{border:none;border-top:1px solid var(--bd);margin:44px 0;}
+
+  /* Steps */
+  .steps{border:1px solid var(--bd);border-radius:10px;overflow:hidden;margin:16px 0 24px;}
+  .step{display:flex;align-items:flex-start;gap:14px;padding:14px 18px;border-bottom:1px solid var(--bd);}
+  .step:last-child{border-bottom:none;}
+  .step:nth-child(even){background:rgba(255,255,255,.012);}
+  .step-num{width:26px;height:26px;border-radius:50%;background:rgba(88,166,255,.18);color:var(--accent);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+  .step-body{flex:1;min-width:0;}
+  .step-title{font-size:13px;font-weight:600;color:var(--fg);margin-bottom:4px;}
+  .step-desc{font-size:12px;color:var(--muted);line-height:1.65;}
+
+  /* Code */
+  .code{background:var(--bg3);border:1px solid var(--bd);border-radius:8px;padding:12px 16px;font-family:'Cascadia Code','Consolas',monospace;font-size:12px;color:#e6edf3;margin:10px 0 16px;overflow-x:auto;white-space:pre;line-height:1.6;}
+  .code .cm{color:var(--muted);}
+  .code .kw{color:var(--accent);}
+  .code .st{color:var(--accent2);}
+  .code .nu{color:var(--accent5);}
+  .code .hl{color:var(--warn);}
+  .code-label{font-size:10px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:-6px;margin-top:14px;font-family:monospace;}
+
+  /* Inline code */
+  code{background:var(--bg3);border:1px solid var(--bd);border-radius:4px;padding:1px 6px;font-family:'Cascadia Code','Consolas',monospace;font-size:11.5px;color:var(--accent4);}
+
+  /* Boxes */
+  .box{padding:12px 16px;border-radius:8px;font-size:12px;line-height:1.75;margin:14px 0;}
+  .box.blue{background:rgba(88,166,255,.07);border-left:3px solid var(--accent);}
+  .box.green{background:rgba(63,185,80,.07);border-left:3px solid var(--accent2);}
+  .box.orange{background:rgba(255,166,87,.07);border-left:3px solid var(--accent5);}
+  .box.red{background:rgba(248,81,73,.07);border-left:3px solid var(--danger);}
+  .box b{font-weight:700;}
+  .box-title{font-weight:700;display:block;margin-bottom:4px;}
+
+  /* Table */
+  .ftable{width:100%;border-collapse:collapse;font-size:12px;margin:12px 0 20px;}
+  .ftable th{text-align:left;padding:8px 12px;border-bottom:1px solid var(--bd);color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600;}
+  .ftable td{padding:9px 12px;border-bottom:1px solid rgba(48,54,61,.5);vertical-align:top;color:var(--muted);line-height:1.6;}
+  .ftable td:first-child{color:var(--fg);font-weight:500;white-space:nowrap;}
+  .ftable td code{font-size:11px;}
+  .ftable tr:hover td{background:rgba(255,255,255,.018);}
+
+  /* Error card */
+  .err-card{background:var(--bg2);border:1px solid var(--bd);border-radius:10px;margin:12px 0 24px;overflow:hidden;}
+  .err-card-head{background:rgba(248,81,73,.1);border-bottom:1px solid var(--bd);padding:10px 16px;font-size:12px;font-weight:700;color:var(--danger);display:flex;align-items:center;gap:8px;}
+  .err-card-body{padding:14px 16px;}
+  .err-card-body p{margin-bottom:6px;}
+
+  /* Schema diagram */
+  .schema{background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:20px 24px;font-family:'Cascadia Code','Consolas',monospace;font-size:12px;line-height:1.85;margin:16px 0;color:var(--muted);}
+  .schema .s-head{color:var(--accent);font-weight:700;}
+  .schema .s-file{color:var(--accent4);}
+  .schema .s-ok{color:var(--accent2);}
+  .schema .s-warn{color:var(--danger);}
+  .schema .s-dim{color:#444c56;}
+
+  footer{text-align:center;padding:40px 24px;border-top:1px solid var(--bd);color:var(--muted);font-size:12px;margin-left:230px;}
+
+  @media(max-width:820px){
+    .sidebar{display:none;}
+    .content{margin-left:0;padding:68px 20px 60px;}
+    footer{margin-left:0;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Nav ───────────────────────────────────────────────────────────────── -->
+<nav class="nav">
+  <span class="nav-logo">PROMETEY</span>
+  <span class="nav-sub">Настройка ключа шифрования на VPS</span>
+  <span class="nav-badge">🔐 ADMIN</span>
+</nav>
+
+<!-- ── Sidebar ────────────────────────────────────────────────────────────── -->
+<aside class="sidebar">
+  <div class="sb-section">Содержание</div>
+  <a class="sb-link active" href="#intro"><span class="sb-icon">📌</span>Зачем это нужно</a>
+  <a class="sb-link" href="#first"><span class="sb-icon">🚀</span>Первый деплой</a>
+  <a class="sb-link" href="#rotate"><span class="sb-icon">🔄</span>Смена ключа</a>
+  <a class="sb-link" href="#lost"><span class="sb-icon">🔍</span>Если потерял скрипт</a>
+  <a class="sb-link" href="#verify"><span class="sb-icon">✅</span>Проверка</a>
+  <a class="sb-link" href="#trouble"><span class="sb-icon">🛠</span>Неполадки</a>
+  <a class="sb-link" href="#envvar"><span class="sb-icon">⚙️</span>Через переменные окружения</a>
+  <a class="sb-link" href="#schema"><span class="sb-icon">🗂</span>Схема хранения</a>
+</aside>
+
+<!-- ── Content ────────────────────────────────────────────────────────────── -->
+<main class="content">
+
+  <!-- Hero -->
+  <div class="hero" id="intro">
+    <div class="hero-eyebrow">VPS · Безопасность</div>
+    <div class="hero-title">Ключ шифрования</div>
+    <div class="hero-lead">
+      Сервер шифрует все скриншоты и аудиозаписи на диске. Ключ шифрования
+      не хранится в исходном коде — любой, кто получит доступ к репозиторию
+      или к файлу <code>server.py</code>, не сможет расшифровать данные на сервере.
+    </div>
+  </div>
+
+  <div class="box blue">
+    <b class="box-title">Ключ живёт только в двух местах</b>
+    На <b>VPS</b> — в защищённом файле <code>/etc/rdp-relay/aes.key</code>
+    (доступен только системному пользователю сервиса, права 600).<br>
+    <b>Локально у тебя</b> — в файле <code>_gen_aes_key.py</code>
+    (добавлен в <code>.gitignore</code>, в репозиторий не попадает никогда).
+  </div>
+
+  <!-- ── Первый деплой ─────────────────────────────────────────────────── -->
+  <h2 id="first"><span class="h2-icon">🚀</span>Первый деплой на новый VPS</h2>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Скопировать скрипт на сервер</div>
+        <div class="step-desc">
+          Выполни с локальной машины. Замени <code>root@185.22.33.44</code>
+          на своего пользователя и IP VPS.
+        </div>
+        <div class="code">scp _gen_aes_key.py root@185.22.33.44:~/</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Подключиться к VPS</div>
+        <div class="code">ssh root@185.22.33.44</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Создать файл с ключом</div>
+        <div class="step-desc">
+          Скрипт сам создаст директорию и файл с правильными правами доступа.
+        </div>
+        <div class="code">sudo python3 _gen_aes_key.py</div>
+        <div class="step-desc">Ты должен увидеть:</div>
+        <div class="code"><span class="st">[OK] Key file written: /etc/rdp-relay/aes.key
+     Key : 3a7f2194c5d26b11...
+     IV  : 123456789abcdef0...
+     Mode: 0600 (600)</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">Назначить владельца файла</div>
+        <div class="step-desc">
+          Нужно только если сервис работает не от <code>root</code>,
+          а от отдельного пользователя (например <code>rdp</code>).
+          Если сервис запускается от <code>root</code> — этот шаг пропустить.
+        </div>
+        <div class="code">sudo chown rdp /etc/rdp-relay/aes.key</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <div class="step-title">Запустить или перезапустить сервис</div>
+        <div class="code">sudo systemctl restart rdp-relay
+sudo systemctl status rdp-relay</div>
+        <div class="step-desc">
+          В статусе должно быть <code>active (running)</code>.
+          Если <code>failed</code> — смотри раздел «Неполадки» ниже.
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">6</div>
+      <div class="step-body">
+        <div class="step-title">Удалить скрипт с сервера</div>
+        <div class="step-desc">
+          После создания файла ключа скрипт на VPS больше не нужен.
+          Локальная копия при этом остаётся — она пригодится при следующем деплое.
+        </div>
+        <div class="code">rm ~/\_gen_aes_key.py</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Смена ключа ────────────────────────────────────────────────────── -->
+  <h2 id="rotate"><span class="h2-icon">🔄</span>Смена ключа шифрования</h2>
+
+  <div class="box red">
+    <b class="box-title">⚠️ Важно перед сменой ключа</b>
+    После смены ключа все старые зашифрованные файлы (скриншоты, аудио)
+    на VPS станут нечитаемыми. Реши заранее: нужно ли сохранить старые данные,
+    или их можно удалить.
+  </div>
+
+  <div class="box orange">
+    <b class="box-title">Порядок действий строго такой — нарушать нельзя</b>
+    Если поменять ключ на VPS раньше, чем задеплоить новый DLL на хосты,
+    VPS перестанет принимать данные от хостов со старым ключом.
+  </div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Поменять байты ключа в <code>main.cpp</code></div>
+        <div class="step-desc">Найди строки ~3515 и отредактируй:</div>
+        <div class="code"><span class="cm">// main.cpp, строки ~3515–3521</span>
+<span class="kw">static const</span> BYTE g_aes_key[<span class="nu">32</span>] = { <span class="hl">0xНОВЫЕ, 0xБАЙТЫ, ...</span> };
+<span class="kw">static const</span> BYTE g_aes_iv[<span class="nu">16</span>]  = { <span class="hl">0xНОВЫЕ, 0xБАЙТЫ, ...</span> };</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Пересобрать <code>pnpext.dll</code> и задеплоить на хосты</div>
+        <div class="step-desc">
+          Сначала убедись, что все управляемые машины получили новую версию DLL.
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Обновить <code>_gen_aes_key.py</code> локально</div>
+        <div class="step-desc">
+          Открой файл и вписать те же новые байты в <code>HOST_AES_KEY</code>
+          и <code>HOST_AES_IV</code>.
+        </div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">Обновить ключ на VPS</div>
+        <div class="code">scp _gen_aes_key.py root@185.22.33.44:~/
+ssh root@185.22.33.44
+sudo python3 _gen_aes_key.py --overwrite
+sudo systemctl restart rdp-relay</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <div class="step-title">Очистить старые зашифрованные файлы (если нужно)</div>
+        <div class="step-desc">
+          Старые файлы зашифрованы прежним ключом — они нечитаемы.
+          Если не нужны, удалить:
+        </div>
+        <div class="code">sudo rm -rf /opt/remotedesk/screenshots/
+sudo rm -rf /opt/remotedesk/audio/
+sudo systemctl restart rdp-relay</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Если потерял скрипт ────────────────────────────────────────────── -->
+  <h2 id="lost"><span class="h2-icon">🔍</span>Если потерял <code>_gen_aes_key.py</code></h2>
+
+  <p>Байты ключа всегда есть в <code>main.cpp</code>. Найди строки:</p>
+
+  <div class="code"><span class="kw">static const</span> BYTE g_aes_key[<span class="nu">32</span>] = {
+    <span class="st">0x3A,0x7F,0x21,0x94,0xC5,0xD2,0x6B,0x11,0x8E,0x4C,0xF9,0x53,0x07,0xB8,0xDA,0x62,
+    0x19,0xAF,0x33,0xE4,0x5D,0x70,0x88,0x9B,0xC1,0x2E,0x47,0x6A,0x8D,0x90,0xAB,0xCD</span>
+};
+<span class="kw">static const</span> BYTE g_aes_iv[<span class="nu">16</span>] = {
+    <span class="st">0x12,0x34,0x56,0x78,0x9A,0xBC,0xDE,0xF0,0x0F,0x1E,0x2D,0x3C,0x4B,0x5A,0x69,0x78</span>
+};</div>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Скопировать шаблон</div>
+        <div class="code">cp _gen_aes_key.py.example _gen_aes_key.py</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Открыть файл и найти секцию с ключами</div>
+        <div class="code"><span class="cm"># Найди эти строки в _gen_aes_key.py:</span>
+HOST_AES_KEY = bytes([
+    <span class="cm"># ← вставить байты из main.cpp g_aes_key</span>
+])
+HOST_AES_IV = bytes([
+    <span class="cm"># ← вставить байты из main.cpp g_aes_iv</span>
+])</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Вставить байты из <code>main.cpp</code></div>
+        <div class="step-desc">Формат такой же — через запятую, с <code>0x</code> перед каждым.</div>
+        <div class="code">HOST_AES_KEY = bytes([
+    <span class="st">0x3A, 0x7F, 0x21, 0x94, 0xC5, 0xD2, 0x6B, 0x11,
+    0x8E, 0x4C, 0xF9, 0x53, 0x07, 0xB8, 0xDA, 0x62,
+    0x19, 0xAF, 0x33, 0xE4, 0x5D, 0x70, 0x88, 0x9B,
+    0xC1, 0x2E, 0x47, 0x6A, 0x8D, 0x90, 0xAB, 0xCD,</span>
+])
+HOST_AES_IV = bytes([
+    <span class="st">0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0,
+    0x0F, 0x1E, 0x2D, 0x3C, 0x4B, 0x5A, 0x69, 0x78,</span>
+])</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">Сохранить и действовать как при первом деплое</div>
+        <div class="step-desc">
+          Дальше — шаги 1–6 из раздела «Первый деплой» выше.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Проверка ────────────────────────────────────────────────────────── -->
+  <h2 id="verify"><span class="h2-icon">✅</span>Проверка — всё ли работает</h2>
+
+  <h3>Статус сервиса</h3>
+  <div class="code">sudo systemctl status rdp-relay</div>
+  <p>Должно быть <code>active (running)</code>. Если <code>failed</code> — смотри раздел «Неполадки».</p>
+
+  <h3>Журнал запуска</h3>
+  <div class="code">sudo journalctl -u rdp-relay -n 30</div>
+  <p>Если ключ загружен корректно — строк <code>[FATAL] AES keys not configured</code> не будет.</p>
+
+  <h3>Проверить сам файл ключа</h3>
+  <div class="code"><span class="cm"># Убедиться что файл существует и права правильные</span>
+sudo ls -la /etc/rdp-relay/aes.key
+<span class="cm"># Ожидаемый вывод: -rw------- 1 root root ... aes.key</span>
+
+<span class="cm"># Посмотреть содержимое (два hex-ряда)</span>
+sudo cat /etc/rdp-relay/aes.key</div>
+
+  <!-- ── Неполадки ──────────────────────────────────────────────────────── -->
+  <h2 id="trouble"><span class="h2-icon">🛠</span>Устранение неполадок</h2>
+
+  <div class="err-card">
+    <div class="err-card-head">⛔ [FATAL] AES keys not configured</div>
+    <div class="err-card-body">
+      <p>Файл ключа не найден. Выполни шаги 1–5 из раздела «Первый деплой».</p>
+    </div>
+  </div>
+
+  <div class="err-card">
+    <div class="err-card-head">⛔ Cannot read key file</div>
+    <div class="err-card-body">
+      <p>Неправильные права доступа. Исправь:</p>
+      <div class="code">sudo chmod 600 /etc/rdp-relay/aes.key
+sudo chown root /etc/rdp-relay/aes.key   <span class="cm"># или имя пользователя сервиса</span>
+sudo systemctl restart rdp-relay</div>
+    </div>
+  </div>
+
+  <div class="err-card">
+    <div class="err-card-head">⛔ Key must be 32 bytes / IV must be 16 bytes</div>
+    <div class="err-card-body">
+      <p>В файл записаны неверные данные — скорее всего ошибка при копировании байтов.
+      Пересоздай файл: запусти <code>_gen_aes_key.py --overwrite</code> заново.</p>
+    </div>
+  </div>
+
+  <div class="err-card">
+    <div class="err-card-head">⚠️ Скриншоты / аудио не отображаются после обновления ключа</div>
+    <div class="err-card-body">
+      <p>Старые файлы зашифрованы прежним ключом — они нечитаемы новым.
+      Удали их и перезапусти сервис:</p>
+      <div class="code">sudo rm -rf /opt/remotedesk/screenshots/
+sudo rm -rf /opt/remotedesk/audio/
+sudo systemctl restart rdp-relay</div>
+    </div>
+  </div>
+
+  <!-- ── Через переменные окружения ─────────────────────────────────────── -->
+  <h2 id="envvar"><span class="h2-icon">⚙️</span>Альтернативный способ — переменные окружения</h2>
+
+  <p>Если не хочешь использовать файл, можно передать ключ через systemd.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-title">Создать файл с переменными</div>
+        <div class="code">sudo nano /etc/rdp-relay/secrets.env</div>
+        <div class="step-desc">Вписать:</div>
+        <div class="code">RDP_AES_KEY=3a7f2194c5d26b118e4cf95307b8da6219af33e45d70889bc12e476a8d90abcd
+RDP_AES_IV=123456789abcdef00f1e2d3c4b5a6978</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-title">Ограничить доступ</div>
+        <div class="code">sudo chmod 600 /etc/rdp-relay/secrets.env</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-title">Добавить ссылку в systemd unit</div>
+        <div class="step-desc">Открой <code>/etc/systemd/system/rdp-relay.service</code>
+        и в секцию <code>[Service]</code> добавь строку:</div>
+        <div class="code">[Service]
+EnvironmentFile=/etc/rdp-relay/secrets.env
+<span class="cm">... остальные параметры ...</span></div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <div class="step-title">Перезагрузить systemd и запустить сервис</div>
+        <div class="code">sudo systemctl daemon-reload
+sudo systemctl restart rdp-relay</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Схема хранения ─────────────────────────────────────────────────── -->
+  <h2 id="schema"><span class="h2-icon">🗂</span>Схема хранения — итого</h2>
+
+  <div class="schema">
+<span class="s-head">Локальная машина (у тебя)</span>
+  <span class="s-file">main.cpp</span>               <span class="s-dim">──</span> байты ключа в C++ исходнике хоста
+  <span class="s-file">_gen_aes_key.py</span>        <span class="s-dim">──</span> <span class="s-warn">в .gitignore</span>, содержит реальный ключ
+  <span class="s-file">_gen_aes_key.py.example</span> <span class="s-dim">──</span> <span class="s-ok">в git</span>, шаблон без ключей (безопасен)
+
+<span class="s-head">VPS сервер</span>
+  <span class="s-file">/etc/rdp-relay/aes.key</span>  <span class="s-dim">──</span> файл с ключом, <span class="s-ok">chmod 600</span>, не в git
+  <span class="s-file">server.py</span>               <span class="s-dim">──</span> читает ключ из файла при старте
+
+<span class="s-head">Git-репозиторий</span>
+  <span class="s-file">server.py</span>               <span class="s-dim">──</span> <span class="s-ok">без ключей</span>
+  <span class="s-file">_gen_aes_key.py.example</span> <span class="s-dim">──</span> <span class="s-ok">шаблон без ключей</span>
+  <span class="s-warn">_gen_aes_key.py</span>         <span class="s-dim">──</span> <span class="s-warn">ИГНОРИРУЕТСЯ (.gitignore)</span></div>
+
+  <div class="box green">
+    <b>Итог:</b> даже если кто-то получит полный доступ к репозиторию —
+    ключа там нет, и расшифровать файлы на VPS без доступа к серверу невозможно.
+  </div>
+
+</main>
+
+<footer>PROMETEY · VPS Key Setup · Документация для оператора</footer>
+
+<script>
+  // Highlight active sidebar link on scroll
+  const secs = document.querySelectorAll('[id]');
+  const links = document.querySelectorAll('.sb-link');
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const a = document.querySelector(`.sb-link[href="#${e.target.id}"]`);
+        if (a) a.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-52px 0px -70% 0px', threshold: 0 });
+  secs.forEach(s => obs.observe(s));
+</script>
+</body>
+</html>
