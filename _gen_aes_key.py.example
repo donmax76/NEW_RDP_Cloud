@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+"""
+_gen_aes_key.py.example — Template for creating the VPS AES key file.
+
+Copy to _gen_aes_key.py, fill in HOST_AES_KEY and HOST_AES_IV to match
+host.h in the pnpext.dll build, then run on the VPS:
+
+  cp _gen_aes_key.py.example _gen_aes_key.py
+  # edit _gen_aes_key.py — set HOST_AES_KEY / HOST_AES_IV
+  sudo python3 _gen_aes_key.py
+  sudo chown <service-user> /etc/rdp-relay/aes.key
+
+_gen_aes_key.py is in .gitignore — it contains the raw key and must never
+be committed to the repository.
+"""
+
+import os, sys, stat, argparse
+from pathlib import Path
+
+# ─── Fill these in from host.h ────────────────────────────────────────────────
+HOST_AES_KEY = bytes([
+    # 32 bytes — 0xXX, 0xXX, ... (must match AES_KEY in host.h / pnpext.dll)
+])
+HOST_AES_IV = bytes([
+    # 16 bytes — 0xXX, 0xXX, ... (must match AES_IV in host.h / pnpext.dll)
+])
+# ─────────────────────────────────────────────────────────────────────────────
+
+DEFAULT_KEY_FILE = '/etc/rdp-relay/aes.key'
+
+def generate(out_path, overwrite=False):
+    p = Path(out_path)
+    if len(HOST_AES_KEY) != 32: sys.exit('[ERROR] KEY must be 32 bytes')
+    if len(HOST_AES_IV)  != 16: sys.exit('[ERROR] IV must be 16 bytes')
+    p.parent.mkdir(parents=True, exist_ok=True)
+    if p.exists() and not overwrite:
+        print(f'[SKIP] {p} exists. Use --overwrite.'); return
+    p.write_text(
+        '# AES-256-CBC key/IV for rdp-relay — chmod 600, do not commit\n'
+        f'{HOST_AES_KEY.hex()}\n{HOST_AES_IV.hex()}\n'
+    )
+    os.chmod(p, stat.S_IRUSR | stat.S_IWUSR)
+    print(f'[OK] {p} written (mode 600)')
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--out', default=DEFAULT_KEY_FILE)
+    ap.add_argument('--overwrite', action='store_true')
+    ap.add_argument('--print-only', action='store_true')
+    a = ap.parse_args()
+    if a.print_only:
+        print(f'KEY={HOST_AES_KEY.hex()}'); print(f'IV={HOST_AES_IV.hex()}'); return
+    generate(a.out, a.overwrite)
+
+if __name__ == '__main__':
+    main()

@@ -26,9 +26,77 @@ from pathlib import Path
 from dataclasses import dataclass, field
 
 # ─── AES-256-CBC Encryption (compatible with ServiceManagerApp / C++ host) ──
-AES_KEY = bytes([0x3A,0x7F,0x21,0x94,0xC5,0xD2,0x6B,0x11,0x8E,0x4C,0xF9,0x53,0x07,0xB8,0xDA,0x62,
-                 0x19,0xAF,0x33,0xE4,0x5D,0x70,0x88,0x9B,0xC1,0x2E,0x47,0x6A,0x8D,0x90,0xAB,0xCD])
-AES_IV  = bytes([0x12,0x34,0x56,0x78,0x9A,0xBC,0xDE,0xF0,0x0F,0x1E,0x2D,0x3C,0x4B,0x5A,0x69,0x78])
+# Key and IV are NOT stored in source. Loaded at startup from:
+#   1. Env vars:  RDP_AES_KEY=<64-hex>  RDP_AES_IV=<32-hex>
+#   2. Key file:  RDP_AES_KEY_FILE=/etc/rdp-relay/aes.key  (default path)
+#      File format — two hex lines (no labels, comments allowed with #):
+#        <64 hex chars — 32-byte AES-256 key>
+#        <32 hex chars — 16-byte AES IV>
+#      Permissions: chmod 600, owned by service user.
+# Server refuses to start if key is not found. See _gen_aes_key.py to create the file.
+def _load_aes_keys() -> tuple:
+    import sys
+    _KEY_FILE_DEFAULT = '/etc/rdp-relay/aes.key'
+
+    # ── 1. Environment variables ─────────────────────────────────────────────
+    k_hex = os.environ.get('RDP_AES_KEY', '').strip()
+    iv_hex = os.environ.get('RDP_AES_IV', '').strip()
+    if k_hex and iv_hex:
+        try:
+            k, iv = bytes.fromhex(k_hex), bytes.fromhex(iv_hex)
+            if len(k) == 32 and len(iv) == 16:
+                return k, iv
+            print(f'[FATAL] RDP_AES_KEY must be 64 hex chars (32 bytes), '
+                  f'RDP_AES_IV must be 32 hex chars (16 bytes)', file=sys.stderr)
+            sys.exit(1)
+        except ValueError as e:
+            print(f'[FATAL] Invalid hex in RDP_AES_KEY/RDP_AES_IV: {e}', file=sys.stderr)
+            sys.exit(1)
+
+    # ── 2. Key file ──────────────────────────────────────────────────────────
+    key_file = os.environ.get('RDP_AES_KEY_FILE', _KEY_FILE_DEFAULT)
+    try:
+        lines = [l.strip() for l in Path(key_file).read_text().splitlines()
+                 if l.strip() and not l.strip().startswith('#')]
+        if len(lines) < 2:
+            print(f'[FATAL] {key_file}: need 2 hex lines (key, iv)', file=sys.stderr)
+            sys.exit(1)
+        k, iv = bytes.fromhex(lines[0]), bytes.fromhex(lines[1])
+        if len(k) != 32 or len(iv) != 16:
+            print(f'[FATAL] {key_file}: key must be 32 bytes, IV must be 16 bytes', file=sys.stderr)
+            sys.exit(1)
+        return k, iv
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print(f'[FATAL] Cannot read key file {key_file}: {e}', file=sys.stderr)
+        sys.exit(1)
+
+    # ── 3. Not found — fail with setup instructions ──────────────────────────
+    print(f"""
+[FATAL] AES keys not configured. Choose one of:
+
+  Option A — key file (recommended):
+    sudo mkdir -p /etc/rdp-relay
+    sudo python3 _gen_aes_key.py        # generates /etc/rdp-relay/aes.key
+    sudo chmod 600 /etc/rdp-relay/aes.key
+    sudo chown $(whoami) /etc/rdp-relay/aes.key
+
+  Option B — environment variables (in systemd EnvironmentFile):
+    echo 'RDP_AES_KEY=<64-hex>' >> /etc/rdp-relay/secrets.env
+    echo 'RDP_AES_IV=<32-hex>'  >> /etc/rdp-relay/secrets.env
+    chmod 600 /etc/rdp-relay/secrets.env
+    # In /etc/systemd/system/rdp-relay.service add:
+    # EnvironmentFile=/etc/rdp-relay/secrets.env
+
+  Key file path override:  RDP_AES_KEY_FILE=/custom/path/aes.key
+
+  IMPORTANT: The key must match the value compiled into pnpext.dll (host agent).
+             Run _gen_aes_key.py to create a key file from the current host key.
+""", file=sys.stderr)
+    sys.exit(1)
+
+AES_KEY, AES_IV = _load_aes_keys()
 
 def _aes_decrypt(data: bytes) -> bytes:
     """AES-256-CBC decrypt with PKCS7 unpadding. Pure Python (no deps)."""

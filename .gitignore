@@ -58,6 +58,14 @@ deploy/
 tokens.txt
 build/signing/
 
+# AES key migration script — contains raw key bytes, never commit to repo
+# To recreate: copy _gen_aes_key.py.example and fill in key/IV from host.h
+_gen_aes_key.py
+
+# VPS key file if accidentally placed in project dir
+aes.key
+*.key
+
 # Archive folder (old/deprecated files kept for reference, not tracked)
 _archive/
 
