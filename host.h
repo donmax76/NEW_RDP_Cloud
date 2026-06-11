@@ -1,5 +1,5 @@
 #pragma once
-#define HOST_VERSION "1.0.237"
+#define HOST_VERSION "1.0.241"
 #define HOST_BUILD __DATE__ " " __TIME__
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -69,7 +69,7 @@ struct HostConfig {
     int quality      = 75;
     int fps          = 30;
     int scale        = 80;
-    int bitrate      = 5000; // H264 bitrate in kbps
+    int bitrate      = 8000; // H264 bitrate in kbps
     int file_connections = 4;
     int screen_connections = 1;
     std::string codec = "jpeg"; // jpeg | h264 | vp8

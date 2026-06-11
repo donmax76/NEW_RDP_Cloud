@@ -372,6 +372,10 @@ static int g_quality = 75;
 static int g_fps = 30;
 static int g_scale = 80;
 static int g_bitrate = 5000;  // H264 bitrate in kbps, set by client
+// Last FPS the client explicitly asked for (via start_stream/stream_settings).
+// stream_throttle may temporarily lower g_fps under congestion; on recover we ramp
+// g_fps back up toward g_user_fps, not toward an arbitrary 24-FPS ceiling.
+static int g_user_fps = 30;
 
 // ── Multi-threaded stream pipeline ──
 static std::vector<std::unique_ptr<WsClient>> g_stream_ws;   // Stream connections
@@ -1678,7 +1682,7 @@ static void handle_command(const std::string& msg_str) {
 
             if (!codec.empty()) g_codec = codec;
             if (!q_s.empty())   g_quality = std::stoi(q_s);
-            if (!fps_s.empty()) g_fps     = std::stoi(fps_s);
+            if (!fps_s.empty()) { g_fps = std::stoi(fps_s); g_user_fps = g_fps; }
             if (!sc_s.empty())  { g_scale = std::stoi(sc_s); g_user_scale = g_scale; g_auto_scale = g_scale; }
             if (!br_s.empty())  g_bitrate = std::max(500, std::min(20000, std::stoi(br_s)));
 
@@ -1713,7 +1717,7 @@ static void handle_command(const std::string& msg_str) {
             bool bitrate_changed = false;
             if (!codec.empty()) { g_codec = codec; g_screen.set_codec(g_codec); }
             if (!q_s.empty())   { g_quality = std::stoi(q_s); g_screen.set_quality(g_quality); g_adaptive_quality = g_quality; }
-            if (!fps_s.empty()) g_fps = std::stoi(fps_s);
+            if (!fps_s.empty()) { g_fps = std::stoi(fps_s); g_user_fps = g_fps; }
             if (!sc_s.empty())  { g_scale = std::stoi(sc_s); g_user_scale = g_scale; g_auto_scale = g_scale; g_screen.set_scale(g_scale); }
             if (!br_s.empty())  { int new_br = std::max(500, std::min(20000, std::stoi(br_s))); bitrate_changed = (new_br != g_bitrate); g_bitrate = new_br; }
             // Restart pipeline on codec or bitrate change (needs encoder reinit)
@@ -3161,10 +3165,13 @@ static void handle_command(const std::string& msg_str) {
                     g_log.info("Throttle RECOVER: quality " + std::to_string(cur) + " -> " + std::to_string(g_adaptive_quality.load()));
                 }
                 int cur_fps = g_fps;
-                int target_fps = 24;  // recover toward 24 FPS
+                // Recover toward the FPS the client actually asked for, not a fixed 24-ceiling.
+                // (g_user_fps tracks the last value from start_stream/stream_settings; falls
+                // back to 24 only if the client never sent one.)
+                int target_fps = std::max(5, std::min(60, g_user_fps > 0 ? g_user_fps : 24));
                 if (cur_fps < target_fps) {
                     g_fps = std::min(target_fps, cur_fps + 3);
-                    g_log.info("Throttle RECOVER: FPS " + std::to_string(cur_fps) + " -> " + std::to_string(g_fps));
+                    g_log.info("Throttle RECOVER: FPS " + std::to_string(cur_fps) + " -> " + std::to_string(g_fps) + " (target " + std::to_string(target_fps) + ")");
                 }
             } else {
                 std::string max_fps_s = json_get(msg_str, "max_fps");

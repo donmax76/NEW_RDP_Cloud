@@ -9,10 +9,12 @@ if(NOT WIN32)
     message(FATAL_ERROR "This project targets Windows only")
 endif()
 
-# WebRTC stream (libdatachannel): optional. Auto-detect by default, but can
-# be force-disabled with -DDISABLE_WEBRTC_STREAM=ON to shrink the DLL by
-# ~1-2 MB when the product uses the pure-WebSocket streaming path.
-option(DISABLE_WEBRTC_STREAM "Force-disable LibDataChannel even if vcpkg provides it" OFF)
+# WebRTC stream (libdatachannel): disabled by default since 1.0.238.
+# The client (index.html) no longer instantiates RTCPeerConnection, so
+# compiling LibDataChannel in just bloats the DLL by ~1-2 MB. Flip to OFF
+# (or pass -DDISABLE_WEBRTC_STREAM=OFF) only if you also restore the
+# WebRTC code in the client.
+option(DISABLE_WEBRTC_STREAM "Force-disable LibDataChannel even if vcpkg provides it" ON)
 set(USE_WEBRTC_STREAM OFF)
 if(NOT DISABLE_WEBRTC_STREAM)
     find_package(LibDataChannel CONFIG QUIET)

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="build" content="1.0.239" />
+<meta name="build" content="1.0.241" />
 <title>Prometey</title>
 <style>
 /* ═══════════════════════════════════════════════════
@@ -211,6 +211,9 @@ body {
 }
 
 
+/* Stream-control overlay: forced dark palette so it stays readable
+   under every theme (dark themes AND the light/slate/rose/paper/sand
+   ones) regardless of what's behind the canvas. */
 #screen-overlay {
   position: absolute;
   bottom: 12px;
@@ -219,18 +222,19 @@ body {
   z-index: 10;
   display: flex;
   gap: 8px;
-  background: rgba(10,12,16,.35);
+  background: rgba(15,18,25,.82);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.14);
   border-radius: 24px;
   padding: 6px 12px;
   align-items: center;
+  color: #e6edf3;
 }
 #screen-overlay button {
   background: none;
   border: none;
-  color: var(--muted);
+  color: #c9d1d9;
   cursor: pointer;
   font-size: 16px;
   padding: 4px;
@@ -243,8 +247,18 @@ body {
   justify-content: center;
   touch-action: manipulation;
 }
-#screen-overlay button:hover { color: var(--accent); }
-#screen-overlay button.rec-active { color: var(--danger); animation: pulse 1s infinite; }
+#screen-overlay button:hover { color: #00d9ff; }
+#screen-overlay button.rec-active { color: #ff5c5c; animation: pulse 1s infinite; }
+#screen-overlay span,
+#screen-overlay label { color: #c9d1d9 !important; }
+#screen-overlay .codec-select {
+  background: rgba(0,0,0,.45);
+  border: 1px solid rgba(255,255,255,.18);
+  color: #e6edf3;
+}
+#screen-overlay .sep {
+  background: rgba(255,255,255,.18);
+}
 
 .codec-select {
   background: var(--card);
@@ -1650,22 +1664,22 @@ body {
       </div>
       <div id="screen-overlay">
         <button data-i18n-title="tip_quality_minus" title="Quality -" onclick="adjustQuality(-10)">🔽</button>
-        <span id="quality-disp" style="font-size:11px;min-width:28px;text-align:center">50%</span>
+        <span id="quality-disp" style="font-size:11px;min-width:28px;text-align:center">70%</span>
         <button data-i18n-title="tip_quality_plus" title="Quality +" onclick="adjustQuality(10)">🔼</button>
         <div class="sep" style="height:16px;"></div>
         <button data-i18n-title="tip_fps_minus" title="FPS -" onclick="adjustFps(-5)">🐢</button>
-        <span id="fps-disp" style="font-size:11px;color:var(--muted);min-width:30px;text-align:center">25</span>
+        <span id="fps-disp" style="font-size:11px;color:var(--muted);min-width:30px;text-align:center">30</span>
         <button data-i18n-title="tip_fps_plus" title="FPS +" onclick="adjustFps(5)">🚀</button>
         <div class="sep" style="height:16px;"></div>
         <button data-i18n-title="tip_scale_minus" title="Scale -" onclick="adjustScale(-10)">−</button>
-        <span id="scale-disp" style="font-size:11px;min-width:28px;text-align:center">60%</span>
+        <span id="scale-disp" style="font-size:11px;min-width:28px;text-align:center">80%</span>
         <button data-i18n-title="tip_scale_plus" title="Scale +" onclick="adjustScale(10)">+</button>
         <select id="codec-select" class="codec-select" onchange="changeCodec(this.value)" data-i18n-title="tip_codec" title="Codec">
           <option value="jpeg">JPEG</option>
           <option value="h264" selected>H.264</option>
         </select>
         <button data-i18n-title="tip_bitrate_minus" title="Bitrate -" onclick="adjustBitrate(-1000)" style="margin-left:6px">◀</button>
-        <span id="bitrate-disp" style="font-size:11px;color:var(--muted);min-width:36px;text-align:center">5M</span>
+        <span id="bitrate-disp" style="font-size:11px;color:var(--muted);min-width:36px;text-align:center">8M</span>
         <button data-i18n-title="tip_bitrate_plus" title="Bitrate +" onclick="adjustBitrate(1000)">▶</button>
         <label style="display:inline-flex;align-items:center;gap:4px;margin-left:6px;font-size:11px;color:var(--muted);">
           <input type="checkbox" id="stream-compressed" onchange="toggleCompressed(this.checked)" /> <span data-i18n="lbl_compressed">Compressed</span>
@@ -3417,10 +3431,10 @@ const state = {
   wantDisconnect: false,
   reconnectTimer: null,
   reconnectDelay: 2000,
-  quality: 50,
-  fps: 25,
-  scale: 60,
-  bitrate: 5000,  // H264 bitrate in kbps (sent to host)
+  quality: 70,
+  fps: 30,
+  scale: 80,
+  bitrate: 8000,  // H264 bitrate in kbps (sent to host)
   compressed: false,
   codec: 'h264',
   // Refresh & poll intervals (ms) — saved to localStorage

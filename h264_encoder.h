@@ -333,25 +333,41 @@ private:
         // Low latency
         var.vt = VT_BOOL; var.boolVal = VARIANT_TRUE;
         api->SetValue(&CODECAPI_AVLowLatencyMode, &var);
-        // Rate control: CBR for hardware (fast), VBR for software (CBR causes buffering)
+        // Rate control:
+        //   HW: QVBR (Quality-VBR) — peaks higher on complex frames for sharp UI/text,
+        //       drops on static frames to save bandwidth. LAN-friendly; on metered links
+        //       use the bitrate slider as a soft cap (peak ~2x mean).
+        //   SW: UnconstrainedVBR (CBR causes buffering / smearing).
         var.vt = VT_UI4;
         if (hw_encoder_) {
-            var.ulVal = eAVEncCommonRateControlMode_CBR;
+            var.ulVal = eAVEncCommonRateControlMode_Quality;
         } else {
             var.ulVal = eAVEncCommonRateControlMode_UnconstrainedVBR;
         }
-        api->SetValue(&CODECAPI_AVEncCommonRateControlMode, &var);
-        // Quality for VBR (0-100, lower = better quality — 30 for sharp text)
-        if (!hw_encoder_) {
-            var.vt = VT_UI4; var.ulVal = 30;
-            api->SetValue(&CODECAPI_AVEncCommonQuality, &var);
+        HRESULT rc_hr = api->SetValue(&CODECAPI_AVEncCommonRateControlMode, &var);
+        if (hw_encoder_ && FAILED(rc_hr)) {
+            // Older HW MFTs (Intel QSV gen<8) don't support eAVEncCommonRateControlMode_Quality.
+            // Fall back to CBR — never leave the encoder uninitialized.
+            var.ulVal = eAVEncCommonRateControlMode_CBR;
+            api->SetValue(&CODECAPI_AVEncCommonRateControlMode, &var);
         }
-        // GOP: keyframe every 5 seconds (reduces bandwidth — keyframes are 200-400KB each)
-        var.vt = VT_UI4; var.ulVal = fps_ * 5;
+        // Target quality on the 0-100 scale (HIGHER = better on the MF API — note this is the
+        // OPPOSITE of x264's qp scale). 70 is sharp for screen content without going overkill;
+        // both HW QVBR and SW VBR honour this knob.
+        var.vt = VT_UI4; var.ulVal = 70;
+        api->SetValue(&CODECAPI_AVEncCommonQuality, &var);
+        // GOP: keyframe every 2 seconds — twice as frequent as before (was 5s).
+        // Tradeoff: +10-15% bandwidth in exchange for much faster recovery from packet
+        // loss and faster catch-up on tab-focus / reconnect. Acceptable on LAN.
+        var.vt = VT_UI4; var.ulVal = std::max(1, fps_) * 2;
         api->SetValue(&CODECAPI_AVEncMPVGOPSize, &var);
-        // B-frames: 0 (reduce latency)
+        // B-frames: 0 (reduce latency — B-frames need future refs and add ~1 frame delay)
         var.vt = VT_UI4; var.ulVal = 0;
         api->SetValue(&CODECAPI_AVEncMPVDefaultBPictureCount, &var);
+        // QualityVsSpeed: 70/100 → favour quality over speed on HW encoders that expose it.
+        // Cheap on NVENC/QSV/AMF (single-digit % extra GPU); rejected silently if unsupported.
+        var.vt = VT_UI4; var.ulVal = 70;
+        api->SetValue(&CODECAPI_AVEncCommonQualityVsSpeed, &var);
     }
 
     void force_keyframe() {
