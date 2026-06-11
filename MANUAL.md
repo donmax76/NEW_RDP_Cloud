@@ -1,6 +1,6 @@
-# Prometey RDP — User Manual
+# Data RDP — User Manual
 
-**Version:** v1.0.229 (kept in sync with server.py / index.html / pnpext.rc via `_sync_versions.ps1`).
+**Version:** v1.0.242 (kept in sync with server.py / index.html / pnpext.rc via `_sync_versions.ps1`).
 
 This manual covers operator + administrator usage, server deploy, host install/update/uninstall, and troubleshooting.
 

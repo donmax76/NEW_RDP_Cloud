@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="build" content="1.0.242" />
-<title>Prometey</title>
+<title>Data</title>
 <style>
 /* ═══════════════════════════════════════════════════
    DESIGN SYSTEM — Cyber Industrial Dark
@@ -1337,7 +1337,7 @@ body {
 
 <!-- ══════════════════════════════════════════ TOP BAR ══ -->
 <div id="topbar">
-  <div class="logo"><img src="docs/img/logo.jpg" onerror="this.style.display='none'" alt="" style="height:28px;width:28px;object-fit:cover;border-radius:5px;margin-right:6px;vertical-align:middle;">Prometey</div>
+  <div class="logo"><img src="docs/img/logo.jpg" onerror="this.style.display='none'" alt="" style="height:28px;width:28px;object-fit:cover;border-radius:5px;margin-right:6px;vertical-align:middle;">Data</div>
   <div class="sep"></div>
   <div id="conn-status">
     <div id="conn-dot"></div>
@@ -2554,7 +2554,7 @@ body {
   <div class="modal">
     <div class="modal-title" style="color:var(--accent);display:flex;align-items:center;justify-content:center;gap:10px;">
     <img src="docs/img/logo.jpg" onerror="this.style.display='none'" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:8px;">
-    Prometey
+    Data
   </div>
     <div class="modal-subtitle">Connect to your VPS relay server to begin remote monitoring</div>
 
@@ -2622,7 +2622,7 @@ body {
 
 <script>
 const BUILD = document.querySelector('meta[name="build"]')?.content || 'unknown';
-console.log('%c[Prometey] Build: ' + BUILD, 'color: #00d9ff; font-weight: bold; font-size: 14px');
+console.log('%c[Data] Build: ' + BUILD, 'color: #00d9ff; font-weight: bold; font-size: 14px');
 
 // ═══════════════════════════════════════════════════════════════
 //  i18n — runtime language switching (en / az / ru)
@@ -5611,7 +5611,7 @@ async function toggleRecording() {
       const blob = new Blob(state.recordingChunks, { type: mimeType });
       const ext = (mimeType || '').indexOf('webm') >= 0 ? 'webm' : 'mp4';
       const now = new Date();
-      const fn = 'Prometey_' + now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '_' + String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0') + String(now.getSeconds()).padStart(2,'0') + '.' + ext;
+      const fn = 'Data_' + now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '_' + String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0') + String(now.getSeconds()).padStart(2,'0') + '.' + ext;
       const lastEl2 = document.getElementById('rec-last-path');
       const hintEl2 = document.getElementById('rec-where-hint');
       const setSaved = (name, locText) => {
@@ -8184,7 +8184,7 @@ document.addEventListener('keydown', e => {
   loadJitterBufSetting();
 })();
 
-addLog('Prometey initialized', 'OK');
+addLog('Data initialized', 'OK');
 addLog('Click CONNECT to begin', 'INFO');
 
 // ═══════════════════════════════════════════════════════════════
