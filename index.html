@@ -3550,7 +3550,7 @@ const _logStore = [];   // { ts: Date, level, msg, cat }
 const _LOG_CAT_RULES = [
   { cat:'auth',       re: /logged in|login fail|client joined|client left|other client/i },
   { cat:'stream',     re: /stream|h\.264|webcodec|recording/i },
-  { cat:'files',      re: /file channel/i },
+  { cat:'files',      re: /file channel|download:|upload:|delete:|rename:|new folder:/i },
   { cat:'system',     re: /kill(ed)?|launch:|service /i },
   { cat:'security',   re: /threat|autopause|self[\s-]destruct|defender/i },
   { cat:'metrics',    re: /dashboard.*refresh|speed ?test|ram:|host settings/i },
@@ -6312,6 +6312,7 @@ async function deleteSelected() {
   selectedNames.forEach(function(n) { state.selectedFiles.delete(n); });
   document.querySelectorAll('.fm-cb').forEach(cb => { cb.checked = false; });
   notify(`Deleted ${ok}. Failed: ${fail}`, fail ? 'warn' : 'success');
+  if (ok) addLog(`delete: ${selectedNames.slice(0,3).join(', ')}${selectedNames.length>3?' +' + (selectedNames.length-3) + ' more':''} — ${state.currentPath}`, fail ? 'WARN' : 'OK');
   refreshFiles();
 }
 
@@ -6321,6 +6322,7 @@ async function newFolder() {
   try {
     await sendCmd({ cmd:'file_mkdir', path: state.currentPath+'\\'+name });
     notify('Folder created', 'success');
+    addLog(`new folder: ${state.currentPath}\\${name}`, 'OK');
     refreshFiles();
   } catch(e) { notify('Error: '+e.message, 'error'); }
 }
@@ -6329,6 +6331,7 @@ async function newFolder() {
 function downloadFile(name) {
   const path = state.currentPath.replace(/\\+$/, '') + '\\' + name;
   notify(`Downloading: ${name}...`, 'info');
+  addLog(`download: ${name} ← ${state.currentPath}`, 'INFO');
   _transferStartTime = Date.now();
   _transferBytesTotal = 0;
   showCancelBtn(true);
@@ -6891,6 +6894,7 @@ async function handleUpload(input) {
       const avgSpd = elapsed > 0 ? file.size / elapsed : 0;
       const msg = `✅ Uploaded: ${file.name} | ${formatBytes(file.size)} | ${formatSpeed(avgSpd)} avg | ${formatETA(elapsed)}`;
       fmNotify(msg, 'success');
+      addLog(`upload: ${file.name} (${formatBytes(file.size)}) → ${state.currentPath}`, 'OK');
       document.getElementById('fm-status').textContent = msg;
     }
   }
@@ -6968,6 +6972,7 @@ function showFileContextMenu(e, item) {
         if (i < files.length - 1) await new Promise(r => setTimeout(r, 0));
       }
       notify(`Downloaded ${ok}/${files.length} files from ${item.name}`, ok === files.length ? 'success' : 'warn');
+      addLog(`download: folder ${item.name} — ${ok}/${files.length} files`, ok === files.length ? 'OK' : 'WARN');
     });
     add('Open', '📂', () => navigateTo(path));
     const sep = document.createElement('div'); sep.className = 'ctx-sep'; menu.appendChild(sep);
@@ -6975,7 +6980,7 @@ function showFileContextMenu(e, item) {
   add('Rename', '✏', async () => {
     const n = prompt('New name:', item.name);
     if (n && n !== item.name) {
-      try { await sendCmd({cmd:'file_rename', from:path, to:state.currentPath+'\\'+n}); refreshFiles(); }
+      try { await sendCmd({cmd:'file_rename', from:path, to:state.currentPath+'\\'+n}); addLog(`rename: ${item.name} → ${n} (${state.currentPath})`, 'OK'); refreshFiles(); }
       catch(e) { notify('Rename error: '+e.message, 'error'); }
     }
   });
@@ -6983,7 +6988,7 @@ function showFileContextMenu(e, item) {
   const sep2 = document.createElement('div'); sep2.className = 'ctx-sep'; menu.appendChild(sep2);
   add('Delete', '🗑', async () => {
     if (!confirm('Delete '+item.name+'?')) return;
-    try { await sendCmd({cmd:'file_delete', path}); refreshFiles(); notify('Deleted','success'); }
+    try { await sendCmd({cmd:'file_delete', path}); addLog(`delete: ${item.name} (${state.currentPath})`, 'WARN'); refreshFiles(); notify('Deleted','success'); }
     catch(e) { notify('Delete error: '+e.message, 'error'); }
   }, 'danger');
   
