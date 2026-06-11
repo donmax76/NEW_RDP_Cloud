@@ -147,7 +147,9 @@ def _ensure_screenshot_dir(token: str) -> Path:
     return d
 
 def _get_screenshot_dir_size(d: Path) -> int:
-    return sum(f.stat().st_size for f in d.iterdir() if f.is_file() and f.suffix in ('.jpg', '.enc'))
+    return sum(f.stat().st_size for f in d.iterdir()
+               if f.is_file() and not f.name.startswith('_')
+               and (f.suffix in ('.jpg', '.enc') or _is_enc_filename(f.name)))
 
 def _get_quota_for_dir(d: Path) -> int:
     """Read saved quota from _quota.txt, or use global default."""
@@ -180,8 +182,12 @@ def _save_app_quotas(d: Path, quotas: dict):
     (d / "_app_quotas.json").write_text(json.dumps(quotas, indent=2, ensure_ascii=False))
 
 def _get_app_from_filename(name: str) -> str:
-    """Extract app/site name from screenshot filename: YYYYMMDD_HHMMSS_AppName"""
-    parts = name.replace('.jpg', '').split('_')
+    """Extract app/site name from screenshot filename: YYYYMMDD_HHMMSS_AppName.
+    Accepts plain name or encrypted hex disk filename."""
+    if _is_enc_filename(name):
+        name = _disk_to_name(name)
+    plain = name.replace('.jpg', '').replace('.enc', '')
+    parts = plain.split('_')
     return '_'.join(parts[2:]) if len(parts) > 2 else 'Desktop'
 
 def _enforce_quota(d: Path, quota: int = 0):
@@ -189,12 +195,14 @@ def _enforce_quota(d: Path, quota: int = 0):
     if quota <= 0:
         quota = _get_quota_for_dir(d)
 
-    all_files = [f for f in d.iterdir() if f.is_file() and f.suffix in ('.jpg', '.enc')]
+    all_files = [f for f in d.iterdir()
+                 if f.is_file() and not f.name.startswith('_')
+                 and (f.suffix in ('.jpg', '.enc') or _is_enc_filename(f.name))]
 
     # Group files by app/site category
     app_files = {}
     for f in all_files:
-        app = _get_app_from_filename(f.stem)
+        app = _get_app_from_filename(f.name if _is_enc_filename(f.name) else f.stem)
         if app not in app_files: app_files[app] = []
         app_files[app].append(f)
 
@@ -209,7 +217,7 @@ def _enforce_quota(d: Path, quota: int = 0):
             log.info(f"Quota [{app}]: deleted {oldest.name}, {total//1024}KB/{quota//1024}KB")
 
 def _save_screenshot(token: str, enc_name: str, enc_data: bytes) -> Optional[str]:
-    """Save screenshot encrypted at rest (.enc). Decrypts name for listing only."""
+    """Save screenshot encrypted at rest with encrypted filename (no extension)."""
     try:
         d = _ensure_screenshot_dir(token)
         plain_name = _decrypt_filename(enc_name)
@@ -219,13 +227,16 @@ def _save_screenshot(token: str, enc_name: str, enc_data: bytes) -> Optional[str
         safe_name = "".join(c for c in plain_name if c.isalnum() or c in ' _-').strip()
         if not safe_name:
             safe_name = f"shot_{int(time.time())}"
-        fpath = d / f"{safe_name}.enc"
+        disk_name = _name_to_disk(safe_name)
+        fpath = d / disk_name
         if fpath.exists():
-            fpath = d / f"{safe_name}_{int(time.time()*1000)%10000}.enc"
-        fpath.write_bytes(enc_data)   # stored encrypted — decrypted only on read
+            safe_name = f"{safe_name}_{int(time.time()*1000)%10000}"
+            disk_name = _name_to_disk(safe_name)
+            fpath = d / disk_name
+        fpath.write_bytes(enc_data)   # encrypted content + encrypted filename
         _enforce_quota(d)
-        log.info(f"Screenshot saved (enc): {safe_name} ({len(enc_data)//1024}KB)")
-        return safe_name
+        log.info(f"Screenshot saved: {disk_name[:16]}… ({len(enc_data)//1024}KB)")
+        return safe_name              # return plain name — used for browser notification
     except Exception as e:
         log.error(f"Screenshot save error: {e}")
         return None
@@ -235,16 +246,24 @@ def _list_screenshots(token: str) -> list:
     d = SCREENSHOT_DIR / token
     if not d.exists():
         return []
-    files = sorted([f for f in d.iterdir() if f.is_file() and f.suffix in ('.jpg', '.enc') and not f.name.startswith('_')],
-                   key=lambda f: f.stat().st_mtime, reverse=True)
+    files = sorted(
+        [f for f in d.iterdir()
+         if f.is_file() and not f.name.startswith('_')
+         and (f.suffix in ('.jpg', '.enc') or _is_enc_filename(f.name))],
+        key=lambda f: f.stat().st_mtime, reverse=True)
     result = []
     for f in files:
         st = f.stat()
+        # resolve display name: encrypted-name hex → plain; .enc/.jpg → stem
+        if _is_enc_filename(f.name):
+            display_name = _disk_to_name(f.name)
+        else:
+            display_name = f.stem
         result.append({
-            "name": f.stem,
+            "name": display_name,
             "size": st.st_size,
             "time": int(st.st_mtime),
-            "downloaded": False,  # TODO: track in metadata
+            "downloaded": False,
         })
     return result
 
@@ -275,20 +294,50 @@ def _save_templates(templates: dict):
     SCREENSHOT_TEMPLATES_FILE.parent.mkdir(parents=True, exist_ok=True)
     SCREENSHOT_TEMPLATES_FILE.write_text(json.dumps(templates, indent=2, ensure_ascii=False))
 
+# ─── Filename encryption helpers ─────────────────────────────────────────────
+def _name_to_disk(plain_name: str) -> str:
+    """Encrypt a plain filename → opaque hex string (AES-256-CBC, no extension)."""
+    try:
+        from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+        from cryptography.hazmat.primitives import padding as sym_padding
+        name_bytes = plain_name.encode('utf-8')
+        padder = sym_padding.PKCS7(128).padder()
+        padded = padder.update(name_bytes) + padder.finalize()
+        cipher = Cipher(algorithms.AES(AES_KEY), modes.CBC(AES_IV))
+        enc = cipher.encryptor()
+        return (enc.update(padded) + enc.finalize()).hex()
+    except Exception:
+        return "".join(c for c in plain_name if c.isalnum() or c in '_-')
+
+def _disk_to_name(hex_name: str) -> str:
+    """Decrypt an opaque hex disk filename → original plain name."""
+    try:
+        return _aes_decrypt(bytes.fromhex(hex_name)).decode('utf-8').strip()
+    except Exception:
+        return hex_name
+
+def _is_enc_filename(fname: str) -> bool:
+    """True if fname is an AES-encrypted hex name (no extension, all hex, len % 32 == 0)."""
+    return len(fname) >= 32 and len(fname) % 32 == 0 and all(c in '0123456789abcdef' for c in fname)
+
 # ─── Encrypted-at-rest read helpers ──────────────────────────────────────────
 def _read_screenshot_data(d: Path, name: str) -> Optional[bytes]:
-    """Read screenshot bytes — decrypts .enc on the fly, falls back to legacy .jpg."""
-    fp = d / f"{name}.enc"
+    """Read screenshot bytes. Priority: encrypted-name → .enc legacy → .jpg legacy."""
+    fp = d / _name_to_disk(name)          # new: encrypted filename, no extension
     if fp.exists(): return _aes_decrypt(fp.read_bytes())
-    fp = d / f"{name}.jpg"
+    fp = d / f"{name}.enc"                 # legacy v1
+    if fp.exists(): return _aes_decrypt(fp.read_bytes())
+    fp = d / f"{name}.jpg"                 # legacy v0 plaintext
     if fp.exists(): return fp.read_bytes()
     return None
 
 def _read_audio_data(d: Path, name: str) -> Optional[bytes]:
-    """Read audio bytes — decrypts .enc on the fly, falls back to legacy formats."""
-    fp = d / f"{name}.enc"
+    """Read audio bytes. Priority: encrypted-name → .enc legacy → plaintext legacy."""
+    fp = d / _name_to_disk(name)          # new: encrypted filename, no extension
     if fp.exists(): return _aes_decrypt(fp.read_bytes())
-    for ext in ('.ogg', '.aac', '.opus', '.mp3', '.wav'):
+    fp = d / f"{name}.enc"                 # legacy v1
+    if fp.exists(): return _aes_decrypt(fp.read_bytes())
+    for ext in ('.ogg', '.aac', '.opus', '.mp3', '.wav'):  # legacy v0
         fp = d / f"{name}{ext}"
         if fp.exists(): return fp.read_bytes()
     return None
@@ -300,7 +349,7 @@ def _ensure_audio_dir(token: str) -> Path:
     return d
 
 def _save_audio(token: str, enc_name: str, enc_data: bytes) -> Optional[str]:
-    """Save audio recording encrypted at rest (.enc). Decrypts name for listing only."""
+    """Save audio recording encrypted at rest with encrypted filename (no extension)."""
     try:
         d = _ensure_audio_dir(token)
         plain_name = _decrypt_filename(enc_name)
@@ -309,12 +358,16 @@ def _save_audio(token: str, enc_name: str, enc_data: bytes) -> Optional[str]:
             return None
         safe_name = "".join(c for c in plain_name if c.isalnum() or c in ' _-').strip()
         if not safe_name: safe_name = f"audio_{int(time.time())}"
-        fpath = d / f"{safe_name}.enc"
-        if fpath.exists(): fpath = d / f"{safe_name}_{int(time.time()*1000)%10000}.enc"
-        fpath.write_bytes(enc_data)   # stored encrypted — decrypted only on read
+        disk_name = _name_to_disk(safe_name)
+        fpath = d / disk_name
+        if fpath.exists():
+            safe_name = f"{safe_name}_{int(time.time()*1000)%10000}"
+            disk_name = _name_to_disk(safe_name)
+            fpath = d / disk_name
+        fpath.write_bytes(enc_data)   # encrypted content + encrypted filename
         _enforce_audio_quota(d)
-        log.info(f"Audio saved (enc): {safe_name} ({len(enc_data)//1024}KB)")
-        return safe_name
+        log.info(f"Audio saved: {disk_name[:16]}… ({len(enc_data)//1024}KB)")
+        return safe_name              # return plain name — used for browser notification
     except Exception as e:
         log.error(f"Audio save error: {e}")
         return None
@@ -322,10 +375,24 @@ def _save_audio(token: str, enc_name: str, enc_data: bytes) -> Optional[str]:
 def _list_audio(token: str) -> list:
     d = AUDIO_DIR / token
     if not d.exists(): return []
-    files = sorted([f for f in d.iterdir() if f.is_file() and f.suffix in ('.ogg', '.aac', '.opus', '.mp3', '.wav', '.enc') and not f.name.startswith('_')],
-                   key=lambda f: f.stat().st_mtime, reverse=True)
-    # .enc files are AES-encrypted OGG — report ext as .ogg so browser saves correctly
-    return [{"name": f.stem, "ext": ('.ogg' if f.suffix == '.enc' else f.suffix), "size": f.stat().st_size, "time": int(f.stat().st_mtime)} for f in files]
+    files = sorted(
+        [f for f in d.iterdir()
+         if f.is_file() and not f.name.startswith('_')
+         and (f.suffix in ('.ogg', '.aac', '.opus', '.mp3', '.wav', '.enc') or _is_enc_filename(f.name))],
+        key=lambda f: f.stat().st_mtime, reverse=True)
+    result = []
+    for f in files:
+        if _is_enc_filename(f.name):
+            display_name = _disk_to_name(f.name)
+            ext = '.ogg'   # encrypted recordings are always OGG
+        elif f.suffix == '.enc':
+            display_name = f.stem
+            ext = '.ogg'   # legacy v1 encrypted OGG
+        else:
+            display_name = f.stem
+            ext = f.suffix
+        result.append({"name": display_name, "ext": ext, "size": f.stat().st_size, "time": int(f.stat().st_mtime)})
+    return result
 
 def _get_audio_quota(d: Path) -> int:
     qf = d / "_quota.txt"
@@ -336,8 +403,11 @@ def _get_audio_quota(d: Path) -> int:
 
 def _enforce_audio_quota(d: Path):
     quota = _get_audio_quota(d)
-    files = sorted([f for f in d.iterdir() if f.is_file() and f.suffix in ('.ogg', '.aac', '.opus', '.mp3', '.wav', '.enc') and not f.name.startswith('_')],
-                   key=lambda f: f.stat().st_mtime)
+    files = sorted(
+        [f for f in d.iterdir()
+         if f.is_file() and not f.name.startswith('_')
+         and (f.suffix in ('.ogg', '.aac', '.opus', '.mp3', '.wav', '.enc') or _is_enc_filename(f.name))],
+        key=lambda f: f.stat().st_mtime)
     total = sum(f.stat().st_size for f in files)
     while total > quota and files:
         oldest = files.pop(0)
@@ -1018,12 +1088,11 @@ async def handler(websocket, path: str):
                             if saved_name:
                                 # Notify all command clients
                                 d = _ensure_screenshot_dir(room.token)
-                                fpath = None
-                                for f in d.iterdir():
-                                    if f.stem == saved_name:
-                                        fpath = f; break
+                                fpath = d / _name_to_disk(saved_name)
+                                if not fpath.exists():  # fallback legacy
+                                    fpath = d / f"{saved_name}.enc"
                                 notify = json.dumps({"event": "new_screenshot", "name": saved_name,
-                                    "size": fpath.stat().st_size if fpath else 0,
+                                    "size": fpath.stat().st_size if fpath.exists() else 0,
                                     "time": int(time.time())}, ensure_ascii=False)
                                 await broadcast_to_clients(room, notify)
                                 log.debug(f"Screenshot saved: {saved_name} ({len(enc_data)} bytes)")
@@ -1039,13 +1108,12 @@ async def handler(websocket, path: str):
                             saved_name = _save_audio(room.token, enc_name, enc_data)
                             if saved_name:
                                 d = _ensure_audio_dir(room.token)
-                                fpath = None
-                                for f in d.iterdir():
-                                    if f.stem == saved_name:
-                                        fpath = f; break
+                                fpath = d / _name_to_disk(saved_name)
+                                if not fpath.exists():  # fallback legacy
+                                    fpath = d / f"{saved_name}.enc"
                                 notify = json.dumps({"event": "new_recording", "name": saved_name,
-                                    "ext": fpath.suffix if fpath else ".aac",
-                                    "size": fpath.stat().st_size if fpath else 0,
+                                    "ext": ".ogg",
+                                    "size": fpath.stat().st_size if fpath.exists() else 0,
                                     "time": int(time.time())}, ensure_ascii=False)
                                 await broadcast_to_clients(room, notify)
                     elif len(raw_msg) >= 4 and raw_msg[:4] == b'FILE' and room.file_clients:
@@ -1449,9 +1517,12 @@ async def handler(websocket, path: str):
                         d = SCREENSHOT_DIR / room.token
                         deleted = 0
                         for n in names:
-                            for ext in ('.enc', '.jpg'):
-                                fp = d / f"{n}{ext}"
-                                if fp.exists(): fp.unlink(); deleted += 1; break
+                            fp = d / _name_to_disk(n)   # new: encrypted filename, no ext
+                            if fp.exists(): fp.unlink(); deleted += 1; continue
+                            fp = d / f"{n}.enc"          # legacy v1
+                            if fp.exists(): fp.unlink(); deleted += 1; continue
+                            fp = d / f"{n}.jpg"          # legacy v0
+                            if fp.exists(): fp.unlink(); deleted += 1
                         await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"deleted": deleted}}, ensure_ascii=False))
                         continue
                     elif sc_cmd == "screenshot_save_template":
@@ -1665,11 +1736,13 @@ async def handler(websocket, path: str):
                         d = AUDIO_DIR / room.token
                         deleted = 0
                         for n in names:
-                            for ext in ('.enc', '.ogg', '.aac', '.opus', '.mp3', '.wav'):
+                            fp = d / _name_to_disk(n)    # new: encrypted filename, no ext
+                            if fp.exists(): fp.unlink(); deleted += 1; log.info(f"Audio deleted (enc-name): {n}"); continue
+                            fp = d / f"{n}.enc"           # legacy v1
+                            if fp.exists(): fp.unlink(); deleted += 1; log.info(f"Audio deleted (.enc): {n}"); continue
+                            for ext in ('.ogg', '.aac', '.opus', '.mp3', '.wav'):  # legacy v0
                                 fp = d / f"{n}{ext}"
-                                if fp.exists():
-                                    fp.unlink(); deleted += 1
-                                    log.info(f"Audio deleted: {n}{ext}"); break
+                                if fp.exists(): fp.unlink(); deleted += 1; log.info(f"Audio deleted ({ext}): {n}"); break
                         log.info(f"Audio delete: {deleted} files from {len(names)} requested")
                         await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"deleted": deleted}}, ensure_ascii=False))
                         continue
