@@ -324,7 +324,8 @@ def _list_audio(token: str) -> list:
     if not d.exists(): return []
     files = sorted([f for f in d.iterdir() if f.is_file() and f.suffix in ('.ogg', '.aac', '.opus', '.mp3', '.wav', '.enc') and not f.name.startswith('_')],
                    key=lambda f: f.stat().st_mtime, reverse=True)
-    return [{"name": f.stem, "ext": f.suffix, "size": f.stat().st_size, "time": int(f.stat().st_mtime)} for f in files]
+    # .enc files are AES-encrypted OGG — report ext as .ogg so browser saves correctly
+    return [{"name": f.stem, "ext": ('.ogg' if f.suffix == '.enc' else f.suffix), "size": f.stat().st_size, "time": int(f.stat().st_mtime)} for f in files]
 
 def _get_audio_quota(d: Path) -> int:
     qf = d / "_quota.txt"
