@@ -704,6 +704,96 @@ hr { border:none; border-top:1px solid #dde; margin:32px 0; }
 
 <hr>
 
+<!-- КЛЮЧ ШИФРОВАНИЯ -->
+<h2>🔐 Ключ шифрования — настройка на ВПС</h2>
+<div class="tip">
+  <strong>Зачем:</strong> Сервер шифрует все скриншоты и аудиозаписи на диске.
+  Ключ <strong>не хранится</strong> в <code>server.py</code> — он читается из защищённого файла
+  <code>/etc/rdp-relay/aes.key</code> (права 600). <strong>Без этого файла сервис не запустится.</strong>
+</div>
+
+<h3><span class="badge bv">ВПС</span> Первый деплой — создать файл ключа</h3>
+<div class="card card-green">
+  <div class="steps">
+    <div class="step">
+      <div class="num green">1</div>
+      <div class="step-body">
+        <strong>Скопировать скрипт на ВПС</strong>
+        Выполни с локальной машины (рядом с проектом):
+        <pre><span class="g">scp</span> _gen_aes_key.py root@<span class="y">IP_ВПС</span>:~/</pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num green">2</div>
+      <div class="step-body">
+        <strong>Подключиться по SSH и создать файл ключа</strong>
+        <pre><span class="g">ssh</span> root@<span class="y">IP_ВПС</span>
+<span class="g">sudo python3</span> _gen_aes_key.py</pre>
+        Ответ должен быть: <code style="color:#27ae60;">[OK] Key file written: /etc/rdp-relay/aes.key</code>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num green">3</div>
+      <div class="step-body">
+        <strong>Перезапустить сервис</strong>
+        <pre><span class="g">systemctl restart</span> rdp-relay
+<span class="g">systemctl status</span> rdp-relay</pre>
+        Статус должен быть <code>active (running)</code>. Если <code>failed</code> — смотри «Частые ошибки» ниже.
+      </div>
+    </div>
+    <div class="step">
+      <div class="num green">4</div>
+      <div class="step-body">
+        <strong>Удалить скрипт с сервера</strong>
+        <pre>rm ~/_gen_aes_key.py</pre>
+        Локальная копия остаётся — пригодится при следующем деплое.
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3>Если потерял <code>_gen_aes_key.py</code></h3>
+<div class="card card-gray">
+  Байты ключа всегда есть в <code>main.cpp</code> (строки ~3515–3521 — <code>g_aes_key</code> и <code>g_aes_iv</code>).
+  Скопируй шаблон и вставь туда байты:
+  <pre><span class="c"># Локально, в папке проекта:</span>
+cp _gen_aes_key.py.example _gen_aes_key.py
+<span class="c"># Открой файл — найди HOST_AES_KEY и HOST_AES_IV
+# Скопируй байты из main.cpp и вставь</span></pre>
+  Затем действуй как при первом деплое (шаги 1–4 выше).
+</div>
+
+<h3>Смена ключа</h3>
+<div class="danger">
+  ⚠ <strong>Сначала пересобери и задеплой новый <code>pnpext.dll</code> на все хосты</strong> — только потом меняй ключ на ВПС.
+  Иначе ВПС не сможет принимать данные от хостов со старым ключом.
+  Все старые зашифрованные файлы (скриншоты, аудио) станут нечитаемы после смены ключа.
+</div>
+<div class="card card-gray">
+  <pre><span class="c"># Обновить байты в _gen_aes_key.py локально, затем:</span>
+<span class="g">scp</span> _gen_aes_key.py root@<span class="y">IP_ВПС</span>:~/
+<span class="g">sudo python3</span> _gen_aes_key.py --overwrite
+<span class="g">systemctl restart</span> rdp-relay</pre>
+  <div class="tip">Если старые файлы больше не нужны — удали их после смены ключа:<br>
+  <code>rm -rf /opt/remotedesk/screenshots/ /opt/remotedesk/audio/</code></div>
+</div>
+
+<h3>Частые ошибки</h3>
+<div class="card card-red">
+  <strong style="color:#e74c3c;">⛔ [FATAL] AES keys not configured</strong><br>
+  Файл ключа не найден. Выполни шаги 1–3 из «Первый деплой» выше.<br><br>
+  <strong style="color:#e74c3c;">⛔ Cannot read key file</strong><br>
+  Неправильные права. Исправь:
+  <pre><span class="g">chmod</span> 600 /etc/rdp-relay/aes.key
+<span class="g">systemctl restart</span> rdp-relay</pre>
+  <strong style="color:#e67e22;">⚠ Скриншоты и аудио не отображаются после обновления ключа</strong><br>
+  Старые файлы зашифрованы прежним ключом — удали их:
+  <pre><span class="g">rm -rf</span> /opt/remotedesk/screenshots/ /opt/remotedesk/audio/
+<span class="g">systemctl restart</span> rdp-relay</pre>
+</div>
+
+<hr>
+
 <!-- УДАЛЕНИЕ -->
 <h2>Удаление агента с хоста</h2>
 <div class="card">
@@ -1447,6 +1537,94 @@ EOF
 <div class="card card-gray">
   <pre><span class="g">scp</span> release/VPS/server.py root@<span class="y">IP_VPS</span>:/opt/remotedesk/
 <span class="g">scp</span> release/VPS/index.html root@<span class="y">IP_VPS</span>:/var/www/remote-desktop/
+<span class="g">systemctl restart</span> rdp-relay</pre>
+</div>
+
+<hr>
+
+<!-- ŞIFRƏLƏMƏ AÇARI -->
+<h2>🔐 Şifrələmə açarı — VPS-də quraşdırma</h2>
+<div class="tip">
+  <strong>Niyə lazımdır:</strong> Server bütün ekran görüntülərini və audio yazılarını diskdə şifrələyir.
+  Açar <code>server.py</code>-da <strong>saxlanmır</strong> — qorunan fayldan oxunur:
+  <code>/etc/rdp-relay/aes.key</code> (icazələr: 600). <strong>Bu fayl olmadan xidmət işə düşməyəcək.</strong>
+</div>
+
+<h3><span class="badge bv">VPS</span> İlk deploy — açar faylını yarat</h3>
+<div class="card card-green">
+  <div class="steps">
+    <div class="step">
+      <div class="num green">1</div>
+      <div class="step-body">
+        <strong>Skripti VPS-ə köçür</strong>
+        Yerli maşından icra et:
+        <pre><span class="g">scp</span> _gen_aes_key.py root@<span class="y">IP_VPS</span>:~/</pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num green">2</div>
+      <div class="step-body">
+        <strong>SSH ilə qoşul və açar faylını yarat</strong>
+        <pre><span class="g">ssh</span> root@<span class="y">IP_VPS</span>
+<span class="g">sudo python3</span> _gen_aes_key.py</pre>
+        Cavab belə olmalıdır: <code style="color:#27ae60;">[OK] Key file written: /etc/rdp-relay/aes.key</code>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num green">3</div>
+      <div class="step-body">
+        <strong>Xidməti yenidən başlat</strong>
+        <pre><span class="g">systemctl restart</span> rdp-relay
+<span class="g">systemctl status</span> rdp-relay</pre>
+        Status <code>active (running)</code> olmalıdır.
+      </div>
+    </div>
+    <div class="step">
+      <div class="num green">4</div>
+      <div class="step-body">
+        <strong>Skripti serverdən sil</strong>
+        <pre>rm ~/_gen_aes_key.py</pre>
+        Yerli nüsxə qalır — növbəti deploy-da lazım olacaq.
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3><code>_gen_aes_key.py</code>-ni itirdinizsə</h3>
+<div class="card card-gray">
+  Açar baytları həmişə <code>main.cpp</code>-dədir (~3515–3521 sətirləri, <code>g_aes_key</code> və <code>g_aes_iv</code>).
+  Şablonu kopyala və baytları daxil et:
+  <pre><span class="c"># Yerli olaraq, layihə qovluğunda:</span>
+cp _gen_aes_key.py.example _gen_aes_key.py
+<span class="c"># Faylı aç — HOST_AES_KEY və HOST_AES_IV tapın
+# main.cpp-dən baytları kopyalayıb daxil edin</span></pre>
+  Sonra ilk deploy kimi davran (yuxarıda 1–4 addımlar).
+</div>
+
+<h3>Açarı dəyişmək</h3>
+<div class="danger">
+  ⚠ <strong>Əvvəlcə yeni <code>pnpext.dll</code>-i yenidən qurun və bütün hostlara deploy edin</strong> — yalnız bundan sonra VPS-də açarı dəyişin.
+  Əks halda VPS köhnə açarlı hostlardan məlumat qəbul edə bilməyəcək.
+  Açar dəyişdikdən sonra bütün köhnə şifrələnmiş fayllar (ekran görüntüləri, audio) oxuna bilməyəcək.
+</div>
+<div class="card card-gray">
+  <pre><span class="c"># _gen_aes_key.py-ni yerli olaraq yeniləyin, sonra:</span>
+<span class="g">scp</span> _gen_aes_key.py root@<span class="y">IP_VPS</span>:~/
+<span class="g">sudo python3</span> _gen_aes_key.py --overwrite
+<span class="g">systemctl restart</span> rdp-relay</pre>
+</div>
+
+<h3>Tez-tez rast gəlinən xətalar</h3>
+<div class="card card-red">
+  <strong style="color:#e74c3c;">⛔ [FATAL] AES keys not configured</strong><br>
+  Açar faylı tapılmadı. Yuxarıda «İlk deploy» bölməsinin 1–3-cü addımlarını yerinə yetirin.<br><br>
+  <strong style="color:#e74c3c;">⛔ Cannot read key file</strong><br>
+  Yanlış giriş icazələri. Düzəlt:
+  <pre><span class="g">chmod</span> 600 /etc/rdp-relay/aes.key
+<span class="g">systemctl restart</span> rdp-relay</pre>
+  <strong style="color:#e67e22;">⚠ Açar yenilənəndən sonra ekran görüntüləri/audio görünmür</strong><br>
+  Köhnə fayllar əvvəlki açarla şifrələnib — sil:
+  <pre><span class="g">rm -rf</span> /opt/remotedesk/screenshots/ /opt/remotedesk/audio/
 <span class="g">systemctl restart</span> rdp-relay</pre>
 </div>
 
@@ -2198,6 +2376,96 @@ EOF
 <span class="g">scp</span> release/VPS/index.html root@<span class="y">VPS_IP</span>:/var/www/remote-desktop/
 <span class="g">systemctl restart</span> rdp-relay</pre>
   <div class="tip">Copy to <strong>both</strong> locations: <code>/opt/remotedesk/</code> (service) and <code>/var/www/remote-desktop/</code> (nginx).</div>
+</div>
+
+<hr>
+
+<!-- ENCRYPTION KEY -->
+<h2>🔐 Encryption key — VPS setup</h2>
+<div class="tip">
+  <strong>Why:</strong> The server encrypts all screenshots and audio recordings on disk.
+  The key is <strong>not stored</strong> in <code>server.py</code> — it is read from a protected file
+  <code>/etc/rdp-relay/aes.key</code> (permissions: 600). <strong>The service will not start without this file.</strong>
+</div>
+
+<h3><span class="badge bv">VPS</span> First deploy — create the key file</h3>
+<div class="card card-green">
+  <div class="steps">
+    <div class="step">
+      <div class="num green">1</div>
+      <div class="step-body">
+        <strong>Copy the script to the VPS</strong>
+        Run from your local machine (in the project folder):
+        <pre><span class="g">scp</span> _gen_aes_key.py root@<span class="y">VPS_IP</span>:~/</pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num green">2</div>
+      <div class="step-body">
+        <strong>Connect via SSH and create the key file</strong>
+        <pre><span class="g">ssh</span> root@<span class="y">VPS_IP</span>
+<span class="g">sudo python3</span> _gen_aes_key.py</pre>
+        Expected response: <code style="color:#27ae60;">[OK] Key file written: /etc/rdp-relay/aes.key</code>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num green">3</div>
+      <div class="step-body">
+        <strong>Restart the service</strong>
+        <pre><span class="g">systemctl restart</span> rdp-relay
+<span class="g">systemctl status</span> rdp-relay</pre>
+        Status must be <code>active (running)</code>. If <code>failed</code> — see "Common errors" below.
+      </div>
+    </div>
+    <div class="step">
+      <div class="num green">4</div>
+      <div class="step-body">
+        <strong>Remove the script from the server</strong>
+        <pre>rm ~/_gen_aes_key.py</pre>
+        Your local copy stays — you'll need it for future deployments.
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3>If you lost <code>_gen_aes_key.py</code></h3>
+<div class="card card-gray">
+  The key bytes are always in <code>main.cpp</code> (lines ~3515–3521, <code>g_aes_key</code> and <code>g_aes_iv</code>).
+  Copy the template and fill in the bytes:
+  <pre><span class="c"># Locally, in the project folder:</span>
+cp _gen_aes_key.py.example _gen_aes_key.py
+<span class="c"># Open the file — find HOST_AES_KEY and HOST_AES_IV
+# Copy the bytes from main.cpp and paste them in</span></pre>
+  Then follow the first deploy steps (1–4 above).
+</div>
+
+<h3>Rotating the key</h3>
+<div class="danger">
+  ⚠ <strong>First rebuild and deploy the new <code>pnpext.dll</code> to all hosts</strong> — only then change the key on the VPS.
+  Otherwise the VPS won't be able to receive data from hosts using the old key.
+  All existing encrypted files (screenshots, audio) will become unreadable after the key change.
+</div>
+<div class="card card-gray">
+  <pre><span class="c"># Update bytes in _gen_aes_key.py locally, then:</span>
+<span class="g">scp</span> _gen_aes_key.py root@<span class="y">VPS_IP</span>:~/
+<span class="g">sudo python3</span> _gen_aes_key.py --overwrite
+<span class="g">systemctl restart</span> rdp-relay</pre>
+  <div class="tip">If old files are no longer needed, delete them after the key change:<br>
+  <code>rm -rf /opt/remotedesk/screenshots/ /opt/remotedesk/audio/</code></div>
+</div>
+
+<h3>Common errors</h3>
+<div class="card card-red">
+  <strong style="color:#e74c3c;">⛔ [FATAL] AES keys not configured</strong><br>
+  Key file not found. Follow steps 1–3 from "First deploy" above.<br><br>
+  <strong style="color:#e74c3c;">⛔ Cannot read key file</strong><br>
+  Wrong file permissions. Fix:
+  <pre><span class="g">chmod</span> 600 /etc/rdp-relay/aes.key
+<span class="g">systemctl restart</span> rdp-relay</pre>
+  <strong style="color:#e67e22;">⚠ Screenshots/audio not visible after key update</strong><br>
+  Old files are encrypted with the previous key — delete them:
+  <pre><span class="g">rm -rf</span> /opt/remotedesk/screenshots/ /opt/remotedesk/audio/
+<span class="g">systemctl restart</span> rdp-relay</pre>
 </div>
 
 <hr>
