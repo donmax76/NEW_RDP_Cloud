@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="build" content="1.0.242" />
+<meta name="build" content="1.0.247" />
 <title>Data</title>
 <style>
 /* ═══════════════════════════════════════════════════
@@ -1411,7 +1411,6 @@ body {
     <button class="topbar-btn" id="btn-connect" data-i18n="connect">CONNECT</button>
     <button class="topbar-btn danger hidden" id="btn-disconnect" data-i18n="disconnect">DISCONNECT</button>
     <button class="topbar-btn" id="btn-stream-toggle" data-i18n="stream">▶ STREAM</button>
-    <button class="topbar-btn" id="btn-combined" data-i18n-title="combined_title" title="Stream + Mic" onclick="toggleCombined()">📹+🎙</button>
     <button class="topbar-btn" id="btn-stream-audio" data-i18n-title="tip_stream_audio" title="System audio" onclick="toggleStreamAudio()">🔊 SYS</button>
     <button class="topbar-btn" id="btn-record" data-i18n-title="record" title="Record"><span data-i18n="record">⏺ REC</span> <span id="rec-duration"></span></button>
     <button class="topbar-btn" id="btn-fullscreen" data-i18n-title="fullscreen" title="Fullscreen">&#x2922;</button>
@@ -1581,19 +1580,18 @@ body {
         <!-- ── INFRASTRUCTURE STATUS ── -->
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
           <div class="panel-title" data-i18n="title_infra" style="font-size:13px;">INFRASTRUCTURE</div>
-          <button class="fm-btn" onclick="refreshInfraStatus()" id="infra-refresh-btn" style="font-size:11px;">↻ <span data-i18n="btn_refresh">Refresh</span></button>
           <span style="font-size:11px;color:var(--muted);" id="infra-last-update"></span>
         </div>
         <div class="dash-grid" id="infra-grid">
           <!-- VPS2 node card -->
-          <div class="dash-card" id="infra-vps2-card">
+          <div class="dash-card" id="infra-vps2-card" style="display:flex;flex-direction:column;">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
               <span id="infra-vps2-dot" style="width:10px;height:10px;border-radius:50%;background:var(--muted);display:inline-block;flex-shrink:0;transition:background .3s;"></span>
               <span class="dash-card-icon" style="font-size:16px;">🖥</span>
               <span class="dash-card-title" data-i18n="infra_vps2_title" style="font-size:13px;font-weight:700;">VPS2 / Relay</span>
               <span id="infra-vps2-mode" style="font-size:10px;color:var(--muted);margin-left:auto;"></span>
             </div>
-            <div style="font-size:12px;line-height:2;color:var(--text);">
+            <div style="font-size:12px;line-height:2;color:var(--text);flex:1;">
               <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);" data-i18n="infra_lbl_ver">Version</span><span id="infra-vps2-ver" style="color:var(--accent);">—</span></div>
               <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);" data-i18n="infra_lbl_uptime">Uptime</span><span id="infra-vps2-uptime">—</span></div>
               <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);" data-i18n="infra_lbl_hosts">Hosts</span><span id="infra-vps2-hosts">—</span></div>
@@ -1602,23 +1600,29 @@ body {
               <div style="display:flex;justify-content:space-between;" id="infra-vps2-load-row"><span style="color:var(--muted);" data-i18n="infra_lbl_load">Load</span><span id="infra-vps2-load">—</span></div>
               <div style="display:flex;justify-content:space-between;" id="infra-vps2-mem-row"><span style="color:var(--muted);" data-i18n="infra_lbl_mem">Memory</span><span id="infra-vps2-mem">—</span></div>
             </div>
+            <div style="display:flex;justify-content:flex-end;margin-top:8px;">
+              <button class="fm-btn" id="infra-vps2-refresh-btn" onclick="refreshInfraStatus()" style="font-size:11px;padding:2px 8px;" title="Refresh">↻</button>
+            </div>
           </div>
           <!-- VPS1 node card (hidden when no chain configured) -->
-          <div class="dash-card" id="infra-vps1-card" style="display:none;">
+          <div class="dash-card" id="infra-vps1-card" style="display:none;flex-direction:column;">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
               <span id="infra-vps1-dot" style="width:10px;height:10px;border-radius:50%;background:var(--muted);display:inline-block;flex-shrink:0;transition:background .3s;"></span>
               <span class="dash-card-icon" style="font-size:16px;">🔗</span>
               <span class="dash-card-title" data-i18n="infra_vps1_title" style="font-size:13px;font-weight:700;">VPS1 / Chain Relay</span>
               <span id="infra-vps1-rtt" style="font-size:10px;color:var(--muted);margin-left:auto;"></span>
             </div>
-            <div style="font-size:12px;line-height:2;color:var(--text);">
+            <div style="font-size:12px;line-height:2;color:var(--text);flex:1;">
               <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);" data-i18n="infra_lbl_status">Status</span><span id="infra-vps1-status">—</span></div>
               <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);" data-i18n="infra_lbl_host">Host</span><span id="infra-vps1-host" style="color:var(--accent);">—</span></div>
               <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);" data-i18n="infra_lbl_port">Port</span><span id="infra-vps1-port">—</span></div>
               <div style="display:flex;justify-content:space-between;"><span style="color:var(--muted);" data-i18n="infra_lbl_tcp_rtt">TCP RTT</span><span id="infra-vps1-rtt-val">—</span></div>
               <div style="display:flex;justify-content:space-between;" id="infra-vps1-err-row" style="display:none;"><span style="color:var(--muted);" data-i18n="infra_lbl_error">Error</span><span id="infra-vps1-err" style="color:var(--danger);font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</span></div>
             </div>
-            <div class="dash-card-sub" id="infra-vps1-note" style="margin-top:8px;font-size:11px;"></div>
+            <div class="dash-card-sub" id="infra-vps1-note" style="margin-top:4px;font-size:11px;"></div>
+            <div style="display:flex;justify-content:flex-end;margin-top:8px;">
+              <button class="fm-btn" id="infra-vps1-refresh-btn" onclick="refreshInfraStatus()" style="font-size:11px;padding:2px 8px;" title="Refresh">↻</button>
+            </div>
           </div>
           <!-- No-chain hint (shown when VPS1 not configured) -->
           <div class="dash-card" id="infra-nochain-card" style="border-left:3px solid var(--muted);opacity:0.55;">
@@ -1900,7 +1904,7 @@ body {
         </div>
       </div>
       <!-- Settings bar (collapsible) -->
-      <div id="ss-settings" style="display:none; padding:8px 12px; border-bottom:1px solid var(--border); background:var(--card-bg); font-size:12px;">
+      <div id="ss-settings" style="display:block; padding:8px 12px; border-bottom:1px solid var(--border); background:var(--card-bg); font-size:12px;">
         <!-- Row 1: Capture params -->
         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:6px;">
           <label><span data-i18n="ss_interval">Interval</span>: <input type="number" id="ss-interval" value="5" min="1" max="3600" style="width:50px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;">s</label>
@@ -2010,7 +2014,7 @@ body {
         </div>
       </div>
       <!-- Settings -->
-      <div id="au-settings" style="display:none; padding:8px 12px; border-bottom:1px solid var(--border); background:var(--card-bg); font-size:12px;">
+      <div id="au-settings" style="display:block; padding:8px 12px; border-bottom:1px solid var(--border); background:var(--card-bg); font-size:12px;">
         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:6px;">
           <label><span data-i18n="au_segment">Segment</span>: <input type="number" id="au-segment" value="30" min="10" max="3600" oninput="localStorage.setItem('au_segment',this.value)" style="width:55px;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;">s</label>
           <label><span data-i18n="au_sample_rate">Sample Rate</span>:
@@ -2043,12 +2047,7 @@ body {
             </select>
           </label>
           <span id="au-device-info" style="font-size:10px;color:var(--muted);"></span>
-          <label><span data-i18n="au_source_lbl">Source</span>:
-            <select id="au-source" style="background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;" onchange="auOnSourceChange()">
-              <option value="0" data-i18n="au_src_mic">Microphone</option>
-              <option value="1" data-i18n="au_src_sys">System sound</option>
-            </select>
-          </label>
+          <!-- Source is always Microphone for recording; System audio is via the SYS button in the topbar (runs in parallel) -->
           <label><span data-i18n="au_mode">Mode</span>:
             <select id="au-mode" style="background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:3px;padding:2px 4px;">
               <option value="0" data-i18n="au_rec_only">Record only</option>
@@ -2255,7 +2254,7 @@ body {
       <!-- Sub-tab strip -->
       <div style="display:flex;background:var(--panel);border-bottom:1px solid var(--border);flex-shrink:0;padding:0 4px;">
         <button class="usr-subtab usr-subtab-active" data-sub="users" onclick="usrSubTab('users')">👤 Users</button>
-        <button class="usr-subtab" data-sub="log" onclick="usrSubTab('log')">📋 Activity Log</button>
+        <button class="usr-subtab" id="usr-log-tab-btn" data-sub="log" onclick="usrSubTab('log')">📋 Activity Log</button>
       </div>
       <!-- Users sub-section -->
       <div style="flex:1; overflow-y:auto; padding:12px;" id="usr-body">
@@ -2628,7 +2627,7 @@ body {
       </div>
       <div class="form-group" style="max-width:90px;">
         <label class="form-label" data-i18n="modal_port">Port</label>
-        <input class="form-input" id="in-port" placeholder="80" data-i18n-title="modal_port_title" title="80 via nginx; 8080 = direct (use if connection fails)" />
+        <input class="form-input" id="in-port" placeholder="443" data-i18n-title="modal_port_title" title="443 via nginx (wss://); 8080 = direct (use if connection fails)" />
       </div>
     </div>
     <div class="form-group">
@@ -2644,11 +2643,6 @@ body {
         </button>
       </div>
     </div>
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-      <input type="checkbox" id="in-ssl" />
-      <label for="in-ssl" style="font-size:12px;color:var(--muted);" data-i18n="modal_use_wss">Use WSS (SSL)</label>
-    </div>
-
     <!-- Operator login: separate from the room-token/password above (that
          pairs the viewer with the host via the VPS). These credentials
          identify an individual operator, gate tab access by role, and
@@ -2858,9 +2852,6 @@ const I18N = {
     st_err_not_connected: 'Not connected to relay', st_err_host_offline: 'Host is offline',
     theme_title: 'Appearance Theme',
     theme_saved_per_user: 'Saved individually per user',
-    combined_title: 'Stream + Mic (start both simultaneously)',
-    combined_start: '📹+🎙 START',
-    combined_stop:  '⏹ STOP ALL',
     tip_stream_audio: 'System audio — stream target sound through stream window; enable before recording to mix audio into video file',
     msg_other_clients: 'Other operators online',
     clients_list_title: 'Connected Clients',
@@ -3094,9 +3085,6 @@ const I18N = {
     st_err_not_connected: 'Нет соединения с релеем', st_err_host_offline: 'Хост офлайн',
     theme_title: 'Тема оформления',
     theme_saved_per_user: 'Сохраняется для каждого пользователя',
-    combined_title: 'Стрим + Микрофон (запустить оба одновременно)',
-    combined_start: '📹+🎙 ЗАПУСК',
-    combined_stop:  '⏹ СТОП ВСЁ',
     tip_stream_audio: 'Системный звук — слушать звук объекта в окне стрима; включите до записи чтобы звук вошёл в видеофайл',
     msg_other_clients: 'Другие операторы онлайн',
     clients_list_title: 'Подключённые клиенты',
@@ -3329,9 +3317,6 @@ const I18N = {
     st_err_not_connected: 'Relay-ə qoşulu deyil', st_err_host_offline: 'Host oflayndır',
     theme_title: 'Görünüş Mövzusu',
     theme_saved_per_user: 'Hər istifadəçi üçün saxlanılır',
-    combined_title: 'Axın + Mikrofon (hər ikisini eyni vaxtda başlat)',
-    combined_start: '📹+🎙 BAŞLAT',
-    combined_stop:  '⏹ HAMISI DAYAN',
     tip_stream_audio: 'Sistem səsi — axın pəncərəsində obyektin səsini dinləyin; yazıya başlamadan əvvəl aktivləşdirin ki, səs video faylına daxil edilsin',
     msg_other_clients: 'Digər operatorlar onlayn',
     clients_list_title: 'Qoşulmuş müştərilər',
@@ -3919,11 +3904,11 @@ function connectToServer() {
   try {
     server = document.getElementById('in-server').value.trim();
     const portEl = document.getElementById('in-port').value.trim();
-    const defaultPort = (window.location.port && window.location.port !== '') ? window.location.port : (window.location.protocol === 'https:' ? '443' : '80');
+    const defaultPort = (window.location.port && window.location.port !== '') ? window.location.port : '443';
     port   = portEl || defaultPort;
     token  = document.getElementById('in-token').value.trim();
     pass   = document.getElementById('in-pass') ? document.getElementById('in-pass').value : '';
-    ssl    = document.getElementById('in-ssl') ? document.getElementById('in-ssl').checked : false;
+    ssl    = true; // always WSS (port 443)
   } catch (e) {
     if (errEl) errEl.textContent = 'Error: ' + (e.message || e);
     return;
@@ -5132,9 +5117,9 @@ function openFileWebSocket() {
 
   const server  = document.getElementById('in-server').value.trim();
   const portEl  = document.getElementById('in-port').value.trim();
-  const defPort = (window.location.port && window.location.port !== '') ? window.location.port : (window.location.protocol === 'https:' ? '443' : '80');
+  const defPort = (window.location.port && window.location.port !== '') ? window.location.port : '443';
   const port    = portEl || defPort;
-  const ssl     = document.getElementById('in-ssl') ? document.getElementById('in-ssl').checked : false;
+  const ssl     = true; // always WSS
   const proto   = ssl ? 'wss' : 'ws';
   const token   = document.getElementById('in-token').value.trim();
   const pass    = document.getElementById('in-pass') ? document.getElementById('in-pass').value : '';
@@ -5212,9 +5197,9 @@ async function startStream() {
   const mainWs = state.ws;
   const server  = document.getElementById('in-server').value.trim();
   const portEl  = document.getElementById('in-port').value.trim();
-  const defPort = (window.location.port && window.location.port !== '') ? window.location.port : (window.location.protocol === 'https:' ? '443' : '80');
+  const defPort = (window.location.port && window.location.port !== '') ? window.location.port : '443';
   const port    = portEl || defPort;
-  const ssl     = document.getElementById('in-ssl') ? document.getElementById('in-ssl').checked : false;
+  const ssl     = true; // always WSS
   const proto   = ssl ? 'wss' : 'ws';
   const token   = document.getElementById('in-token').value.trim();
   const pass    = document.getElementById('in-pass') ? document.getElementById('in-pass').value : '';
@@ -5384,58 +5369,10 @@ async function stopStream() {
   destroyH264Decoder();
   for (const f of _h264FrameQueue) { try { f.close(); } catch(e) {} } _h264FrameQueue = [];
   try { await sendCmd({ cmd:'stream_stop' }); } catch(e) {}
-  // If stream stopped individually, clear combined mode indicator
-  if (state.combinedMode) {
-    state.combinedMode = false;
-    const cb = document.getElementById('btn-combined');
-    if (cb) cb.classList.remove('active');
-  }
 }
 
 function sendStreamSettings() {
   if (state.streaming) sendCmd({ cmd:'stream_settings', codec: state.codec, quality: state.quality, fps: state.fps, scale: state.scale, bitrate: state.bitrate });
-}
-
-// ── Combined Stream + Mic mode ───────────────────────────────────────────────
-// One button to start/stop both screen stream and host microphone simultaneously.
-// state.combinedMode tracks whether combined mode is currently engaged.
-state.combinedMode = false;
-
-async function toggleCombined() {
-  if (!state.connected || !state.hostOnline) { notify('Host not online', 'warn'); return; }
-  const btn = document.getElementById('btn-combined');
-  // If either is running (or combined is flagged), treat as STOP
-  const isRunning = state.combinedMode || state.streaming;
-  if (isRunning) {
-    state.combinedMode = false;
-    if (btn) btn.classList.remove('active');
-    // Stop stream
-    if (state.streaming) { try { await stopStream(); } catch(e) {} }
-    // Stop audio
-    try { await auStop(); } catch(e) {}
-    addLog('Combined mode stopped', 'INFO');
-  } else {
-    state.combinedMode = true;
-    if (btn) btn.classList.add('active');
-    // 1) Start screen stream
-    try { await startStream(); } catch(e) { addLog('Stream start failed: ' + e.message, 'WARN'); }
-    // 2) Start audio in whatever mode is currently selected in the Audio tab.
-    //    Do NOT override the mode — let the user decide beforehand via Audio tab.
-    try {
-      if (typeof auApplyConfig === 'function') await auApplyConfig(); // send current config to host
-      await sendCmd({ cmd: 'audio_start' });
-      // Reflect current mode in status label
-      const modeEl = document.getElementById('au-mode');
-      const auStatus = document.getElementById('au-status');
-      if (auStatus && modeEl) {
-        const m = parseInt(modeEl.value);
-        if (m === 1) { auStatus.textContent = '🔴 LIVE'; auStatus.style.color = '#f44336'; }
-        else if (m === 2) { auStatus.textContent = '🔴 LIVE + ⏺ REC'; auStatus.style.color = '#9c27b0'; }
-        else { auStatus.textContent = '⏺ Recording'; auStatus.style.color = '#f44336'; }
-      }
-      addLog('Combined mode: stream + mic started', 'OK');
-    } catch(e) { addLog('Audio start failed: ' + e.message, 'WARN'); }
-  }
 }
 
 // ── System audio in stream window ────────────────────────────────────────────
@@ -5463,11 +5400,12 @@ async function toggleStreamAudio() {
       window._auLive.analyser.connect(window._auStreamDest);
     }
 
-    // Tell host: loopback capture (source=1), live-stream mode (mode=1)
+    // Tell host: start dedicated WASAPI loopback stream thread (independent of mic recording)
+    // audio_stream_start runs capture_audio_live_stream_wasapi in a separate thread on the host
+    // so it can run in parallel with mic recording (audio_start/stop).
     try {
-      await sendCmd({ cmd: 'audio_config', source: 1, mode: 1 });
-      await sendCmd({ cmd: 'audio_start' });
-      addLog('Stream audio started (WASAPI loopback, live)', 'OK');
+      await sendCmd({ cmd: 'audio_stream_start' });
+      addLog('Stream audio started (WASAPI loopback, independent thread)', 'OK');
       notify('🔊 System audio ON', 'success');
     } catch(e) {
       state.streamAudioActive = false;
@@ -5488,7 +5426,7 @@ async function toggleStreamAudio() {
     window._auStreamDest = null;
 
     try {
-      await sendCmd({ cmd: 'audio_stop' });
+      await sendCmd({ cmd: 'audio_stream_stop' });
       addLog('Stream audio stopped', 'OK');
       notify('🔊 System audio OFF', 'info');
     } catch(e) {}
@@ -7489,8 +7427,10 @@ function _setText(id, text, color) {
 
 async function refreshInfraStatus() {
   if (!state.connected) return;
-  const btn = document.getElementById('infra-refresh-btn');
-  if (btn) btn.disabled = true;
+  const btn2 = document.getElementById('infra-vps2-refresh-btn');
+  const btn1 = document.getElementById('infra-vps1-refresh-btn');
+  if (btn2) { btn2.disabled = true; btn2.textContent = '…'; }
+  if (btn1) { btn1.disabled = true; btn1.textContent = '…'; }
 
   // Set probing state
   _setInfraDot('infra-vps2-dot', null);
@@ -7541,7 +7481,7 @@ async function refreshInfraStatus() {
     if (v1 !== null && v1 !== undefined) {
       // VPS1 is configured
       if (noChainCard)  noChainCard.style.display  = 'none';
-      if (vps1Card)     vps1Card.style.display      = '';
+      if (vps1Card)     { vps1Card.style.display = 'flex'; vps1Card.style.flexDirection = 'column'; }
       _setInfraDot('infra-vps1-dot', v1.online);
 
       _setText('infra-vps1-host',   v1.host || '—');
@@ -7582,7 +7522,8 @@ async function refreshInfraStatus() {
     _setInfraDot('infra-vps1-dot', false);
     console.warn('[INFRA] refreshInfraStatus error:', e);
   } finally {
-    if (btn) btn.disabled = false;
+    if (btn2) { btn2.disabled = false; btn2.textContent = '↻'; }
+    if (btn1) { btn1.disabled = false; btn1.textContent = '↻'; }
   }
 }
 
@@ -8259,11 +8200,10 @@ document.addEventListener('keydown', e => {
   const inPort = document.getElementById('in-port');
   const inToken = document.getElementById('in-token');
   const inPass = document.getElementById('in-pass');
-  const defaultPort = (window.location.port && window.location.port !== '') ? window.location.port : (window.location.protocol === 'https:' ? '443' : '80');
+  const defaultPort = (window.location.port && window.location.port !== '') ? window.location.port : '443';
   if (inServer) inServer.value = window.location.hostname || '';
   if (inPort) inPort.value = defaultPort;
-  const inSsl = document.getElementById('in-ssl');
-  if (inSsl && window.location.protocol === 'https:') inSsl.checked = true;
+  // WSS is always on — no ssl checkbox needed
   try {
     const s = localStorage.getItem('rdp_server');
     const p = localStorage.getItem('rdp_port');
@@ -9657,19 +9597,11 @@ function auToggleSettings() {
   el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
-// Called when user changes audio source (mic / system sound).
-// Hides mic-specific controls (device select, device info) for system sound.
-function auOnSourceChange() {
-  const src = parseInt(document.getElementById('au-source').value);
-  const devLabel = document.getElementById('au-device')?.closest('label');
-  const devInfo  = document.getElementById('au-device-info');
-  if (devLabel) devLabel.style.display = src === 1 ? 'none' : '';
-  if (devInfo)  devInfo.style.display  = src === 1 ? 'none' : '';
-}
+// auOnSourceChange: kept as no-op — source dropdown removed (recording always mic; system audio via SYS button)
+function auOnSourceChange() {}
 
 async function auApplyConfig() {
   try {
-    const src = document.getElementById('au-source');
     await sendCmd({
       cmd: 'audio_config',
       segment_duration: document.getElementById('au-segment').value,
@@ -9681,7 +9613,7 @@ async function auApplyConfig() {
       denoise: document.getElementById('au-denoise').checked ? 'true' : 'false',
       normalize: document.getElementById('au-normalize').checked ? 'true' : 'false',
       hum_filter: document.getElementById('au-hum').value,
-      source: src ? src.value : '0',
+      source: '0', // recording always uses microphone; system audio is via SYS button (separate stream thread)
     });
     addLog('Audio config applied (gain=' + document.getElementById('au-gain').value + '%)', 'OK');
     console.log('[AU] Config sent: gain=' + document.getElementById('au-gain').value);
@@ -9722,28 +9654,27 @@ async function auStartBoth() {
 }
 
 async function auStop() {
-  // ── 1. Mute & close locally FIRST (before awaiting host) so ALIV chunks
-  //       arriving during the round-trip don't get scheduled into the future.
-  window._auStopping = true;
-  if (window._auLive) {
-    const L = window._auLive;
-    window._auLive = null; // ALIV handler skips when null
-    try { L.vol.gain.value = 0; } catch(e) {}
-    try { L.analyser.disconnect(); } catch(e) {}
-    try { L.inputNode.disconnect(); } catch(e) {}
-    try { L.ctx.close(); } catch(e) {} // kills all scheduled sources instantly
+  // ── 1. Mute & close locally FIRST so in-flight ALIV chunks don't get scheduled.
+  // IMPORTANT: Only kill _auLive / block ALIV when stream audio (SYS) is NOT active.
+  // When SYS is on the Web Audio context is still needed — stream audio runs on its
+  // own independent host thread and must NOT be affected by stopping mic recording.
+  if (!state.streamAudioActive) {
+    window._auStopping = true;
+    if (window._auLive) {
+      const L = window._auLive;
+      window._auLive = null; // ALIV handler skips when null
+      try { L.vol.gain.value = 0; } catch(e) {}
+      try { L.analyser.disconnect(); } catch(e) {}
+      try { L.inputNode.disconnect(); } catch(e) {}
+      try { L.ctx.close(); } catch(e) {} // kills all scheduled sources instantly
+    }
+    window._auStreamDest = null;
+    if (window._auLiveVis) { cancelAnimationFrame(window._auLiveVis); window._auLiveVis = null; }
+    window._auLiveAnalyser = null;
   }
-  // If stream audio was active, clean up its recording dest too
-  window._auStreamDest = null;
-  if (state.streamAudioActive) {
-    state.streamAudioActive = false;
-    const btnTop = document.getElementById('btn-stream-audio');
-    const btnOv  = document.getElementById('btn-stream-audio-overlay');
-    if (btnTop) { btnTop.classList.remove('active'); btnTop.title = 'System audio'; }
-    if (btnOv)  { btnOv.classList.remove('active'); }
-  }
-  if (window._auLiveVis) { cancelAnimationFrame(window._auLiveVis); window._auLiveVis = null; }
-  window._auLiveAnalyser = null;
+  // Note: state.streamAudioActive, _auStreamDest, and SYS buttons are NOT touched here.
+  // Stream audio is controlled exclusively by toggleStreamAudio() / audio_stream_start/stop.
+
   const audioEl = document.getElementById('au-audio');
   if (audioEl) {
     audioEl.pause(); audioEl.src = '';
@@ -9752,7 +9683,8 @@ async function auStop() {
     if (audioEl._liveTimer) { clearInterval(audioEl._liveTimer); audioEl._liveTimer = null; }
   }
 
-  // ── 2. Tell host to stop sending
+  // ── 2. Tell host to stop sending (audio_stop stops only the mic recording thread;
+  //       the dedicated stream audio thread is independent and stays running if SYS is on)
   try {
     await sendCmd({ cmd: 'audio_stop' });
     document.getElementById('au-status').textContent = 'Stopped';
@@ -9767,9 +9699,11 @@ async function auStop() {
     document.getElementById('au-player-time').textContent = '0:00 / 0:00';
     addLog('Audio stopped', 'OK');
   } catch (e) { addLog('Audio stop failed: ' + e.message, 'WARN'); }
-  // Allow new ALIV chunks again after a long grace period (host's pipeline drains).
-  // Host audio thread may still flush 1-2 buffered Opus chunks before noticing stop.
-  setTimeout(() => { window._auStopping = false; }, 4000);
+  // Allow new ALIV chunks again — only needed when stream is NOT active;
+  // when SYS is on, ALIV must keep flowing unblocked.
+  if (!state.streamAudioActive) {
+    setTimeout(() => { window._auStopping = false; }, 4000);
+  }
 }
 
 async function auSetDevice() {
@@ -9806,10 +9740,7 @@ async function auLoadStatus() {
     if (res.denoise != null) document.getElementById('au-denoise').checked = !!res.denoise;
     if (res.normalize != null) document.getElementById('au-normalize').checked = !!res.normalize;
     if (res.hum_filter != null) document.getElementById('au-hum').value = String(res.hum_filter);
-    if (res.source != null) {
-      const srcEl = document.getElementById('au-source');
-      if (srcEl) { srcEl.value = String(res.source); auOnSourceChange(); }
-    }
+    // source is always mic (0) for recording panel — no UI element to update
     // Populate device list
     if (res.devices && res.devices.length > 0) {
       const sel = document.getElementById('au-device');
@@ -12183,7 +12114,8 @@ function applyTabVisibility() {
     const panel = btn.getAttribute('data-panel');
     if (panel === 'screen' || panel === 'dashboard') return;  // always visible
     if (panel === 'users') {
-      btn.style.display = (state.userRole === 'admin') ? '' : 'none';
+      // Show for any logged-in user — non-admins see a limited view with just "Change password"
+      btn.style.display = state.session ? '' : 'none';
       return;
     }
     // Settings tab is visible if user has "settings" OR any "settings.X"
@@ -12513,19 +12445,25 @@ function usrSubTab(name) {
   );
   const usrSection = document.getElementById('usr-body');
   const logSection  = document.getElementById('usr-log-section');
-  const hdrBtns     = document.getElementById('usr-header-btns');
   const refreshBtn  = document.getElementById('usr-refresh');
   const createBtn   = document.getElementById('usr-create-btn');
+  const mypwBtn     = document.getElementById('mypw-btn');
+  const logTabBtn   = document.getElementById('usr-log-tab-btn');
+  const isAdmin     = state.userRole === 'admin';
   if (name === 'users') {
     if (usrSection) usrSection.style.display = '';
     if (logSection)  logSection.style.display = 'none';
-    if (refreshBtn)  refreshBtn.style.display = '';
-    if (createBtn)   createBtn.style.display = '';
+    // Only show admin-only buttons for admins
+    if (refreshBtn) refreshBtn.style.display = isAdmin ? '' : 'none';
+    if (createBtn)  createBtn.style.display  = isAdmin ? '' : 'none';
+    if (mypwBtn)    mypwBtn.style.display     = isAdmin ? '' : 'none';
+    if (logTabBtn)  logTabBtn.style.display   = isAdmin ? '' : 'none';
   } else {
     if (usrSection) usrSection.style.display = 'none';
     if (logSection)  logSection.style.display = 'flex';
     if (refreshBtn)  refreshBtn.style.display = 'none';
-    if (createBtn)   createBtn.style.display = 'none';
+    if (createBtn)   createBtn.style.display  = 'none';
+    if (mypwBtn)     mypwBtn.style.display     = 'none';
     _usrLogBuildCats();
     _usrLogRender();
   }
@@ -12835,11 +12773,22 @@ function myPasswordDialog() {
 async function usrRefresh() {
   const body = document.getElementById('usr-body');
   if (!body) return;
+  const refreshBtn = document.getElementById('usr-refresh');
+  const createBtn  = document.getElementById('usr-create-btn');
+  const logTabBtn  = document.getElementById('usr-log-tab-btn');
   if (!state.session) {
     body.innerHTML = '<div style="color:var(--muted);padding:16px;">'+t('usr_not_logged_in')+'</div>';
     return;
   }
+  const mypwBtn = document.getElementById('mypw-btn');
   if (state.userRole !== 'admin') {
+    // Non-admin: hide all header buttons and admin tabs
+    if (mypwBtn)    mypwBtn.style.display    = 'none';
+    if (refreshBtn) refreshBtn.style.display = 'none';
+    if (createBtn)  createBtn.style.display  = 'none';
+    if (logTabBtn)  logTabBtn.style.display  = 'none';
+    // Make sure users sub-tab is shown (switch away from log if it was active)
+    usrSubTab('users');
     body.innerHTML =
       '<div style="padding:16px;">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">' +
@@ -12855,6 +12804,11 @@ async function usrRefresh() {
     if (btn) btn.onclick = myPasswordDialog;
     return;
   }
+  // Admin: show all controls
+  if (mypwBtn)    mypwBtn.style.display    = '';
+  if (refreshBtn) refreshBtn.style.display = '';
+  if (createBtn)  createBtn.style.display  = '';
+  if (logTabBtn)  logTabBtn.style.display  = '';
   try {
     const data = await sendCmd({cmd:'user_list', session: state.session});
     usrRender(data);

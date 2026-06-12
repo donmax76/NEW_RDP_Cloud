@@ -194,11 +194,19 @@ private:
         staging_.Reset();
         duplication_.Reset(); d3dDevice_.Reset(); d3dContext_.Reset();
         if (!init_dxgi()) {
+            // Hard failure — DXGI device/output unavailable, fall back to GDI immediately
             use_gdi_ = true; dxgi_retry_interval_s_ = 3;
             last_dxgi_retry_ = std::chrono::steady_clock::now();
-        } else {
+        } else if (dxgi_fail_count_ >= 3) {
+            // Soft failure: DXGI reinits OK but AcquireNextFrame keeps returning ACCESS_LOST.
+            // Classic locked-screen pattern — DuplicateOutput succeeds but no frames come.
+            // GDI BitBlt captures the lock screen without restrictions; retry DXGI in 5s.
+            use_gdi_ = true; dxgi_retry_interval_s_ = 5;
+            last_dxgi_retry_ = std::chrono::steady_clock::now();
             dxgi_fail_count_ = 0;
+            LOG_INFO("DXGI repeated ACCESS_LOST — locked screen detected; GDI fallback active, retry DXGI in 5s");
         }
+        // else: 1st or 2nd ACCESS_LOST, reinit succeeded — give DXGI one more chance before GDI
     }
 
     // ── Raw capture (for pipeline) ──

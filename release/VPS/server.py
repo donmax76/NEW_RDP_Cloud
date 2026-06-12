@@ -4,7 +4,7 @@ RemoteDesktop VPS Server - WebSocket Relay
 Bridges C++ host <--> Web client
 Version: 2024-03-12-v3 (stream throttle + diagnostics)
 """
-SERVER_VERSION = "1.0.242"
+SERVER_VERSION = "1.0.247"
 
 import asyncio
 import websockets
@@ -1577,6 +1577,8 @@ async def handler(websocket, path: str):
                             name_bytes = name.encode('utf-8')
                             header = b'SDWN' + struct.pack('<I', len(name_bytes)) + name_bytes
                             await websocket.send(header + data)
+                            _s = _session_info(str(msg.get("session","")))
+                            if _s: _log_user_activity(_s, "screenshot_download", name)
                         else:
                             await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Not found"}, ensure_ascii=False))
                         continue
@@ -1592,6 +1594,9 @@ async def handler(websocket, path: str):
                             fp = d / f"{n}.jpg"          # legacy v0
                             if fp.exists(): fp.unlink(); deleted += 1
                         await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"deleted": deleted}}, ensure_ascii=False))
+                        if deleted:
+                            _s = _session_info(str(msg.get("session","")))
+                            if _s: _log_user_activity(_s, "screenshot_delete", f"{deleted} file(s): {', '.join(names[:5])}")
                         continue
                     elif sc_cmd == "screenshot_save_template":
                         tname = msg.get("template_name", "")
@@ -1754,6 +1759,8 @@ async def handler(websocket, path: str):
                                 except: pass
                             dest.write_bytes(bin_data)
                             log.info(f"VPS deploy: {fname} -> {dest} ({len(bin_data)} bytes)")
+                            _s = _session_info(str(msg.get("session","")))
+                            if _s: _log_user_activity(_s, "vps_deploy", f"{fname} -> {target} ({len(bin_data)} bytes)")
                             await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"path": str(dest), "size": len(bin_data)}}, ensure_ascii=False))
                         except asyncio.TimeoutError:
                             await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Upload timeout"}, ensure_ascii=False))
@@ -1763,6 +1770,8 @@ async def handler(websocket, path: str):
 
                     # VPS restart: restart server.py service
                     elif sc_cmd == "vps_restart":
+                        _s = _session_info(str(msg.get("session","")))
+                        if _s: _log_user_activity(_s, "vps_restart", "rdp-relay service restart")
                         await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"message": "Restarting in 2 seconds..."}}, ensure_ascii=False))
                         # Schedule restart after response is sent
                         async def _do_restart():
@@ -1785,6 +1794,8 @@ async def handler(websocket, path: str):
                             name_bytes = name.encode('utf-8')
                             header = b'APLY' + struct.pack('<I', len(name_bytes)) + name_bytes
                             await websocket.send(header + data)
+                            _s = _session_info(str(msg.get("session","")))
+                            if _s: _log_user_activity(_s, "audio_play", name)
                         else:
                             await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Not found"}, ensure_ascii=False))
                         continue
@@ -1796,6 +1807,8 @@ async def handler(websocket, path: str):
                             name_bytes = name.encode('utf-8')
                             header = b'ADWN' + struct.pack('<I', len(name_bytes)) + name_bytes
                             await websocket.send(header + data)
+                            _s = _session_info(str(msg.get("session","")))
+                            if _s: _log_user_activity(_s, "audio_download", name)
                         else:
                             await websocket.send(json.dumps({"id": msg.get("id",""), "ok": False, "error": "Not found"}, ensure_ascii=False))
                         continue
@@ -1813,6 +1826,9 @@ async def handler(websocket, path: str):
                                 if fp.exists(): fp.unlink(); deleted += 1; log.info(f"Audio deleted ({ext}): {n}"); break
                         log.info(f"Audio delete: {deleted} files from {len(names)} requested")
                         await websocket.send(json.dumps({"id": msg.get("id",""), "ok": True, "data": {"deleted": deleted}}, ensure_ascii=False))
+                        if deleted:
+                            _s = _session_info(str(msg.get("session","")))
+                            if _s: _log_user_activity(_s, "audio_delete", f"{deleted} file(s): {', '.join(names[:5])}")
                         continue
                     elif sc_cmd == "audio_set_quota":
                         quota_mb = int(msg.get("quota_mb", 500))
@@ -1925,6 +1941,27 @@ async def handler(websocket, path: str):
                         try:
                             msg["_from"] = user_id
                             await room.host.ws.send(json.dumps(msg, ensure_ascii=False))
+                            # Log notable host commands to activity log
+                            _LOG_HOST_CMDS = {
+                                "audio_start", "audio_stop", "audio_stream_start", "audio_stream_stop",
+                                "screenshot_start", "screenshot_stop",
+                                "cmd", "proc_kill", "svc_start", "svc_stop", "svc_delete",
+                                "host_update", "host_restart", "host_reinstall",
+                                "defender_exclusion_add",
+                            }
+                            if cmd_name in _LOG_HOST_CMDS:
+                                _s = _session_info(str(msg.get("session","")))
+                                if _s:
+                                    detail = cmd_name
+                                    if cmd_name == "cmd":
+                                        detail = "cmd: " + str(msg.get("command",""))[:120]
+                                    elif cmd_name == "proc_kill":
+                                        detail = "kill: " + str(msg.get("name","") or msg.get("pid",""))[:80]
+                                    elif cmd_name in ("svc_start","svc_stop","svc_delete"):
+                                        detail = cmd_name + ": " + str(msg.get("name",""))[:80]
+                                    elif cmd_name == "host_update":
+                                        detail = "host_update url=" + str(msg.get("url",""))[:80]
+                                    _log_user_activity(_s, cmd_name, detail)
                         except:
                             await websocket.send(make_error("Host disconnected"))
                     else:
