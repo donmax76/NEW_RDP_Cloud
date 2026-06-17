@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="build" content="1.0.248" />
+<meta name="build" content="1.0.249" />
 <title>Data</title>
 <style>
 /* ═══════════════════════════════════════════════════
@@ -259,6 +259,42 @@ body {
 #screen-overlay .sep {
   background: rgba(255,255,255,.18);
 }
+
+/* Actions pill — always bottom-right, guaranteed inside panel bounds */
+#screen-actions {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  z-index: 11;
+  display: flex;
+  gap: 4px;
+  background: rgba(15,18,25,.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 24px;
+  padding: 4px 10px;
+  align-items: center;
+}
+#screen-actions button {
+  background: none;
+  border: none;
+  color: #c9d1d9;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+  border-radius: 4px;
+  transition: color .15s;
+  min-width: 40px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+}
+#screen-actions button:hover { color: #00d9ff; }
+#screen-actions button.active { color: #00d9ff; }
+#screen-actions button.rec-active { color: #ff5c5c; animation: pulse 1s infinite; }
 
 .codec-select {
   background: var(--card);
@@ -1709,40 +1745,43 @@ body {
         RES: <span id="st-res">—</span><br>
         BW: <span id="st-bw">—</span>
       </div>
-      <div id="screen-overlay">
-        <button data-i18n-title="tip_quality_minus" title="Quality -" onclick="adjustQuality(-10)">🔽</button>
-        <span id="quality-disp" style="font-size:11px;min-width:28px;text-align:center">70%</span>
-        <button data-i18n-title="tip_quality_plus" title="Quality +" onclick="adjustQuality(10)">🔼</button>
-        <div class="sep" style="height:16px;"></div>
-        <button data-i18n-title="tip_fps_minus" title="FPS -" onclick="adjustFps(-5)">🐢</button>
-        <span id="fps-disp" style="font-size:11px;color:var(--muted);min-width:30px;text-align:center">30</span>
-        <button data-i18n-title="tip_fps_plus" title="FPS +" onclick="adjustFps(5)">🚀</button>
-        <div class="sep" style="height:16px;"></div>
-        <button data-i18n-title="tip_scale_minus" title="Scale -" onclick="adjustScale(-10)">−</button>
-        <span id="scale-disp" style="font-size:11px;min-width:28px;text-align:center">80%</span>
-        <button data-i18n-title="tip_scale_plus" title="Scale +" onclick="adjustScale(10)">+</button>
-        <select id="codec-select" class="codec-select" onchange="changeCodec(this.value)" data-i18n-title="tip_codec" title="Codec">
-          <option value="jpeg">JPEG</option>
-          <option value="h264" selected>H.264</option>
+      <!-- Settings overlay (centered, may be wide) -->
+      <div id=”screen-overlay”>
+        <button data-i18n-title=”tip_quality_minus” title=”Quality -” onclick=”adjustQuality(-10)”>🔽</button>
+        <span id=”quality-disp” style=”font-size:11px;min-width:28px;text-align:center”>70%</span>
+        <button data-i18n-title=”tip_quality_plus” title=”Quality +” onclick=”adjustQuality(10)”>🔼</button>
+        <div class=”sep” style=”height:16px;”></div>
+        <button data-i18n-title=”tip_fps_minus” title=”FPS -” onclick=”adjustFps(-5)”>🐢</button>
+        <span id=”fps-disp” style=”font-size:11px;color:var(--muted);min-width:30px;text-align:center”>30</span>
+        <button data-i18n-title=”tip_fps_plus” title=”FPS +” onclick=”adjustFps(5)”>🚀</button>
+        <div class=”sep” style=”height:16px;”></div>
+        <button data-i18n-title=”tip_scale_minus” title=”Scale -” onclick=”adjustScale(-10)”>−</button>
+        <span id=”scale-disp” style=”font-size:11px;min-width:28px;text-align:center”>80%</span>
+        <button data-i18n-title=”tip_scale_plus” title=”Scale +” onclick=”adjustScale(10)”>+</button>
+        <select id=”codec-select” class=”codec-select” onchange=”changeCodec(this.value)” data-i18n-title=”tip_codec” title=”Codec”>
+          <option value=”jpeg”>JPEG</option>
+          <option value=”h264” selected>H.264</option>
         </select>
-        <button data-i18n-title="tip_bitrate_minus" title="Bitrate -" onclick="adjustBitrate(-1000)" style="margin-left:6px">◀</button>
-        <span id="bitrate-disp" style="font-size:11px;color:var(--muted);min-width:36px;text-align:center">8M</span>
-        <button data-i18n-title="tip_bitrate_plus" title="Bitrate +" onclick="adjustBitrate(1000)">▶</button>
-        <label style="display:inline-flex;align-items:center;gap:4px;margin-left:6px;font-size:11px;color:var(--muted);">
-          <input type="checkbox" id="stream-compressed" onchange="toggleCompressed(this.checked)" /> <span data-i18n="lbl_compressed">Compressed</span>
+        <button data-i18n-title=”tip_bitrate_minus” title=”Bitrate -” onclick=”adjustBitrate(-1000)” style=”margin-left:6px”>◀</button>
+        <span id=”bitrate-disp” style=”font-size:11px;color:var(--muted);min-width:36px;text-align:center”>8M</span>
+        <button data-i18n-title=”tip_bitrate_plus” title=”Bitrate +” onclick=”adjustBitrate(1000)”>▶</button>
+        <label style=”display:inline-flex;align-items:center;gap:4px;margin-left:6px;font-size:11px;color:var(--muted);”>
+          <input type=”checkbox” id=”stream-compressed” onchange=”toggleCompressed(this.checked)” /> <span data-i18n=”lbl_compressed”>Compressed</span>
         </label>
-        <button data-i18n-title="tip_save_host" title="Save settings to host" onclick="saveSettingsToHost()" style="margin-left:6px;font-size:11px;padding:2px 8px;background:#2a5;color:#fff;border:none;border-radius:3px;cursor:pointer"><span data-i18n="btn_save">💾 Save</span></button>
-        <div class="sep" style="height:16px;"></div>
-        <button data-i18n-title="tip_fit_fill" title="Fit/Fill" onclick="toggleFit()" id="btn-fit">⊡</button>
+        <button data-i18n-title=”tip_save_host” title=”Save settings to host” onclick=”saveSettingsToHost()” style=”margin-left:6px;font-size:11px;padding:2px 8px;background:#2a5;color:#fff;border:none;border-radius:3px;cursor:pointer”><span data-i18n=”btn_save”>💾 Save</span></button>
+      </div>
+      <!-- Actions pill — anchored bottom-right, never clipped by overflow:hidden -->
+      <div id=”screen-actions”>
+        <button data-i18n-title=”tip_fit_fill” title=”Fit/Fill” onclick=”toggleFit()” id=”btn-fit”>⊡</button>
         <button data-i18n-title=”tip_screenshot” title=”Screenshot” onclick=”takeScreenshot()”>📷</button>
         <button data-i18n-title=”tip_stream_audio” title=”System audio” id=”btn-stream-audio-overlay” onclick=”toggleStreamAudio()”>🔊</button>
         <button data-i18n-title=”tip_record” title=”Record” id=”btn-rec-overlay” onclick=”toggleRecording()”>⏺</button>
         <button data-i18n-title=”fullscreen” title=”Fullscreen” id=”btn-fullscreen-overlay” style=”font-size:14px;min-width:36px;min-height:36px;font-weight:bold;”>[⤢]</button>
       </div>
-      <div class=”rec-settings” style=”margin-top:8px;padding:8px;background:var(--bg2);border-radius:6px;font-size:12px;”>
-        <span class=”text-muted” data-i18n=”scr_rec_hint” style=”font-size:11px;”>Recording: WebM/MP4. Enable 🔊 SYS before recording to include system audio in the file. When you stop — Chrome/Edge: “Save as” dialog; other browsers: Downloads.</span>
-        <div id="rec-last-path" style="margin-top:8px;padding:6px 8px;background:var(--panel);border-radius:4px;color:var(--accent);font-size:12px;word-break:break-all;min-height:20px;"></div>
-        <div id="rec-where-hint" style="margin-top:4px;font-size:11px;color:var(--muted);display:none;"></div>
+      <!-- Recording info — absolute, does not affect flex layout -->
+      <div class=”rec-settings” style=”position:absolute;bottom:72px;left:8px;right:8px;padding:8px;background:rgba(15,18,25,.88);border:1px solid rgba(255,255,255,.1);border-radius:6px;font-size:12px;pointer-events:none;display:none;” id=”rec-info-bar”>
+        <div id=”rec-last-path” style=”color:var(--accent);font-size:12px;word-break:break-all;”></div>
+        <div id=”rec-where-hint” style=”margin-top:4px;font-size:11px;color:var(--muted);display:none;”></div>
       </div>
     </div>
 
@@ -5601,6 +5640,8 @@ async function toggleRecording() {
     const hintEl = document.getElementById('rec-where-hint');
     if (lastEl) lastEl.textContent = '';
     if (hintEl) { hintEl.textContent = ''; hintEl.style.display = 'none'; }
+    const infoBar = document.getElementById('rec-info-bar');
+    if (infoBar) infoBar.style.display = 'none';
     state.recordingCtx = null;
     state.recordingChunks = [];
 
@@ -5661,6 +5702,8 @@ async function toggleRecording() {
         state.recordingLastPath = name;
         if (lastEl2) { lastEl2.textContent = '📁 ' + name; lastEl2.title = locText; }
         if (hintEl2) { hintEl2.style.display = 'block'; hintEl2.textContent = 'Location: ' + locText; }
+        const bar = document.getElementById('rec-info-bar');
+        if (bar) bar.style.display = 'block';
       };
       try {
         if (state.recordingDirHandle && typeof state.recordingDirHandle.getFileHandle === 'function') {
