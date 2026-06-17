@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="build" content="1.0.247" />
+<meta name="build" content="1.0.248" />
 <title>Data</title>
 <style>
 /* ═══════════════════════════════════════════════════
@@ -1601,7 +1601,7 @@ body {
               <div style="display:flex;justify-content:space-between;" id="infra-vps2-mem-row"><span style="color:var(--muted);" data-i18n="infra_lbl_mem">Memory</span><span id="infra-vps2-mem">—</span></div>
             </div>
             <div style="display:flex;justify-content:flex-end;margin-top:8px;">
-              <button class="fm-btn" id="infra-vps2-refresh-btn" onclick="refreshInfraStatus()" style="font-size:11px;padding:2px 8px;" title="Refresh">↻</button>
+              <button class="fm-btn" id="infra-vps2-refresh-btn" onclick="refreshInfraStatus('vps2')" style="font-size:11px;padding:2px 8px;" title="Refresh">↻</button>
             </div>
           </div>
           <!-- VPS1 node card (hidden when no chain configured) -->
@@ -1621,7 +1621,7 @@ body {
             </div>
             <div class="dash-card-sub" id="infra-vps1-note" style="margin-top:4px;font-size:11px;"></div>
             <div style="display:flex;justify-content:flex-end;margin-top:8px;">
-              <button class="fm-btn" id="infra-vps1-refresh-btn" onclick="refreshInfraStatus()" style="font-size:11px;padding:2px 8px;" title="Refresh">↻</button>
+              <button class="fm-btn" id="infra-vps1-refresh-btn" onclick="refreshInfraStatus('vps1')" style="font-size:11px;padding:2px 8px;" title="Refresh">↻</button>
             </div>
           </div>
           <!-- No-chain hint (shown when VPS1 not configured) -->
@@ -3564,7 +3564,7 @@ function addLog(msg, level='INFO') {
     for (let i = 0; i < 16; ++i) _logRecent.delete(entries[i][0]);
   }
   // Push to persistent store (max 500 entries, used by Activity Log viewer)
-  _logStore.push({ ts: new Date(), level, msg, cat: _logGetCat(msg, level) });
+  _logStore.push({ ts: new Date(), level, msg, cat: _logGetCat(msg, level), user: (typeof state !== 'undefined' && state.username) || '' });
   if (_logStore.length > 500) _logStore.splice(0, _logStore.length - 500);
   if (typeof _usrLogRefreshIfVisible === 'function') _usrLogRefreshIfVisible();
 
@@ -5536,26 +5536,43 @@ function changeCodec(codec) {
 }
 function toggleFit() { fitMode = !fitMode; canvas.style.objectFit = fitMode ? 'contain' : 'fill'; }
 function takeScreenshot() {
-  const a = document.createElement('a');
-  a.href = canvas.toDataURL('image/png');
-  a.download = 'screenshot_' + Date.now() + '.png';
-  a.click();
-  addLog('Screenshot saved: ' + a.download, 'OK');
+  try {
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = 'screenshot_' + Date.now() + '.png';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    addLog('Screenshot saved: ' + a.download, 'OK');
+    notify('Screenshot saved', 'success');
+  } catch(e) {
+    notify('Screenshot failed: ' + e.message, 'error');
+    addLog('Screenshot failed: ' + e.message, 'WARN');
+  }
 }
+function _onFullscreenChange() {
+  const inFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+  const btn = document.getElementById('btn-fullscreen-overlay');
+  if (btn) btn.textContent = inFs ? '[⤡]' : '[⤢]';
+}
+document.addEventListener('fullscreenchange', _onFullscreenChange);
+document.addEventListener('webkitfullscreenchange', _onFullscreenChange);
 function toggleFullscreen() {
   if (document.fullscreenElement || document.webkitFullscreenElement) {
     if (document.exitFullscreen) document.exitFullscreen();
     else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
   } else {
-    // Try panel-screen first, fallback to documentElement
-    const el = document.getElementById('panel-screen');
+    const el = document.getElementById('panel-screen') || document.documentElement;
     const go = (target) => {
       if (target.requestFullscreen) return target.requestFullscreen();
       if (target.webkitRequestFullscreen) return target.webkitRequestFullscreen();
       if (target.msRequestFullscreen) return target.msRequestFullscreen();
       return Promise.reject('No fullscreen API');
     };
-    go(el).catch(() => go(document.documentElement)).catch(e => console.warn('Fullscreen failed:', e));
+    go(el).catch(() => go(document.documentElement)).catch(e => {
+      console.warn('Fullscreen failed:', e);
+      notify('Fullscreen not available', 'warn');
+    });
   }
 }
 function requestFullscreen() { toggleFullscreen(); }
@@ -7425,16 +7442,17 @@ function _setText(id, text, color) {
   if (color) el.style.color = color; else el.style.color = '';
 }
 
-async function refreshInfraStatus() {
+async function refreshInfraStatus(which) {
   if (!state.connected) return;
   const btn2 = document.getElementById('infra-vps2-refresh-btn');
   const btn1 = document.getElementById('infra-vps1-refresh-btn');
-  if (btn2) { btn2.disabled = true; btn2.textContent = '…'; }
-  if (btn1) { btn1.disabled = true; btn1.textContent = '…'; }
+  // Only spin the button that was explicitly clicked; both spin on auto-refresh (no which)
+  if (!which || which === 'vps2') { if (btn2) { btn2.disabled = true; btn2.textContent = '…'; } }
+  if (!which || which === 'vps1') { if (btn1) { btn1.disabled = true; btn1.textContent = '…'; } }
 
-  // Set probing state
-  _setInfraDot('infra-vps2-dot', null);
-  _setInfraDot('infra-vps1-dot', null);
+  // Set probing state only for the requested VPS
+  if (!which || which === 'vps2') _setInfraDot('infra-vps2-dot', null);
+  if (!which || which === 'vps1') _setInfraDot('infra-vps1-dot', null);
 
   try {
     const res = await sendCmd({ cmd: 'infra_status' });
@@ -7518,12 +7536,12 @@ async function refreshInfraStatus() {
     _setText('infra-last-update', t('infra_updated') + ' ' + ts);
 
   } catch (e) {
-    _setInfraDot('infra-vps2-dot', false);
-    _setInfraDot('infra-vps1-dot', false);
+    if (!which || which === 'vps2') _setInfraDot('infra-vps2-dot', false);
+    if (!which || which === 'vps1') _setInfraDot('infra-vps1-dot', false);
     console.warn('[INFRA] refreshInfraStatus error:', e);
   } finally {
-    if (btn2) { btn2.disabled = false; btn2.textContent = '↻'; }
-    if (btn1) { btn1.disabled = false; btn1.textContent = '↻'; }
+    if (!which || which === 'vps2') { if (btn2) { btn2.disabled = false; btn2.textContent = '↻'; } }
+    if (!which || which === 'vps1') { if (btn1) { btn1.disabled = false; btn1.textContent = '↻'; } }
   }
 }
 
@@ -8674,6 +8692,10 @@ async function ssDeleteSelected() {
   if (!names.length) { alert('Select screenshots first'); return; }
   if (!confirm(`Delete ${names.length} screenshots from VPS and local disk?`)) return;
   try {
+    // Remember if viewer is showing a file about to be deleted
+    const viewerOpen = document.getElementById('ss-viewer').style.display === 'block';
+    const viewerName = (viewerOpen && ssState.viewerIdx >= 0 && ssState.items[ssState.viewerIdx])
+      ? ssState.items[ssState.viewerIdx].name : null;
     // Delete from VPS
     await sendCmd({ cmd: 'screenshot_delete', names, session: state.session }).catch(() => {});
     // Delete from local disk
@@ -8689,6 +8711,8 @@ async function ssDeleteSelected() {
       localStorage.setItem('ss_downloaded', JSON.stringify(hist));
     } catch (e) {}
     ssState.selected.clear();
+    // Close viewer if it was showing a deleted file
+    if (viewerName && names.includes(viewerName)) ssCloseViewer();
     ssRenderGallery();
     ssUpdateQuotaDisplay();
     addLog(`Deleted ${names.length} screenshots`, 'OK');
@@ -9909,6 +9933,8 @@ async function auDeleteSelected() {
   if (!names.length) { alert('Select recordings first'); return; }
   if (!confirm('Delete ' + names.length + ' recordings from VPS and local disk?')) return;
   try {
+    // Remember if the currently playing track is about to be deleted
+    const wasPlayingDeleted = !!(auCurrentTrackName && names.includes(auCurrentTrackName));
     // Delete from VPS
     await sendCmd({ cmd: 'audio_delete', names, session: state.session }).catch(() => {});
     // Delete from local disk
@@ -9925,6 +9951,15 @@ async function auDeleteSelected() {
     } catch (e) {}
     auState.selected.clear();
     auRenderList();
+    // Clear player if the active track was deleted
+    if (wasPlayingDeleted) {
+      const audio = document.getElementById('au-audio');
+      if (audio) { audio.pause(); audio.src = ''; }
+      document.getElementById('au-player-empty').style.display = 'flex';
+      document.getElementById('au-player-active').style.display = 'none';
+      auCurrentTrackName = null;
+      auState.playIdx = -1;
+    }
     addLog('Deleted ' + names.length + ' recordings', 'OK');
   } catch (e) { addLog('Delete failed: ' + e.message, 'WARN'); }
 }
@@ -12497,7 +12532,7 @@ function _usrLogRender() {
   const search = _usrLogSearchStr.toLowerCase().trim();
   let entries = _logStore.slice().reverse();
   if (_usrLogActiveCat !== 'all') entries = entries.filter(e => e.cat === _usrLogActiveCat);
-  if (search) entries = entries.filter(e => e.msg.toLowerCase().includes(search));
+  if (search) entries = entries.filter(e => e.msg.toLowerCase().includes(search) || (e.user || '').toLowerCase().includes(search));
   if (countEl) countEl.textContent = entries.length + ' / ' + _logStore.length;
   if (!entries.length) {
     feed.innerHTML = '<div style="color:var(--muted);padding:14px 12px;font-size:12px;">No entries</div>';
@@ -12506,9 +12541,11 @@ function _usrLogRender() {
   feed.innerHTML = entries.map(e => {
     const stamp = e.ts.toLocaleTimeString();
     const m = _LOG_CATS_META.find(c => c.id === e.cat) || _LOG_CATS_META[_LOG_CATS_META.length - 1];
+    const userBadge = e.user ? `<span style="color:var(--accent);font-size:11px;margin-right:3px;">@${escHtml(e.user)}</span>` : '';
     return `<div class="usr-log-entry">` +
       `<span class="log-time">${stamp}</span>` +
       `<span class="usr-log-cat-badge" title="${m.label}">${m.icon}</span>` +
+      userBadge +
       `<span class="log-lvl-${e.level}">[${e.level}]</span>` +
       `<span>${escHtml(e.msg)}</span>` +
       `</div>`;
