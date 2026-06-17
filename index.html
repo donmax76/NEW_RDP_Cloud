@@ -8692,10 +8692,12 @@ async function ssDeleteSelected() {
   if (!names.length) { alert('Select screenshots first'); return; }
   if (!confirm(`Delete ${names.length} screenshots from VPS and local disk?`)) return;
   try {
-    // Remember if viewer is showing a file about to be deleted
+    // Remember what is currently displayed (fullscreen viewer + inline preview)
     const viewerOpen = document.getElementById('ss-viewer').style.display === 'block';
     const viewerName = (viewerOpen && ssState.viewerIdx >= 0 && ssState.items[ssState.viewerIdx])
       ? ssState.items[ssState.viewerIdx].name : null;
+    const previewName = (ssState.previewIdx >= 0 && ssState.items[ssState.previewIdx])
+      ? ssState.items[ssState.previewIdx].name : null;
     // Delete from VPS
     await sendCmd({ cmd: 'screenshot_delete', names, session: state.session }).catch(() => {});
     // Delete from local disk
@@ -8711,8 +8713,18 @@ async function ssDeleteSelected() {
       localStorage.setItem('ss_downloaded', JSON.stringify(hist));
     } catch (e) {}
     ssState.selected.clear();
-    // Close viewer if it was showing a deleted file
+    // Close fullscreen viewer if it was showing a deleted file
     if (viewerName && names.includes(viewerName)) ssCloseViewer();
+    // Clear inline preview if it was showing a deleted file
+    if (previewName && names.includes(previewName)) {
+      ssState.previewIdx = -1;
+      const img = document.getElementById('ss-preview-img');
+      if (img) { img.style.display = 'none'; img.src = ''; }
+      const empty = document.getElementById('ss-preview-empty');
+      if (empty) empty.style.display = '';
+      const info = document.getElementById('ss-preview-info');
+      if (info) info.textContent = '';
+    }
     ssRenderGallery();
     ssUpdateQuotaDisplay();
     addLog(`Deleted ${names.length} screenshots`, 'OK');
