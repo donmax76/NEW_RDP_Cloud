@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PROMETEY v1.0.250 — Presentation</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0c12;
+  --bg2:#131820;
+  --bg3:#1a2030;
+  --accent:#00d9ff;
+  --accent2:#00ff88;
+  --fg:#e6edf3;
+  --muted:#8b949e;
+  --border:rgba(0,217,255,.18);
+}
+html,body{width:100%;height:100%;overflow:hidden;font-family:"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--fg);}
+
+/* Progress bar */
+#progress-bar{position:fixed;top:0;left:0;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent2));width:0%;transition:width .4s ease;z-index:300;}
+
+/* Lang switcher */
+.lang-sw{position:fixed;top:16px;right:20px;z-index:200;display:flex;gap:4px;}
+.lbtn{padding:5px 14px;border:1px solid rgba(255,255,255,.2);border-radius:20px;background:transparent;color:rgba(255,255,255,.5);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;letter-spacing:.5px;}
+.lbtn:hover{border-color:var(--accent);color:var(--accent);}
+.lbtn.active{background:var(--accent);border-color:var(--accent);color:#000;}
+
+/* Slide number */
+#slide-num{position:fixed;top:18px;left:20px;font-size:12px;color:var(--muted);z-index:200;letter-spacing:.5px;}
+
+/* Deck & Slides */
+.deck{width:100%;height:100vh;position:relative;overflow:hidden;}
+.slide{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:60px 80px;opacity:0;pointer-events:none;transition:opacity .4s;}
+.slide.active{opacity:1;pointer-events:auto;}
+
+/* Nav buttons */
+.nav-prev,.nav-next{position:fixed;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:#fff;width:48px;height:48px;border-radius:50%;cursor:pointer;font-size:20px;transition:all .2s;z-index:100;display:flex;align-items:center;justify-content:center;}
+.nav-prev{left:18px;}
+.nav-next{right:18px;}
+.nav-prev:hover,.nav-next:hover{background:rgba(0,217,255,.2);border-color:var(--accent);color:var(--accent);}
+
+/* Dots */
+.slide-counter{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:100;align-items:center;}
+.dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.22);cursor:pointer;transition:all .2s;}
+.dot:hover{background:rgba(0,217,255,.5);}
+.dot.active{background:var(--accent);transform:scale(1.35);}
+
+/* Language blocks */
+.t-ru,.t-en,.t-az{display:none;}
+body.lang-ru .t-ru{display:block;}
+body.lang-en .t-en{display:block;}
+body.lang-az .t-az{display:block;}
+body.lang-ru .t-ru.d-flex,
+body.lang-en .t-en.d-flex,
+body.lang-az .t-az.d-flex{display:flex!important;}
+body.lang-ru .t-ru.d-inline,
+body.lang-en .t-en.d-inline,
+body.lang-az .t-az.d-inline{display:inline!important;}
+
+/* Common elements */
+.slide-title{font-size:36px;font-weight:700;text-align:center;margin-bottom:32px;letter-spacing:-.5px;}
+.slide-title .hl{color:var(--accent);}
+.subtitle{color:var(--muted);font-size:16px;text-align:center;margin-top:8px;line-height:1.5;}
+.glow{text-shadow:0 0 30px rgba(0,217,255,.6),0 0 60px rgba(0,217,255,.3);}
+.glow2{text-shadow:0 0 20px rgba(0,255,136,.5);}
+
+/* Cards */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:28px;transition:border-color .2s;}
+.card:hover{border-color:rgba(0,217,255,.45);}
+.card-icon{font-size:36px;margin-bottom:14px;}
+.card-title{font-size:15px;font-weight:700;color:var(--accent);margin-bottom:8px;letter-spacing:.3px;}
+.card-text{font-size:13px;color:var(--muted);line-height:1.6;}
+
+/* Grid layouts */
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;width:100%;}
+.grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:24px;width:100%;}
+.grid-4{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;width:100%;}
+
+/* Table */
+.spec-table{width:100%;border-collapse:collapse;font-size:14px;}
+.spec-table th{text-align:left;padding:10px 16px;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);border-bottom:1px solid var(--border);}
+.spec-table td{padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.06);color:var(--fg);}
+.spec-table td:first-child{color:var(--muted);width:42%;}
+.spec-table tr:hover td{background:rgba(0,217,255,.04);}
+
+/* Feature list */
+.feat-list{list-style:none;display:flex;flex-direction:column;gap:12px;}
+.feat-list li{display:flex;align-items:flex-start;gap:12px;font-size:14px;line-height:1.5;}
+.feat-list li::before{content:"▸";color:var(--accent);flex-shrink:0;margin-top:1px;}
+
+/* Badge strip */
+.badge-strip{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:20px;}
+.badge{padding:6px 18px;border:1px solid rgba(0,217,255,.3);border-radius:20px;font-size:12px;color:var(--accent);background:rgba(0,217,255,.07);letter-spacing:.3px;}
+
+/* Section tag */
+.sec-tag{font-size:11px;text-transform:uppercase;letter-spacing:2px;color:var(--accent);margin-bottom:12px;opacity:.8;}
+
+/* Steps */
+.steps{display:flex;align-items:flex-start;gap:0;width:100%;position:relative;}
+.step{flex:1;display:flex;flex-direction:column;align-items:center;text-align:center;position:relative;}
+.step-num{width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,rgba(0,217,255,.2),rgba(0,217,255,.05));border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:var(--accent);margin-bottom:16px;position:relative;z-index:1;}
+.step-connector{position:absolute;top:26px;left:calc(50% + 26px);right:calc(-50% + 26px);height:2px;background:linear-gradient(90deg,var(--accent),transparent);z-index:0;}
+.step:last-child .step-connector{display:none;}
+.step-title{font-size:14px;font-weight:700;color:var(--fg);margin-bottom:6px;}
+.step-desc{font-size:12px;color:var(--muted);line-height:1.5;max-width:200px;}
+
+/* Role cards */
+.role-card{background:var(--bg2);border-radius:16px;padding:28px;border:1px solid var(--border);position:relative;overflow:hidden;}
+.role-card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;}
+.role-card.admin::before{background:linear-gradient(90deg,var(--accent),var(--accent2));}
+.role-card.oper::before{background:linear-gradient(90deg,#a371f7,#79c0ff);}
+.role-title{font-size:13px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:16px;}
+.role-card.admin .role-title{color:var(--accent);}
+.role-card.oper .role-title{color:#a371f7;}
+
+/* Arch diagram */
+.arch{display:flex;align-items:center;justify-content:center;gap:0;width:100%;flex-wrap:nowrap;}
+.arch-node{background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:20px 24px;text-align:center;min-width:170px;flex-shrink:0;}
+.arch-node .node-icon{font-size:28px;margin-bottom:8px;}
+.arch-node .node-title{font-size:14px;font-weight:700;color:var(--fg);}
+.arch-node .node-sub{font-size:11px;color:var(--accent);margin-top:4px;font-family:monospace;}
+.arch-arrow{display:flex;flex-direction:column;align-items:center;gap:4px;padding:0 8px;flex-shrink:0;}
+.arch-arrow .arr-line{width:60px;height:2px;background:linear-gradient(90deg,var(--accent),var(--accent));position:relative;}
+.arch-arrow .arr-line::after{content:"▶";position:absolute;right:-8px;top:-8px;color:var(--accent);font-size:14px;}
+.arch-arrow .arr-label{font-size:10px;color:var(--muted);text-align:center;letter-spacing:.3px;white-space:nowrap;}
+
+/* Security list */
+.sec-list{display:flex;flex-direction:column;gap:14px;width:100%;}
+.sec-item{display:flex;align-items:center;gap:16px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px 20px;}
+.sec-item .s-icon{font-size:22px;flex-shrink:0;}
+.sec-item .s-text{font-size:14px;color:var(--fg);}
+
+/* Stats bar */
+.stats-bar{display:flex;gap:40px;justify-content:center;margin-top:24px;}
+.stat{text-align:center;}
+.stat-val{font-size:28px;font-weight:700;color:var(--accent);}
+.stat-lbl{font-size:12px;color:var(--muted);margin-top:4px;letter-spacing:.5px;}
+
+/* Pill (action buttons) */
+.pill{display:inline-flex;gap:4px;background:rgba(0,0,0,.5);border:1px solid rgba(0,217,255,.25);border-radius:30px;padding:6px 12px;margin-top:16px;}
+.pill-btn{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;color:#fff;transition:all .15s;}
+.pill-btn:hover{background:rgba(0,217,255,.2);border-color:var(--accent);}
+
+/* File placeholder */
+.file-img-placeholder{border-radius:12px;border:1px solid rgba(0,217,255,.3);background:var(--bg3);display:flex;align-items:center;justify-content:center;min-height:200px;color:var(--muted);font-size:13px;flex-direction:column;gap:8px;}
+
+/* Tagline */
+.tagline{font-size:15px;color:var(--muted);letter-spacing:1px;text-align:center;margin-top:10px;}
+
+/* =================== SLIDE 1 =================== */
+#slide-1{background:radial-gradient(ellipse 70% 60% at 50% 50%, rgba(0,217,255,.06) 0%, transparent 70%), var(--bg);}
+#slide-1 .prom-title{font-size:80px;font-weight:900;letter-spacing:-2px;color:var(--accent);line-height:1;}
+#slide-1 .prom-sub{font-size:20px;color:var(--fg);margin-top:14px;text-align:center;letter-spacing:.5px;}
+#slide-1 .prom-ver{margin-top:12px;font-size:13px;color:var(--accent2);letter-spacing:2px;font-weight:700;}
+#slide-1 .prom-tag{margin-top:8px;font-size:14px;color:var(--muted);letter-spacing:.5px;}
+
+/* =================== SLIDE 3 arch =================== */
+.arch-wrap{width:100%;overflow-x:auto;padding-bottom:8px;}
+
+</style>
+</head>
+<body class="lang-ru">
+
+<!-- Progress bar -->
+<div id="progress-bar"></div>
+
+<!-- Slide number -->
+<div id="slide-num">1 / 14</div>
+
+<!-- Language switcher -->
+<div class="lang-sw">
+  <button class="lbtn active" data-lang="ru">RU</button>
+  <button class="lbtn" data-lang="en">EN</button>
+  <button class="lbtn" data-lang="az">AZ</button>
+</div>
+
+<!-- Navigation -->
+<button class="nav-prev" id="btn-prev">&#8592;</button>
+<button class="nav-next" id="btn-next">&#8594;</button>
+
+<!-- Dots -->
+<div class="slide-counter" id="dots"></div>
+
+<!-- ============================================================ -->
+<!--  DECK                                                         -->
+<!-- ============================================================ -->
+<div class="deck" id="deck">
+
+<!-- ===== SLIDE 1 — TITLE ===== -->
+<div class="slide active" id="slide-1">
+  <!-- Logo -->
+  <svg width="72" height="72" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:20px;filter:drop-shadow(0 0 16px rgba(0,217,255,.5))">
+    <path d="M32 4L6 16v20c0 16.6 11.2 31.2 26 35.8C47.8 67.2 58 52.6 58 36V16L32 4z" fill="rgba(0,217,255,.15)" stroke="#00d9ff" stroke-width="2.5"/>
+    <ellipse cx="32" cy="32" rx="10" ry="7" fill="none" stroke="#00d9ff" stroke-width="2"/>
+    <circle cx="32" cy="32" r="3.5" fill="#00d9ff"/>
+    <path d="M36 18l-7 14h5L27 50" fill="none" stroke="#00d9ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <div class="prom-title glow">PROMETEY</div>
+  <div class="prom-ver">v1.0.250</div>
+  <div class="prom-sub">
+    <span class="t-ru">Система удалённого управления и мониторинга</span>
+    <span class="t-en">Remote Management &amp; Monitoring System</span>
+    <span class="t-az">Uzaqdan İdarəetmə və Monitorinq Sistemi</span>
+  </div>
+  <div class="prom-tag">
+    <span class="t-ru">Полный контроль через обычный браузер</span>
+    <span class="t-en">Full control through any browser</span>
+    <span class="t-az">İstənilən brauzer vasitəsilə tam nəzarət</span>
+  </div>
+  <div class="badge-strip" style="margin-top:32px;">
+    <div class="badge">WebSocket TLS</div>
+    <div class="badge">Stage-2 Modular</div>
+    <div class="badge">Zero-Install Operator</div>
+    <div class="badge">AES-256 Config</div>
+  </div>
+</div>
+
+<!-- ===== SLIDE 2 — WHAT IS PROMETEY ===== -->
+<div class="slide" id="slide-2">
+  <div class="sec-tag">Overview</div>
+  <div class="slide-title">
+    <span class="t-ru">Что такое <span class="hl">PROMETEY</span>?</span>
+    <span class="t-en">What is <span class="hl">PROMETEY</span>?</span>
+    <span class="t-az"><span class="hl">PROMETEY</span> nədir?</span>
+  </div>
+  <div class="grid-3" style="max-width:960px;">
+    <div class="card" style="text-align:center;">
+      <div class="card-icon">🖥️</div>
+      <div class="card-title">
+        <span class="t-ru">Агент на ПК</span>
+        <span class="t-en">PC Agent</span>
+        <span class="t-az">PC Agenti</span>
+      </div>
+      <div class="card-text">
+        <span class="t-ru">Невидимая фоновая служба Windows на управляемом компьютере. Устанавливается один раз.</span>
+        <span class="t-en">Invisible background Windows service on the managed computer. Installed once.</span>
+        <span class="t-az">İdarə olunan kompüterdə görünməz fon Windows xidməti. Bir dəfə quraşdırılır.</span>
+      </div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <div class="card-icon">☁️</div>
+      <div class="card-title">
+        <span class="t-ru">VPS Ретранслятор</span>
+        <span class="t-en">VPS Relay</span>
+        <span class="t-az">VPS Relay</span>
+      </div>
+      <div class="card-text">
+        <span class="t-ru">Зашифрованный сервер-ретранслятор. Соединяет агента с браузером оператора через TLS.</span>
+        <span class="t-en">Encrypted relay server. Bridges agent to operator's browser over TLS.</span>
+        <span class="t-az">Şifrəli relay server. Agent ilə operator brauzerini TLS üzərindən birləşdirir.</span>
+      </div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <div class="card-icon">🌐</div>
+      <div class="card-title">
+        <span class="t-ru">Браузер-панель</span>
+        <span class="t-en">Browser Panel</span>
+        <span class="t-az">Brauzer Paneli</span>
+      </div>
+      <div class="card-text">
+        <span class="t-ru">Полный контроль из любого браузера. Установка не нужна — только URL.</span>
+        <span class="t-en">Full control from any browser. No install needed — just open a URL.</span>
+        <span class="t-az">İstənilən brauzerdən tam nəzarət. Quraşdırma yoxdur — sadəcə URL.</span>
+      </div>
+    </div>
+  </div>
+  <div class="badge-strip">
+    <div class="badge">TLS Encrypted</div>
+    <div class="badge">Zero-install for Operator</div>
+    <div class="badge">Works over Internet</div>
+  </div>
+</div>
+
+<!-- ===== SLIDE 3 — ARCHITECTURE ===== -->
+<div class="slide" id="slide-3">
+  <div class="sec-tag">Architecture</div>
+  <div class="slide-title">
+    <span class="t-ru">Как это работает</span>
+    <span class="t-en">How it Works</span>
+    <span class="t-az">Necə İşləyir</span>
+  </div>
+  <div class="arch-wrap">
+    <div class="arch" style="max-width:1000px;margin:0 auto;">
+      <div class="arch-node">
+        <div class="node-icon">🖥️</div>
+        <div class="node-title">Windows PC</div>
+        <div class="node-sub">pnpext.dll</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">MspIscSvc service</div>
+      </div>
+      <div class="arch-arrow">
+        <div class="arr-line"></div>
+        <div class="arr-label">WebSocket<br/>TLS</div>
+      </div>
+      <div class="arch-node" style="border-color:rgba(0,255,136,.3);">
+        <div class="node-icon">☁️</div>
+        <div class="node-title">VPS Server</div>
+        <div class="node-sub">server.py</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">nginx + TLS relay</div>
+      </div>
+      <div class="arch-arrow">
+        <div class="arr-line" style="background:linear-gradient(90deg,var(--accent2),var(--accent2));"></div>
+        <div class="arr-label" style="color:var(--accent2)">HTTPS /<br/>WSS</div>
+      </div>
+      <div class="arch-node" style="border-color:rgba(0,255,136,.3);">
+        <div class="node-icon">🌐</div>
+        <div class="node-title">Browser</div>
+        <div class="node-sub">index.html</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">Operator panel</div>
+      </div>
+    </div>
+  </div>
+  <!-- Component details -->
+  <div class="grid-3" style="max-width:900px;margin-top:28px;">
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:8px;">Host Agent</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6;">C++ DLL · Stage-2 Modular<br/>Reflective loader · DACL</div>
+    </div>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--accent2);margin-bottom:8px;">Relay Server</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6;">Python asyncio<br/>nginx · Self-signed TLS</div>
+    </div>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#79c0ff;margin-bottom:8px;">Web Client</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6;">Vanilla JS · No framework<br/>Chrome / Edge / Firefox</div>
+    </div>
+  </div>
+  <div class="badge-strip">
+    <div class="badge">Port 443 Only</div>
+    <div class="badge">AES-256 Encrypted Config</div>
+    <div class="badge">Self-signed TLS</div>
+  </div>
+</div>
+
+<!-- ===== SLIDE 4 — DASHBOARD ===== -->
+<div class="slide" id="slide-4">
+  <div class="sec-tag">Dashboard</div>
+  <div class="slide-title">
+    <span class="t-ru">Панель мониторинга</span>
+    <span class="t-en">Monitoring Dashboard</span>
+    <span class="t-az">Monitorinq Paneli</span>
+  </div>
+  <div class="grid-4" style="max-width:820px;">
+    <div class="card">
+      <div class="card-icon">💻</div>
+      <div class="card-title">CPU / RAM / GPU / Disk</div>
+      <div class="card-text">
+        <span class="t-ru">Метрики системы в реальном времени. Обновление каждые несколько секунд.</span>
+        <span class="t-en">Real-time system metrics. Updates every few seconds.</span>
+        <span class="t-az">Real-time sistem metrikalari. Hər bir neçə saniyədən bir yenilənir.</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-icon">🟢</div>
+      <div class="card-title">
+        <span class="t-ru">Статус VPS1 / VPS2</span>
+        <span class="t-en">VPS1 / VPS2 Status</span>
+        <span class="t-az">VPS1 / VPS2 Statusu</span>
+      </div>
+      <div class="card-text">
+        <span class="t-ru">Независимые карточки статуса с кнопкой обновления.</span>
+        <span class="t-en">Independent status cards with manual refresh button.</span>
+        <span class="t-az">Yeniləmə düyməsi olan müstəqil status kartları.</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-icon">⚡</div>
+      <div class="card-title">
+        <span class="t-ru">Тест скорости</span>
+        <span class="t-en">Speed Test</span>
+        <span class="t-az">Sürət Testi</span>
+      </div>
+      <div class="card-text">
+        <span class="t-ru">Измерение скорости соединения с VPS. Ping, Download, Upload.</span>
+        <span class="t-en">Measure connection speed to VPS. Ping, Download, Upload.</span>
+        <span class="t-az">VPS-ə bağlantı sürətini ölçür. Ping, Endirmə, Yükləmə.</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-icon">📋</div>
+      <div class="card-title">
+        <span class="t-ru">Журнал активности</span>
+        <span class="t-en">Activity Log</span>
+        <span class="t-az">Fəaliyyət Jurnalı</span>
+      </div>
+      <div class="card-text">
+        <span class="t-ru">Полная история действий с @именами пользователей и метками времени.</span>
+        <span class="t-en">Full audit trail with @usernames and timestamps.</span>
+        <span class="t-az">@istifadəçi adları və vaxt möhürləri ilə tam audit izi.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SLIDE 5 — LIVE SCREEN ===== -->
+<div class="slide" id="slide-5">
+  <div class="sec-tag">Screen Stream</div>
+  <div class="slide-title">
+    <span class="t-ru">Трансляция экрана</span>
+    <span class="t-en">Live Screen Stream</span>
+    <span class="t-az">Canlı Ekran Yayımı</span>
+  </div>
+  <!-- Stream preview mockup -->
+  <div style="background:var(--bg2);border:1px solid rgba(0,217,255,.3);border-radius:16px;padding:20px 32px;width:100%;max-width:760px;text-align:center;margin-bottom:24px;">
+    <div style="background:#0d1117;border-radius:10px;height:160px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;margin-bottom:12px;">
+      <div style="position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 29px,rgba(0,217,255,.04) 30px),repeating-linear-gradient(90deg,transparent,transparent 29px,rgba(0,217,255,.04) 30px);"></div>
+      <div style="text-align:center;z-index:1;">
+        <div style="font-size:36px;margin-bottom:8px;">📺</div>
+        <div style="font-size:13px;color:var(--accent);letter-spacing:1px;font-weight:700;">LIVE · 60 FPS</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">H.264 / MJPEG</div>
+      </div>
+    </div>
+    <!-- Action pill -->
+    <div class="pill">
+      <div class="pill-btn" title="Fullscreen">⊡</div>
+      <div class="pill-btn" title="Screenshot">📷</div>
+      <div class="pill-btn" title="Audio">🔊</div>
+      <div class="pill-btn" title="Record">⏺</div>
+      <div class="pill-btn" title="Expand">⤢</div>
+    </div>
+  </div>
+  <div class="grid-2" style="max-width:760px;">
+    <ul class="feat-list">
+      <li>
+        <span class="t-ru">Просмотр экрана в реальном времени, до 60 FPS</span>
+        <span class="t-en">Real-time desktop view, up to 60 FPS</span>
+        <span class="t-az">Real-time masaüstü görüntüsü, 60 FPS-ə qədər</span>
+      </li>
+      <li>
+        <span class="t-ru">Кодеки: H.264 / MJPEG (настраивается)</span>
+        <span class="t-en">Codecs: H.264 / MJPEG (configurable)</span>
+        <span class="t-az">Kodeklər: H.264 / MJPEG (konfiqurasiya edilə bilər)</span>
+      </li>
+      <li>
+        <span class="t-ru">Запись видео в формате .webm</span>
+        <span class="t-en">Video recording to .webm format</span>
+        <span class="t-az">Video qeydi .webm formatında</span>
+      </li>
+    </ul>
+    <ul class="feat-list">
+      <li>
+        <span class="t-ru">Системный звук через WASAPI loopback</span>
+        <span class="t-en">System audio via WASAPI loopback</span>
+        <span class="t-az">WASAPI loopback vasitəsilə sistem səsi</span>
+      </li>
+      <li>
+        <span class="t-ru">Скриншот одним кликом с предпросмотром</span>
+        <span class="t-en">One-click screenshot with inline preview</span>
+        <span class="t-az">Sətiriçi önizləmə ilə bir kliklə ekran görüntüsü</span>
+      </li>
+      <li>
+        <span class="t-ru">WebRTC + MJPEG транспорт на выбор</span>
+        <span class="t-en">WebRTC + MJPEG transport options</span>
+        <span class="t-az">WebRTC + MJPEG nəql seçimləri</span>
+      </li>
+    </ul>
+  </div>
+</div>
+
+<!-- ===== SLIDE 6 — FILE MANAGER ===== -->
+<div class="slide" id="slide-6">
+  <div class="sec-tag">File Manager</div>
+  <div class="slide-title">
+    <span class="t-ru">Файловый менеджер</span>
+    <span class="t-en">File Manager</span>
+    <span class="t-az">Fayl Meneceri</span>
+  </div>
+  <div class="grid-2" style="max-width:880px;align-items:start;">
+    <ul class="feat-list" style="padding-top:8px;">
+      <li>
+        <span class="t-ru">Полный доступ к файловой системе удалённого ПК</span>
+        <span class="t-en">Full filesystem access on remote PC</span>
+        <span class="t-az">Uzaq PC-nin fayl sisteminə tam giriş</span>
+      </li>
+      <li>
+        <span class="t-ru">Навигация по дискам, папкам, скрытым файлам</span>
+        <span class="t-en">Navigate drives, folders, hidden files</span>
+        <span class="t-az">Disklər, qovluqlar, gizli fayllar üzrə naviqasiya</span>
+      </li>
+      <li>
+        <span class="t-ru">Загрузка любого файла одним кликом</span>
+        <span class="t-en">Download any file with one click</span>
+        <span class="t-az">İstənilən faylı bir kliklə endirin</span>
+      </li>
+      <li>
+        <span class="t-ru">Загрузка файлов перетаскиванием (drag &amp; drop)</span>
+        <span class="t-en">Upload files via drag &amp; drop</span>
+        <span class="t-az">Faylları sürükleyib buraxaraq yükləyin</span>
+      </li>
+      <li>
+        <span class="t-ru">Передача больших файлов сегментами</span>
+        <span class="t-en">Large file transfer in segments</span>
+        <span class="t-az">Böyük faylların seqmentlərlə ötürülməsi</span>
+      </li>
+      <li>
+        <span class="t-ru">Поддержка Windows ACL, скрытых атрибутов</span>
+        <span class="t-en">Supports Windows ACL and hidden attributes</span>
+        <span class="t-az">Windows ACL və gizli atributlara dəstək</span>
+      </li>
+    </ul>
+    <div style="text-align:center;">
+      <div class="file-img-placeholder" style="min-height:240px;">
+        <div style="font-size:48px;">📁</div>
+        <div style="font-size:13px;color:var(--muted);">
+          <span class="t-ru">Браузерный файловый менеджер</span>
+          <span class="t-en">Browser-based File Manager</span>
+          <span class="t-az">Brauzer əsaslı Fayl Meneceri</span>
+        </div>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:6px;width:80%;align-items:flex-start;">
+          <div style="background:rgba(0,217,255,.08);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:12px;color:var(--muted);width:100%;display:flex;justify-content:space-between;"><span>📂 C:\Users\Admin\</span><span style="color:var(--accent)">→</span></div>
+          <div style="background:rgba(0,217,255,.05);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:6px 12px;font-size:12px;color:var(--muted);width:100%;display:flex;justify-content:space-between;"><span>📄 report.docx</span><span>⬇</span></div>
+          <div style="background:rgba(0,217,255,.05);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:6px 12px;font-size:12px;color:var(--muted);width:100%;display:flex;justify-content:space-between;"><span>🖼️ screenshot.png</span><span>⬇</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SLIDE 7 — CONTROL TOOLS ===== -->
+<div class="slide" id="slide-7">
+  <div class="sec-tag">Control Tools</div>
+  <div class="slide-title">
+    <span class="t-ru">Инструменты управления</span>
+    <span class="t-en">Control Tools</span>
+    <span class="t-az">İdarəetmə Alətləri</span>
+  </div>
+  <div class="grid-4" style="max-width:820px;">
+    <div class="card">
+      <div class="card-icon">⚙️</div>
+      <div class="card-title">
+        <span class="t-ru">Диспетчер задач</span>
+        <span class="t-en">Process Manager</span>
+        <span class="t-az">Proses Meneceri</span>
+      </div>
+      <div class="card-text">
+        <span class="t-ru">Завершение процессов, запуск программ с правами SYSTEM.</span>
+        <span class="t-en">Kill processes, launch programs with SYSTEM rights.</span>
+        <span class="t-az">Prosesləri sonlandırın, SYSTEM hüquqları ilə proqramlar işə salın.</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-icon">💻</div>
+      <div class="card-title">
+        <span class="t-ru">Терминал</span>
+        <span class="t-en">Terminal</span>
+        <span class="t-az">Terminal</span>
+      </div>
+      <div class="card-text">
+        <span class="t-ru">cmd + PowerShell с полными привилегиями SYSTEM.</span>
+        <span class="t-en">cmd + PowerShell, full SYSTEM privileges.</span>
+        <span class="t-az">cmd + PowerShell, tam SYSTEM imtiyazları.</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-icon">📋</div>
+      <div class="card-title">
+        <span class="t-ru">Реестр Windows</span>
+        <span class="t-en">Registry</span>
+        <span class="t-az">Reyestr</span>
+      </div>
+      <div class="card-text">
+        <span class="t-ru">Полный браузер реестра Windows: HKLM / HKCU / HKCR / HKU / HKCC.</span>
+        <span class="t-en">Full Windows Registry browser: HKLM / HKCU / HKCR / HKU / HKCC.</span>
+        <span class="t-az">Tam Windows Reyestr brauzeri: HKLM / HKCU / HKCR / HKU / HKCC.</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-icon">🔧</div>
+      <div class="card-title">
+        <span class="t-ru">Службы Windows</span>
+        <span class="t-en">Services</span>
+        <span class="t-az">Xidmətlər</span>
+      </div>
+      <div class="card-text">
+        <span class="t-ru">Запуск / остановка / настройка служб Windows удалённо.</span>
+        <span class="t-en">Start / Stop / configure Windows services remotely.</span>
+        <span class="t-az">Windows xidmətlərini uzaqdan başlatın / dayandırın / konfiqurasiya edin.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SLIDE 8 — SURVEILLANCE ===== -->
+<div class="slide" id="slide-8">
+  <div class="sec-tag">Monitoring</div>
+  <div class="slide-title">
+    <span class="t-ru">Функции мониторинга</span>
+    <span class="t-en">Monitoring Features</span>
+    <span class="t-az">Monitorinq Xüsusiyyətləri</span>
+  </div>
+  <div class="grid-2" style="max-width:860px;align-items:start;">
+    <!-- Screenshots -->
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:28px;">
+      <div style="font-size:32px;margin-bottom:12px;">📸</div>
+      <div style="font-size:15px;font-weight:700;color:var(--accent);margin-bottom:16px;">
+        <span class="t-ru">Автоматические скриншоты</span>
+        <span class="t-en">Automatic Screenshots</span>
+        <span class="t-az">Avtomatik Ekran Görüntüləri</span>
+      </div>
+      <ul class="feat-list">
+        <li>
+          <span class="t-ru">Каждые N секунд (настраивается, по умолчанию 10 с)</span>
+          <span class="t-en">Every N seconds (configurable, default 10s)</span>
+          <span class="t-az">Hər N saniyə (konfiqurasiya edilə bilər, default 10s)</span>
+        </li>
+        <li>
+          <span class="t-ru">Хранятся на VPS, просмотр в галерее</span>
+          <span class="t-en">Stored on VPS, viewable in gallery</span>
+          <span class="t-az">VPS-də saxlanılır, qalereyada baxıla bilər</span>
+        </li>
+        <li>
+          <span class="t-ru">Предпросмотр inline + полноэкранный просмотр</span>
+          <span class="t-en">Inline preview + fullscreen viewer</span>
+          <span class="t-az">Sətiriçi önizləmə + tam ekran görüntüləyici</span>
+        </li>
+        <li>
+          <span class="t-ru">Автоочистка при удалении</span>
+          <span class="t-en">Auto-clear on delete</span>
+          <span class="t-az">Silinmə zamanı avtomatik təmizləmə</span>
+        </li>
+      </ul>
+    </div>
+    <!-- Audio -->
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:28px;">
+      <div style="font-size:32px;margin-bottom:12px;">🎙️</div>
+      <div style="font-size:15px;font-weight:700;color:var(--accent2);margin-bottom:16px;">
+        <span class="t-ru">Запись звука</span>
+        <span class="t-en">Audio Recording</span>
+        <span class="t-az">Səs Qeydi</span>
+      </div>
+      <ul class="feat-list">
+        <li>
+          <span class="t-ru">Микрофон через WASAPI (без индикатора)</span>
+          <span class="t-en">Microphone via WASAPI (no indicator shown)</span>
+          <span class="t-az">WASAPI vasitəsilə mikrofon (göstərici yoxdur)</span>
+        </li>
+        <li>
+          <span class="t-ru">OGG Opus, сегменты по 5 минут</span>
+          <span class="t-en">OGG Opus, 5-minute segments</span>
+          <span class="t-az">OGG Opus, 5 dəqiqəlik seqmentlər</span>
+        </li>
+        <li>
+          <span class="t-ru">Встроенный аудиоплеер в браузере</span>
+          <span class="t-en">Built-in audio player in browser</span>
+          <span class="t-az">Brauzerdə daxili audio pleyer</span>
+        </li>
+        <li>
+          <span class="t-ru">Удаление очищает плеер автоматически</span>
+          <span class="t-en">Delete clears player automatically</span>
+          <span class="t-az">Silinmə pleyeri avtomatik təmizləyir</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SLIDE 9 — DIAGNOSTICS ===== -->
+<div class="slide" id="slide-9">
+  <div class="sec-tag">Diagnostics</div>
+  <div class="slide-title">
+    <span class="t-ru">Диагностика системы</span>
+    <span class="t-en">System Diagnostics</span>
+    <span class="t-az">Sistem Diaqnostikası</span>
+  </div>
+  <div class="grid-4" style="max-width:820px;">
+    <div class="card">
+      <div class="card-icon">📝</div>
+      <div class="card-title">
+        <span class="t-ru">Журнал событий</span>
+        <span class="t-en">Event Log</span>
+        <span class="t-az">Hadisə Jurnalı</span>
+      </div>
+      <div class="card-text">
+        <span class="t-ru">Просмотр журнала событий Windows: Application / System / Security.</span>
+        <span class="t-en">Windows Event Log viewer: Application / System / Security.</span>
+        <span class="t-az">Windows Hadisə Jurnalı: Application / System / Security.</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-icon">📋</div>
+      <div class="card-title">
+        <span class="t-ru">Программы</span>
+        <span class="t-en">Programs</span>
+        <span class="t-az">Proqramlar</span>
+      </div>
+      <div class="card-text">
+        <span class="t-ru">Инвентаризация установленных приложений с версиями.</span>
+        <span class="t-en">Installed applications inventory with versions.</span>
+        <span class="t-az">Versiyaları ilə quraşdırılmış proqramların inventarı.</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-icon">📊</div>
+      <div class="card-title">
+        <span class="t-ru">Службы</span>
+        <span class="t-en">Services</span>
+        <span class="t-az">Xidmətlər</span>
+      </div>
+      <div class="card-text">
+        <span class="t-ru">Статус и управление службами Windows: запуск, остановка, тип запуска.</span>
+        <span class="t-en">Windows services status and control: start, stop, startup type.</span>
+        <span class="t-az">Windows xidmətlərinin statusu: başlatma, dayandırma, başlanğıc növü.</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-icon">🛡️</div>
+      <div class="card-title">
+        <span class="t-ru">Защита</span>
+        <span class="t-en">Defense</span>
+        <span class="t-az">Müdafiə</span>
+      </div>
+      <div class="card-text">
+        <span class="t-ru">Сканирование угроз и модуль защиты (stage-2 defender).</span>
+        <span class="t-en">Threat scanning and protection module (stage-2 defender).</span>
+        <span class="t-az">Təhlükə skan etmə və qoruma modulu (stage-2 defender).</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SLIDE 10 — SECURITY ===== -->
+<div class="slide" id="slide-10">
+  <div class="sec-tag">Security</div>
+  <div class="slide-title">
+    <span class="t-ru">Безопасность</span>
+    <span class="t-en">Security</span>
+    <span class="t-az">Təhlükəsizlik</span>
+  </div>
+  <div class="sec-list" style="max-width:700px;">
+    <div class="sec-item"><div class="s-icon">🔐</div><div class="s-text"><span class="t-ru">TLS WebSocket — шифрованный транспорт</span><span class="t-en">TLS WebSocket encrypted transport</span><span class="t-az">TLS WebSocket şifrəli nəql</span></div></div>
+    <div class="sec-item"><div class="s-icon">🔒</div><div class="s-text"><span class="t-ru">AES-256 зашифрованный конфиг (pnpext.sys)</span><span class="t-en">AES-256 encrypted config (pnpext.sys)</span><span class="t-az">AES-256 şifrəli konfiq (pnpext.sys)</span></div></div>
+    <div class="sec-item"><div class="s-icon">👤</div><div class="s-text"><span class="t-ru">Ролевой доступ: Администратор / Оператор</span><span class="t-en">Role-based access: Admin / Operator</span><span class="t-az">Rol əsaslı giriş: Admin / Operator</span></div></div>
+    <div class="sec-item"><div class="s-icon">📝</div><div class="s-text"><span class="t-ru">Полный журнал действий с @именами пользователей</span><span class="t-en">Full activity audit log with @usernames</span><span class="t-az">@istifadəçi adları ilə tam fəaliyyət audit jurnalı</span></div></div>
+    <div class="sec-item"><div class="s-icon">🔑</div><div class="s-text"><span class="t-ru">Токены сессий только в RAM (не пишутся на диск)</span><span class="t-en">Session tokens in RAM only (no disk storage)</span><span class="t-az">Sessiya tokenləri yalnız RAM-da (diskə yazılmır)</span></div></div>
+    <div class="sec-item"><div class="s-icon">🛡️</div><div class="s-text"><span class="t-ru">DACL-защищённая служба Windows</span><span class="t-en">DACL-protected Windows service</span><span class="t-az">DACL ilə qorunan Windows xidməti</span></div></div>
+    <div class="sec-item"><div class="s-icon">🚫</div><div class="s-text"><span class="t-ru">Только ваш VPS — без сторонних C2-серверов</span><span class="t-en">No third-party C2 — your own VPS only</span><span class="t-az">Üçüncü tərəf C2 yoxdur — yalnız öz VPS-iniz</span></div></div>
+  </div>
+</div>
+
+<!-- ===== SLIDE 11 — MULTI-USER ===== -->
+<div class="slide" id="slide-11">
+  <div class="sec-tag">Multi-User</div>
+  <div class="slide-title">
+    <span class="t-ru">Управление операторами</span>
+    <span class="t-en">Multi-User Management</span>
+    <span class="t-az">Çox İstifadəçi İdarəetməsi</span>
+  </div>
+  <div class="grid-2" style="max-width:820px;align-items:start;">
+    <div class="role-card admin">
+      <div class="role-title">👑 Administrator</div>
+      <ul class="feat-list">
+        <li><span class="t-ru">Доступ ко всем вкладкам</span><span class="t-en">All tabs access</span><span class="t-az">Bütün tablara giriş</span></li>
+        <li><span class="t-ru">Управление пользователями</span><span class="t-en">User management</span><span class="t-az">İstifadəçi idarəetməsi</span></li>
+        <li><span class="t-ru">Обновление агента</span><span class="t-en">Agent updates</span><span class="t-az">Agent yeniləmələri</span></li>
+        <li><span class="t-ru">Загрузка файлов на VPS</span><span class="t-en">VPS file upload</span><span class="t-az">VPS-ə fayl yükləmə</span></li>
+        <li><span class="t-ru">Просмотр журнала активности</span><span class="t-en">Activity log visibility</span><span class="t-az">Fəaliyyət jurnalına baxış</span></li>
+      </ul>
+    </div>
+    <div class="role-card oper">
+      <div class="role-title">👤 Operator</div>
+      <ul class="feat-list">
+        <li><span class="t-ru">Только разрешённые вкладки</span><span class="t-en">Permitted tabs only</span><span class="t-az">Yalnız icazə verilmiş tablara giriş</span></li>
+        <li><span class="t-ru">Без административных функций</span><span class="t-en">No admin functions</span><span class="t-az">Admin funksiyaları yoxdur</span></li>
+        <li><span class="t-ru">Индивидуальная тема интерфейса 🎨</span><span class="t-en">Individual UI theme 🎨</span><span class="t-az">Fərdi UI mövzusu 🎨</span></li>
+        <li><span class="t-ru">Все действия фиксируются с @именем</span><span class="t-en">All actions logged with @username</span><span class="t-az">Bütün əməliyyatlar @adla qeydə alınır</span></li>
+      </ul>
+    </div>
+  </div>
+  <div class="badge-strip">
+    <div class="badge"><span class="t-ru">Неограниченное число операторов</span><span class="t-en">Unlimited operators</span><span class="t-az">Limitsiz operatorlar</span></div>
+    <div class="badge"><span class="t-ru">Разрешения по вкладкам</span><span class="t-en">Per-tab permissions</span><span class="t-az">Tab üzrə icazələr</span></div>
+    <div class="badge"><span class="t-ru">Индивидуальные темы</span><span class="t-en">Individual themes</span><span class="t-az">Fərdi mövzular</span></div>
+  </div>
+</div>
+
+<!-- ===== SLIDE 12 — REMOTE UPDATE ===== -->
+<div class="slide" id="slide-12">
+  <div class="sec-tag">Remote Update</div>
+  <div class="slide-title">
+    <span class="t-ru">Удалённое обновление агента</span>
+    <span class="t-en">Remote Agent Update</span>
+    <span class="t-az">Uzaqdan Agent Yeniləməsi</span>
+  </div>
+  <div class="steps" style="max-width:800px;margin-bottom:32px;">
+    <div class="step">
+      <div class="step-connector"></div>
+      <div class="step-num">1</div>
+      <div class="step-title">
+        <span class="t-ru">Загрузка DLL</span>
+        <span class="t-en">Upload DLL</span>
+        <span class="t-az">DLL Yüklə</span>
+      </div>
+      <div class="step-desc">
+        <span class="t-ru">Загрузите новый pnpext.dll на VPS через браузер</span>
+        <span class="t-en">Upload new pnpext.dll to VPS via browser</span>
+        <span class="t-az">Yeni pnpext.dll-i brauzer vasitəsilə VPS-ə yükləyin</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-connector"></div>
+      <div class="step-num">2</div>
+      <div class="step-title">
+        <span class="t-ru">Нажать «Обновить»</span>
+        <span class="t-en">Click «Update»</span>
+        <span class="t-az">«Yenilə»yə Basın</span>
+      </div>
+      <div class="step-desc">
+        <span class="t-ru">Нажмите «Обновить агент» в браузерной панели</span>
+        <span class="t-en">Click "Update Agent" in the browser panel</span>
+        <span class="t-az">Brauzer panelindəki "Update Agent" düyməsinə basın</span>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-title">
+        <span class="t-ru">Автоперезапуск</span>
+        <span class="t-en">Auto-restart</span>
+        <span class="t-az">Avto-yenidən başlatma</span>
+      </div>
+      <div class="step-desc">
+        <span class="t-ru">Агент обновляется и переподключается за 15–30 сек</span>
+        <span class="t-en">Agent self-updates, restarts, reconnects in 15–30 sec</span>
+        <span class="t-az">Agent yenilənir, yenidən başlayır, 15–30 san-da qoşulur</span>
+      </div>
+    </div>
+  </div>
+  <div class="grid-2" style="max-width:700px;gap:16px;">
+    <div style="background:rgba(0,217,255,.07);border:1px solid rgba(0,217,255,.25);border-radius:12px;padding:18px;text-align:center;">
+      <div style="font-size:24px;margin-bottom:8px;">✅</div>
+      <div style="font-size:13px;color:var(--fg);">
+        <span class="t-ru">Без физического доступа к машине</span>
+        <span class="t-en">No physical access to target machine</span>
+        <span class="t-az">Hədəf maşına fiziki giriş yoxdur</span>
+      </div>
+    </div>
+    <div style="background:rgba(0,255,136,.07);border:1px solid rgba(0,255,136,.25);border-radius:12px;padding:18px;text-align:center;">
+      <div style="font-size:24px;margin-bottom:8px;">🔄</div>
+      <div style="font-size:13px;color:var(--fg);">
+        <span class="t-ru">Обновление сотен машин удалённо. Без перезагрузки Windows.</span>
+        <span class="t-en">Update hundreds of machines remotely. No Windows reboot needed.</span>
+        <span class="t-az">Yüzlərlə maşını uzaqdan yeniləyin. Windows yenidən başlatmaya ehtiyac yoxdur.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SLIDE 13 — SPECIFICATIONS ===== -->
+<div class="slide" id="slide-13">
+  <div class="sec-tag">Technical</div>
+  <div class="slide-title">
+    <span class="t-ru">Технические характеристики</span>
+    <span class="t-en">Technical Specifications</span>
+    <span class="t-az">Texniki Xüsusiyyətlər</span>
+  </div>
+  <div class="grid-2" style="max-width:900px;align-items:start;">
+    <table class="spec-table">
+      <thead><tr><th><span class="t-ru">Компонент</span><span class="t-en">Component</span><span class="t-az">Komponent</span></th><th><span class="t-ru">Характеристика</span><span class="t-en">Specification</span><span class="t-az">Xüsusiyyət</span></th></tr></thead>
+      <tbody>
+        <tr><td><span class="t-ru">Агент</span><span class="t-en">Agent</span><span class="t-az">Agent</span></td><td>Windows 7/8/10/11, x86/x64</td></tr>
+        <tr><td><span class="t-ru">Транспорт</span><span class="t-en">Transport</span><span class="t-az">Nəql</span></td><td>WebSocket over TLS (port 443)</td></tr>
+        <tr><td><span class="t-ru">Видео</span><span class="t-en">Video</span><span class="t-az">Video</span></td><td>MJPEG / H.264, up to 60 FPS</td></tr>
+        <tr><td><span class="t-ru">Аудио</span><span class="t-en">Audio</span><span class="t-az">Audio</span></td><td>OGG Opus, WASAPI loopback</td></tr>
+      </tbody>
+    </table>
+    <table class="spec-table">
+      <thead><tr><th><span class="t-ru">Компонент</span><span class="t-en">Component</span><span class="t-az">Komponent</span></th><th><span class="t-ru">Характеристика</span><span class="t-en">Specification</span><span class="t-az">Xüsusiyyət</span></th></tr></thead>
+      <tbody>
+        <tr><td><span class="t-ru">Конфиг</span><span class="t-en">Config</span><span class="t-az">Konfiq</span></td><td>AES-256 encrypted pnpext.sys</td></tr>
+        <tr><td><span class="t-ru">Интерфейс</span><span class="t-en">Interface</span><span class="t-az">İnterfeys</span></td><td>Chrome / Edge / Firefox</td></tr>
+        <tr><td><span class="t-ru">Служба</span><span class="t-en">Service</span><span class="t-az">Xidmət</span></td><td>MspIscSvc, auto-start, DACL</td></tr>
+        <tr><td><span class="t-ru">Архитектура</span><span class="t-en">Architecture</span><span class="t-az">Arxitektura</span></td><td>Stage-2 modular (filemgr / procmgr / defender)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="stats-bar" style="margin-top:30px;">
+    <div class="stat"><div class="stat-val">60</div><div class="stat-lbl">FPS MAX</div></div>
+    <div class="stat"><div class="stat-val">443</div><div class="stat-lbl">PORT ONLY</div></div>
+    <div class="stat"><div class="stat-val">AES-256</div><div class="stat-lbl">CONFIG ENCRYPTION</div></div>
+    <div class="stat"><div class="stat-val">Stage-2</div><div class="stat-lbl">MODULAR ARCH</div></div>
+  </div>
+</div>
+
+<!-- ===== SLIDE 14 — THANK YOU ===== -->
+<div class="slide" id="slide-14" style="background:radial-gradient(ellipse 60% 50% at 50% 50%, rgba(0,217,255,.05) 0%, transparent 70%), var(--bg);">
+  <svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:16px;filter:drop-shadow(0 0 14px rgba(0,217,255,.45))">
+    <path d="M32 4L6 16v20c0 16.6 11.2 31.2 26 35.8C47.8 67.2 58 52.6 58 36V16L32 4z" fill="rgba(0,217,255,.15)" stroke="#00d9ff" stroke-width="2.5"/>
+    <ellipse cx="32" cy="32" rx="10" ry="7" fill="none" stroke="#00d9ff" stroke-width="2"/>
+    <circle cx="32" cy="32" r="3.5" fill="#00d9ff"/>
+    <path d="M36 18l-7 14h5L27 50" fill="none" stroke="#00d9ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <div style="font-size:42px;font-weight:900;color:var(--accent);letter-spacing:-1px;" class="glow">PROMETEY</div>
+  <div style="font-size:15px;color:var(--accent2);letter-spacing:2px;margin-top:6px;font-weight:700;">v1.0.250</div>
+  <div style="margin-top:28px;font-size:22px;font-weight:700;color:var(--fg);">
+    <span class="t-ru">Вопросы и поддержка</span>
+    <span class="t-en">Questions &amp; Support</span>
+    <span class="t-az">Suallar və Dəstək</span>
+  </div>
+  <div style="margin-top:20px;display:flex;align-items:center;gap:12px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px 28px;">
+    <span style="font-size:20px;">✉️</span>
+    <span style="font-size:16px;color:var(--accent);font-weight:600;">rauf.hasanov@gmail.com</span>
+  </div>
+  <div class="badge-strip" style="margin-top:28px;">
+    <div class="badge">Remote Desktop</div>
+    <div class="badge">Process Manager</div>
+    <div class="badge">File Manager</div>
+    <div class="badge">Audio &amp; Screen</div>
+    <div class="badge">Multi-User</div>
+  </div>
+  <div style="position:absolute;bottom:40px;font-size:12px;color:var(--muted);letter-spacing:.5px;">
+    © PROMETEY Remote Management System
+  </div>
+</div>
+
+</div><!-- /.deck -->
+
+<script>
+(function(){
+  const TOTAL = 14;
+  let cur = 0;
+  let lang = localStorage.getItem('prom-lang') || 'ru';
+
+  // ---------- Language ----------
+  function setLang(l){
+    lang = l;
+    document.body.className = 'lang-' + l;
+    localStorage.setItem('prom-lang', l);
+    document.querySelectorAll('.lbtn').forEach(b => b.classList.toggle('active', b.dataset.lang === l));
+  }
+  document.querySelectorAll('.lbtn').forEach(b => b.addEventListener('click', () => setLang(b.dataset.lang)));
+  setLang(lang);
+
+  // ---------- Dots ----------
+  const dotsEl = document.getElementById('dots');
+  for(let i = 0; i < TOTAL; i++){
+    const d = document.createElement('div');
+    d.className = 'dot' + (i === 0 ? ' active' : '');
+    d.addEventListener('click', () => goTo(i));
+    dotsEl.appendChild(d);
+  }
+
+  // ---------- Progress ----------
+  function updateUI(){
+    // slides
+    document.querySelectorAll('.slide').forEach((s, i) => s.classList.toggle('active', i === cur));
+    // dots
+    document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === cur));
+    // counter
+    document.getElementById('slide-num').textContent = (cur + 1) + ' / ' + TOTAL;
+    // progress bar
+    document.getElementById('progress-bar').style.width = ((cur + 1) / TOTAL * 100) + '%';
+  }
+
+  function goTo(n){
+    cur = Math.max(0, Math.min(TOTAL - 1, n));
+    updateUI();
+  }
+
+  document.getElementById('btn-prev').addEventListener('click', () => goTo(cur - 1));
+  document.getElementById('btn-next').addEventListener('click', () => goTo(cur + 1));
+
+  document.addEventListener('keydown', e => {
+    if(e.key === 'ArrowRight' || e.key === ' '){ e.preventDefault(); goTo(cur + 1); }
+    if(e.key === 'ArrowLeft'){ e.preventDefault(); goTo(cur - 1); }
+  });
+
+  // Touch / swipe
+  let tx = 0;
+  document.addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, {passive:true});
+  document.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - tx;
+    if(Math.abs(dx) > 50){ goTo(dx < 0 ? cur + 1 : cur - 1); }
+  }, {passive:true});
+
+  updateUI();
+})();
+</script>
+</body>
+</html>
