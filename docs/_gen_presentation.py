@@ -1,4 +1,4 @@
-import sys
+﻿import sys
 sys.path.insert(0, r'C:\Users\Test\AppData\Roaming\Python\Python311\site-packages')
 
 from pptx import Presentation
@@ -72,7 +72,7 @@ def rect(slide, x, y, w, h, fill=C_PANEL, line_color=None, line_w=Pt(0)):
 def footer(slide, slide_num, total=14):
     # Bottom bar
     rect(slide, 0, 7.1, 13.33, 0.4, C_PANEL)
-    txb(slide, f'PROMETEY v1.0.250', 0.3, 7.15, 5, 0.3, size=9, color=C_MUTED)
+    txb(slide, f'Data v1.0.250', 0.3, 7.15, 5, 0.3, size=9, color=C_MUTED)
     txb(slide, f'{slide_num} / {total}', 12, 7.15, 1.2, 0.3, size=9, color=C_MUTED, align=PP_ALIGN.RIGHT)
 
 def top_bar(slide, color=C_CYAN):
@@ -114,7 +114,7 @@ shield = sl.shapes.add_shape(1, Inches(5.4), Inches(0.8), Inches(2.5), Inches(2.
 shield.fill.solid(); shield.fill.fore_color.rgb = RGBColor(0x00, 0x25, 0x35)
 shield.line.color.rgb = C_CYAN; shield.line.width = Pt(2)
 
-txb(sl, 'PROMETEY', 0.5, 3.7, 12.33, 1.2, size=64, bold=True, color=C_CYAN, align=PP_ALIGN.CENTER)
+txb(sl, 'Data', 0.5, 3.7, 12.33, 1.2, size=64, bold=True, color=C_CYAN, align=PP_ALIGN.CENTER)
 txb(sl, 'v1.0.250  ·  2026', 0.5, 4.75, 12.33, 0.5, size=14, color=C_MUTED, align=PP_ALIGN.CENTER)
 
 txb_ml(sl, [
@@ -464,7 +464,7 @@ txb(sl, 'Yenileme zamanı ~5 san eleqe kesilir — bu normaldır. Windows yenide
 sl = add_slide()
 bg(sl); top_bar(sl); footer(sl, 13)
 section_tag(sl, 'Texniki Xüsusuiyyətlər / Технические характеристики / Technical Specifications')
-txb(sl, 'PROMETEY v1.0.250 — spesifikasiyalar / specifications', 0.4, 0.55, 12.5, 0.5, size=20, bold=True, color=C_WHITE)
+txb(sl, 'Data v1.0.250 — spesifikasiyalar / specifications', 0.4, 0.55, 12.5, 0.5, size=20, bold=True, color=C_WHITE)
 
 specs = [
     ('Agent OS', 'Windows 7/8/10/11 x86/x64'),
@@ -495,7 +495,7 @@ shield2 = sl.shapes.add_shape(1, Inches(5.4), Inches(0.6), Inches(2.5), Inches(2
 shield2.fill.solid(); shield2.fill.fore_color.rgb = RGBColor(0x00, 0x25, 0x35)
 shield2.line.color.rgb = C_CYAN; shield2.line.width = Pt(2)
 
-txb(sl, 'PROMETEY', 0.5, 3.2, 12.33, 1.0, size=52, bold=True, color=C_CYAN, align=PP_ALIGN.CENTER)
+txb(sl, 'Data', 0.5, 3.2, 12.33, 1.0, size=52, bold=True, color=C_CYAN, align=PP_ALIGN.CENTER)
 txb(sl, 'v1.0.250', 0.5, 4.25, 12.33, 0.5, size=16, color=C_MUTED, align=PP_ALIGN.CENTER)
 
 # Divider
@@ -504,7 +504,7 @@ line_div.line.color.rgb = RGBColor(0x30, 0x36, 0x3d); line_div.line.width = Pt(1
 
 txb(sl, 'Suallar / Вопросы / Questions:', 0.5, 5.1, 12.33, 0.45, size=14, color=C_WHITE, align=PP_ALIGN.CENTER)
 txb(sl, 'rauf.hasanov@gmail.com', 0.5, 5.6, 12.33, 0.55, size=18, bold=True, color=C_CYAN, align=PP_ALIGN.CENTER)
-txb(sl, '© PROMETEY Remote Management System  ·  2026', 0.5, 6.25, 12.33, 0.45, size=11, color=C_MUTED, align=PP_ALIGN.CENTER)
+txb(sl, '© Data Remote Management System  ·  2026', 0.5, 6.25, 12.33, 0.45, size=11, color=C_MUTED, align=PP_ALIGN.CENTER)
 
 # --- SAVE ---
 os.makedirs(os.path.dirname(OUT), exist_ok=True)

@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-PROMETEY v1.0.250 — Operator Manual PDF Generator
+Data v1.0.250 — Operator Manual PDF Generator
 Generates Guide_RU.pdf, Guide_EN.pdf, Guide_AZ.pdf
 Light theme: white bg, dark text, #0f3460 blue headings, #00bcd4 cyan accent
 """
@@ -36,7 +36,7 @@ CONTENT_W = PAGE_W - MARGIN_L - MARGIN_R
 
 # ── Draw shield logo (simplified, text-based) ──────────────────────────────
 def draw_logo(c, x, y, size=30):
-    """Draw a simple shield shape with PROMETEY initial."""
+    """Draw a simple shield shape with Data initial."""
     # Shield body (pentagon-like)
     shield_pts = [
         (x, y + size),
@@ -86,10 +86,10 @@ def draw_header(c, page_data):
     # Logo
     draw_logo(c, MARGIN_L, PAGE_H - 1.65 * cm, size=22)
 
-    # PROMETEY title
+    # Data title
     c.setFillColor(white)
     c.setFont("Helvetica-Bold", 13)
-    c.drawString(MARGIN_L + 1.8 * cm, PAGE_H - 0.8 * cm, "PROMETEY")
+    c.drawString(MARGIN_L + 1.8 * cm, PAGE_H - 0.8 * cm, "Data")
 
     # Version
     c.setFillColor(C_ACCENT)
@@ -120,7 +120,7 @@ def draw_footer(c, page_num, total_pages, contact="rauf.hasanov@gmail.com"):
 
     c.setFillColor(HexColor('#555555'))
     c.setFont("Helvetica", 8)
-    c.drawString(MARGIN_L, 0.9 * cm, "PROMETEY v1.0.250  |  " + contact)
+    c.drawString(MARGIN_L, 0.9 * cm, "Data v1.0.250  |  " + contact)
     c.drawRightString(PAGE_W - MARGIN_R, 0.9 * cm, f"{page_num} / {total_pages}")
 
 
@@ -142,15 +142,15 @@ def draw_cover(c, lang_data):
     logo_y = PAGE_H * 0.58
     draw_logo(c, logo_x, logo_y, size=logo_size)
 
-    # PROMETEY title
+    # Data title
     c.setFillColor(white)
     c.setFont("Helvetica-Bold", 42)
-    c.drawCentredString(PAGE_W / 2, PAGE_H * 0.50, "PROMETEY")
+    c.drawCentredString(PAGE_W / 2, PAGE_H * 0.50, "Data")
 
     # Accent underline
     c.setStrokeColor(C_ACCENT)
     c.setLineWidth(2)
-    title_w = c.stringWidth("PROMETEY", "Helvetica-Bold", 42)
+    title_w = c.stringWidth("Data", "Helvetica-Bold", 42)
     c.line(PAGE_W / 2 - title_w / 2, PAGE_H * 0.49,
            PAGE_W / 2 + title_w / 2, PAGE_H * 0.49)
 
@@ -1680,8 +1680,8 @@ def build_pdf(lang_key, output_path):
     total_pages = lang_data['total_pages']
 
     c = canvas.Canvas(output_path, pagesize=A4)
-    c.setTitle(f"PROMETEY v1.0.250 - {lang_data['cover_title']}")
-    c.setAuthor("PROMETEY System")
+    c.setTitle(f"Data v1.0.250 - {lang_data['cover_title']}")
+    c.setAuthor("Data System")
     c.setSubject(lang_data['cover_subtitle'])
 
     # ── Page 1: Cover ──────────────────────────────────────────────────────
