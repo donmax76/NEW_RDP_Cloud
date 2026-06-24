@@ -635,24 +635,27 @@
   <div class="sniff-grid">
     <div class="sniff-card red-tint no-break">
       <div class="sniff-title"><span style="font-size:18px;">&#128269;</span> What sniffer / investigator sees</div>
-      <div class="sniff-item"><span class="sniff-icon">&#10060;</span><b>Object IP</b> — only a connection to the VPS IP address is visible. Who is on the other side is unknown.</div>
-      <div class="sniff-item"><span class="sniff-icon">&#10060;</span><b>Operator IP</b> — the object does not know and cannot learn the operator's IP. It is never sent to the object.</div>
-      <div class="sniff-item"><span class="sniff-icon">&#10060;</span><b>Traffic content</b> — the entire data stream is encrypted (TLS 1.3). Sniffer sees random bytes.</div>
-      <div class="sniff-item"><span class="sniff-icon">&#10060;</span><b>Activity type</b> — traffic looks like ordinary HTTPS. It is impossible to determine that this is remote control.</div>
+      <div class="sniff-item"><span class="sniff-icon">&#10060;</span><b>Server IP</b> — only shared Cloudflare IPs visible (104.x.x.x). Millions of sites behind them — VPS-1 real IP is never exposed.</div>
+      <div class="sniff-item"><span class="sniff-icon">&#10060;</span><b>Domain name</b> — only domain.com visible. Looks like any ordinary site behind Cloudflare — nothing suspicious.</div>
+      <div class="sniff-item"><span class="sniff-icon">&#10060;</span><b>Dynamic IP</b> — Cloudflare IPs change constantly. No fixed target — impossible to track.</div>
+      <div class="sniff-item"><span class="sniff-icon">&#10060;</span><b>Traffic content</b> — TLS 1.3 encryption. Even Cloudflare itself cannot see the inner traffic — only encrypted bytes.</div>
+      <div class="sniff-item"><span class="sniff-icon">&#10060;</span><b>Activity type</b> — ordinary HTTPS/CDN traffic. Remote control is indistinguishable from a normal website visit.</div>
+      <div class="sniff-item"><span class="sniff-icon">&#10060;</span><b>Operator IP</b> — never visible to the object. VPS-2 IP is known only to VPS-1.</div>
     </div>
     <div class="sniff-card green-tint no-break">
-      <div class="sniff-title"><span style="font-size:18px;">&#9989;</span> How VPS protects</div>
-      <div class="sniff-item"><span class="sniff-icon">&#128737;&#65039;</span><b>Direct connection severed</b> — the object only knows the VPS IP. The operator only knows the VPS IP. They do not know each other's address.</div>
-      <div class="sniff-item"><span class="sniff-icon">&#127758;</span><b>Different jurisdiction</b> — VPS in another country means local authorities cannot request logs. An international request is required.</div>
-      <div class="sniff-item"><span class="sniff-icon">&#128274;</span><b>No user data stored</b> — passwords are stored only as encrypted hash (PBKDF2). Even if the server is seized, passwords are not revealed.</div>
-      <div class="sniff-item"><span class="sniff-icon">&#128465;&#65039;</span><b>No operation log</b> — session tokens are in RAM only. No traces remain on restart.</div>
+      <div class="sniff-title"><span style="font-size:18px;">&#9989;</span> How Cloudflare + two VPS protect</div>
+      <div class="sniff-item"><span class="sniff-icon">&#127760;</span><b>Real IP hidden</b> — VPS-1 behind Cloudflare. Even ISP and firewalls cannot determine the real server IP.</div>
+      <div class="sniff-item"><span class="sniff-icon">&#128274;</span><b>VPS-2 isolated</b> — VPS-2 IP appears nowhere publicly. Only VPS-1 knows it — requires a separate seizure.</div>
+      <div class="sniff-item"><span class="sniff-icon">&#127758;</span><b>Three jurisdictions</b> — Cloudflare (USA) + VPS-1 + VPS-2 in different countries. Three simultaneous international requests required.</div>
+      <div class="sniff-item"><span class="sniff-icon">&#128465;&#65039;</span><b>No logs</b> — session data in RAM only. No traces after VPS restart.</div>
+      <div class="sniff-item"><span class="sniff-icon">&#128737;&#65039;</span><b>Passwords not recoverable</b> — PBKDF2 hash. Credentials cannot be extracted even if server is seized.</div>
     </div>
   </div>
 
   <div class="infobox blue no-break">
     <b>Maximum that can be learned in an investigation:</b>
-    About the object — that it regularly connects to the VPS IP address on port 443 (HTTPS). This is indistinguishable from connecting to any other website.
-    Without physical access to VPS with an active session, it is impossible to determine <b>neither purpose, nor operator, nor content</b>.
+    The object regularly connects to <b>domain.com</b> (Cloudflare CDN) on port 443 — <b>indistinguishable</b> from accessing any ordinary website.
+    VPS-1 real IP is not visible. No information about VPS-2 exists publicly. Without simultaneous international requests to Cloudflare (USA) and both VPS providers — <b>purpose, operator, and content remain unknown</b>.
   </div>
 </div>
 

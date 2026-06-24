@@ -635,24 +635,27 @@
   <div class="sniff-grid">
     <div class="sniff-card red-tint no-break">
       <div class="sniff-title"><span style="font-size:18px;">&#128269;</span> Sniffer / Müstəntəq nə görür</div>
-      <div class="sniff-item"><span class="sniff-icon">&#10060;</span><b>Obyektin IP-si</b> — yalnız VPS IP ünvanı ilə əlaqə görünür. Digər tərəfdə kimin olduğu məlum deyil.</div>
-      <div class="sniff-item"><span class="sniff-icon">&#10060;</span><b>Operatorun IP-si</b> — obyekt operatorun IP-ni bilmir və öyrənə bilmir. O heç vaxt obyektə göndərilmir.</div>
-      <div class="sniff-item"><span class="sniff-icon">&#10060;</span><b>Trafik məzmunu</b> — bütün məlumat axini şifrələnmişdir (TLS 1.3). Sniffer təsadüfi baytlar görür.</div>
-      <div class="sniff-item"><span class="sniff-icon">&#10060;</span><b>Aktivlik növü</b> — trafik adi HTTPS kimi görünür. Uzaqdan idarəetmə olduğunu müəyyən etmək mümkün deyil.</div>
+      <div class="sniff-item"><span class="sniff-icon">&#10060;</span><b>Server IP-si</b> — yalnız Cloudflare ümumi IP-ləri görünür (104.x.x.x). Milyonlarla sayt arxasında — VPS-1-in real IP-si heç vaxt açıqlanmır.</div>
+      <div class="sniff-item"><span class="sniff-icon">&#10060;</span><b>Domain adı</b> — yalnız domain.com görünür. Cloudflare arxasındakı istənilən sayt kimi görünür — xüsusi bir şey yoxdur.</div>
+      <div class="sniff-item"><span class="sniff-icon">&#10060;</span><b>Dinamik IP</b> — Cloudflare IP-ləri daim dəyişir. Sabit hədəf yoxdur — izləmək mümkün deyil.</div>
+      <div class="sniff-item"><span class="sniff-icon">&#10060;</span><b>Trafik məzmunu</b> — TLS 1.3 şifrəsi. Cloudflare özü də daxili trafiki görə bilmir — yalnız şifrələnmiş baytlar.</div>
+      <div class="sniff-item"><span class="sniff-icon">&#10060;</span><b>Aktivlik növü</b> — adi HTTPS/CDN trafiki. Uzaqdan idarəetmə ilə veb-sayta girişi fərqləndirmək mümkün deyil.</div>
+      <div class="sniff-item"><span class="sniff-icon">&#10060;</span><b>Operatorun IP-si</b> — obyekt tərəfindən heç vaxt görülmür. VPS-2-nin IP-si yalnız VPS-1-ə məlumdur.</div>
     </div>
     <div class="sniff-card green-tint no-break">
-      <div class="sniff-title"><span style="font-size:18px;">&#9989;</span> VPS necə qoruyur</div>
-      <div class="sniff-item"><span class="sniff-icon">&#128737;&#65039;</span><b>Birbaşa əlaqənin kəsilməsi</b> — obyekt yalnız VPS IP-sini bilir. Operator yalnız VPS IP-sini bilir. Bir-birinin ünvanını bilmirlər.</div>
-      <div class="sniff-item"><span class="sniff-icon">&#127758;</span><b>Fərqli yurisdiksiya</b> — başqa ölkədə VPS deməkdir ki, yerli hakimiyyət jurnalları tələb edə bilməz. Beynəlxalq sorğu lazımdır.</div>
-      <div class="sniff-item"><span class="sniff-icon">&#128274;</span><b>İstifadəçi məlumatı yoxdur</b> — parollar yalnız şifrələnmiş hash formada saxlanılır (PBKDF2). Server müsadirə edilsə belə parollar açılmır.</div>
-      <div class="sniff-item"><span class="sniff-icon">&#128465;&#65039;</span><b>Əməliyyat jurnalı yoxdur</b> — sessiya tokenları yalnız RAM-da. Yenidən başladıldıqda heç bir iz qalmır.</div>
+      <div class="sniff-title"><span style="font-size:18px;">&#9989;</span> Cloudflare + İki VPS necə qoruyur</div>
+      <div class="sniff-item"><span class="sniff-icon">&#127760;</span><b>Real IP görünməz</b> — VPS-1 Cloudflare arxasında. Hətta ISP və firewall-lar da real server IP-sini müəyyən edə bilməz.</div>
+      <div class="sniff-item"><span class="sniff-icon">&#128274;</span><b>VPS-2 izolyasiyası</b> — VPS-2-nin IP-si heç bir açıq mənbədə yoxdur. Yalnız VPS-1 bilir — ayrıca müsadirə lazımdır.</div>
+      <div class="sniff-item"><span class="sniff-icon">&#127758;</span><b>Üç yurisdiksiya</b> — Cloudflare (ABŞ) + VPS-1 + VPS-2 fərqli ölkələrdə. Eyni anda üç beynəlxalq sorğu tələb olunur.</div>
+      <div class="sniff-item"><span class="sniff-icon">&#128465;&#65039;</span><b>Jurnallar yoxdur</b> — sessiya məlumatları yalnız RAM-da. VPS yenidən başladıqda iz qalmır.</div>
+      <div class="sniff-item"><span class="sniff-icon">&#128737;&#65039;</span><b>Parollar açılmır</b> — PBKDF2 hash. Server müsadirə edilsə belə autentifikasiya məlumatları əldə edilə bilməz.</div>
     </div>
   </div>
 
   <div class="infobox blue no-break">
     <b>Araşdırmada maksimum öyrənilə biləcəklər:</b>
-    Obyektdə — onun 443 portunda (HTTPS) VPS IP ünvanına müntəzəm əlaqə qurduğu. Bu hər hansı digər veb-sayta qoşulmaqdan fərqlənmir.
-    Aktiv sessiya ilə VPS-ə fiziki giriş olmadan <b>nə məqsədi, nə operatoru, nə məzmunu</b> müəyyən etmək mümkün deyil.
+    Obyekt 443 portunda <b>domain.com</b>-a (Cloudflare CDN) müntəzəm HTTPS bağlantısı qurur — bu hər hansı digər veb-sayta qoşulmaqdan <b>heç fərqlənmir</b>.
+    VPS-1-in real IP-si görünmür. VPS-2 haqqında heç bir məlumat yoxdur. Cloudflare-ə (ABŞ) və hər iki VPS-ə <b>eyni anda beynəlxalq sorğu</b> olmadan nə məqsəd, nə operator, nə məzmun müəyyən etmək mümkün deyil.
   </div>
 </div>
 
