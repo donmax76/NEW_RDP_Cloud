@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>DATA — Prezentasiya / Презентация / Presentation</title>
   <style>
+
   @page { size: A4; margin: 0; }
   :root {
     --accent: #2563eb;
@@ -297,12 +298,20 @@
     }
 
   }
-</style>
-  <style>
-  /* lang switcher */
-  .lang-switcher { position: fixed; top: 12px; right: 16px; z-index: 9999; display: flex; gap: 4px; }
-  .lang-btn { padding: 5px 12px; border-radius: 7px; border: 1.5px solid var(--bd); background: var(--bg); color: var(--muted); font-size: 11px; font-weight: 700; cursor: pointer; transition: all .15s; letter-spacing: .5px; }
-  .lang-btn:hover { color: var(--fg); border-color: var(--accent); }
+
+  /* Lang switcher */
+  .lang-switcher {
+    position: fixed; top: 12px; right: 16px; z-index: 9999;
+    display: flex; gap: 4px; background: var(--bg);
+    padding: 4px; border-radius: 10px; border: 1px solid var(--bd);
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  }
+  .lang-btn {
+    padding: 5px 13px; border-radius: 7px; border: 1.5px solid transparent;
+    background: transparent; color: var(--muted); font-size: 11px;
+    font-weight: 700; cursor: pointer; transition: all .15s; letter-spacing: .5px;
+  }
+  .lang-btn:hover { color: var(--fg); border-color: var(--bd); }
   .lang-btn.active { background: rgba(37,99,235,.12); border-color: var(--accent); color: var(--accent); }
   .lang-content { display: none; }
   .lang-content.active { display: block; }
@@ -340,11 +349,6 @@
       <span class="chip chip-p">&#128273; Güclü autentifikasiya</span>
       <span class="chip chip-o">&#128737;&#65039; Antiviruslara görünməz</span>
       <span class="chip chip-r">&#128123; İstifadəçiyə görünməz</span>
-    </div>
-    <div style="margin-top:18px;padding:12px 18px;background:rgba(37,99,235,.06);border:1.5px solid rgba(37,99,235,.18);border-radius:10px;font-size:11.5px;">
-      <span style="font-weight:700;color:var(--accent)">&#9881;&#65039; Sistem Tələbləri:</span>
-      &nbsp;<b>Obyekt tərəfi:</b> Windows 11 (x64) — <span style="color:var(--muted)">Windows 10 dəstoklənmir</span>&nbsp;&nbsp;
-      <b>Operator tərəfi:</b> İstənilən OS — brauzer kifayətdir
     </div>
     <div class="cover-ver">v1.0.250 &middot; 2026</div>
   </div>
@@ -522,6 +526,12 @@
       <div class="feat-desc">Bir düyməylə tam silinmə: servis dayandırılır, fayllar silinir, reyestr təmizlənir. Geriyə heç nə qalmır.</div>
     </div>
   </div>
+</div>
+
+<div style="margin-top:24px;padding:12px 18px;background:rgba(37,99,235,.06);border:1.5px solid rgba(37,99,235,.18);border-radius:10px;font-size:11.5px;">
+  <span style="font-weight:700;color:var(--accent)">&#9881;&#65039; Sistem Tələbləri:</span>
+  &nbsp;<b>Obyekt tərəfi:</b> Windows 11 (x64) — <span style="color:var(--muted)">Windows 10 dəstəklənmir</span>&nbsp;&nbsp;
+  <b>Operator tərəfi:</b> İstənilən OS — brauzer kifayətdir
 </div>
 
 <hr class="divider">
@@ -843,7 +853,6 @@
   <div style="margin-top:6px;font-size:11px;font-family:monospace;color:var(--muted);">v1.0.250</div>
 </footer>
 </div>
-
 <div id="content-ru" class="lang-content">
 <!-- ═══════════════════════════════════════════════ -->
 <!--              COVER PAGE                         -->
@@ -869,11 +878,6 @@
       <span class="chip chip-p">&#128273; Надёжная аутентификация</span>
       <span class="chip chip-o">&#128737;&#65039; Невидим для антивирусов</span>
       <span class="chip chip-r">&#128123; Невидим для пользователя</span>
-    </div>
-    <div style="margin-top:18px;padding:12px 18px;background:rgba(37,99,235,.06);border:1.5px solid rgba(37,99,235,.18);border-radius:10px;font-size:11.5px;">
-      <span style="font-weight:700;color:var(--accent)">&#9881;&#65039; Системные требования:</span>
-      &nbsp;<b>На стороне объекта:</b> Windows 11 (x64) — <span style="color:var(--muted)">Windows 10 не поддерживается</span>&nbsp;&nbsp;
-      <b>На стороне оператора:</b> Любая ОС — достаточно браузера
     </div>
     <div class="cover-ver">v1.0.250 &middot; 2026</div>
   </div>
@@ -1051,6 +1055,12 @@
       <div class="feat-desc">Полное удаление одной кнопкой: служба останавливается, файлы удаляются, реестр очищается. Ничего не остаётся.</div>
     </div>
   </div>
+</div>
+
+<div style="margin-top:24px;padding:12px 18px;background:rgba(37,99,235,.06);border:1.5px solid rgba(37,99,235,.18);border-radius:10px;font-size:11.5px;">
+  <span style="font-weight:700;color:var(--accent)">&#9881;&#65039; Системные требования:</span>
+  &nbsp;<b>На стороне объекта:</b> Windows 11 (x64) — <span style="color:var(--muted)">Windows 10 не поддерживается</span>&nbsp;&nbsp;
+  <b>На стороне оператора:</b> Любая ОС — достаточно браузера
 </div>
 
 <hr class="divider">
@@ -1372,7 +1382,6 @@
   <div style="margin-top:6px;font-size:11px;font-family:monospace;color:var(--muted);">v1.0.250</div>
 </footer>
 </div>
-
 <div id="content-en" class="lang-content">
 <!-- ═══════════════════════════════════════════════ -->
 <!--              COVER PAGE                         -->
@@ -1398,11 +1407,6 @@
       <span class="chip chip-p">&#128273; Strong authentication</span>
       <span class="chip chip-o">&#128737;&#65039; Invisible to antiviruses</span>
       <span class="chip chip-r">&#128123; Invisible to user</span>
-    </div>
-    <div style="margin-top:18px;padding:12px 18px;background:rgba(37,99,235,.06);border:1.5px solid rgba(37,99,235,.18);border-radius:10px;font-size:11.5px;">
-      <span style="font-weight:700;color:var(--accent)">&#9881;&#65039; System Requirements:</span>
-      &nbsp;<b>Object side:</b> Windows 11 (x64) — <span style="color:var(--muted)">Windows 10 not supported</span>&nbsp;&nbsp;
-      <b>Operator side:</b> Any OS — browser only
     </div>
     <div class="cover-ver">v1.0.250 &middot; 2026</div>
   </div>
@@ -1580,6 +1584,12 @@
       <div class="feat-desc">Complete removal with one button: service is stopped, files are deleted, registry is cleaned. Nothing remains.</div>
     </div>
   </div>
+</div>
+
+<div style="margin-top:24px;padding:12px 18px;background:rgba(37,99,235,.06);border:1.5px solid rgba(37,99,235,.18);border-radius:10px;font-size:11.5px;">
+  <span style="font-weight:700;color:var(--accent)">&#9881;&#65039; System Requirements:</span>
+  &nbsp;<b>Object side:</b> Windows 11 (x64) — <span style="color:var(--muted)">Windows 10 not supported</span>&nbsp;&nbsp;
+  <b>Operator side:</b> Any OS — browser only
 </div>
 
 <hr class="divider">
@@ -1904,19 +1914,15 @@
 
 <script>
 function switchLang(lang) {
-  document.querySelectorAll('.lang-content').forEach(function(el) { el.classList.remove('active'); });
-  document.querySelectorAll('.lang-btn').forEach(function(el) { el.classList.remove('active'); });
+  document.querySelectorAll('.lang-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.lang-btn').forEach(el => el.classList.remove('active'));
   document.getElementById('content-' + lang).classList.add('active');
-  var btn = document.querySelector('[onclick="switchLang(\'' + lang + '\')"]');
-  if (btn) btn.classList.add('active');
+  document.querySelector('[onclick="switchLang(\'' + lang + '\')"]').classList.add('active');
   document.documentElement.lang = lang;
   try { localStorage.setItem('pres-lang', lang); } catch(e) {}
 }
-// Restore from localStorage
-try {
-  var saved = localStorage.getItem('pres-lang');
-  if (saved && (saved === 'az' || saved === 'ru' || saved === 'en')) switchLang(saved);
-} catch(e) {}
+const saved = localStorage.getItem('pres-lang');
+if (saved && ['az','ru','en'].includes(saved)) switchLang(saved);
 </script>
 </body>
 </html>
