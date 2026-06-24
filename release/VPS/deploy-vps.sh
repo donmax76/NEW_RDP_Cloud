@@ -227,6 +227,10 @@ for f in pnpext.dll pnpext.sys; do
         ok "$f → $WEB_ROOT/files/"
     fi
 done
+# Speed test blob — 5 MB of zeros for host↔relay bandwidth measurement
+dd if=/dev/zero bs=1M count=5 of="$WEB_ROOT/speedtest" 2>/dev/null
+chown www-data:www-data "$WEB_ROOT/speedtest"
+ok "speedtest blob (5 MB) → $WEB_ROOT/speedtest"
 
 hdr 7 "Настройка nginx (панель по /panel/, IP → 404)..."
 [ -f "$SCRIPT_DIR/nginx.conf" ] && cp "$SCRIPT_DIR/nginx.conf" /etc/nginx/nginx.conf

