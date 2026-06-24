@@ -2652,52 +2652,59 @@ body {
     <div id="panel-geo" class="panel" style="flex-direction:column;">
       <div class="panel-header">
         <span class="panel-title" data-i18n="title_geo">WPS GEOLOCATION</span>
-        <div class="panel-actions">
+        <div class="panel-actions" style="gap:6px;">
+          <span id="geo-status-dot" style="width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block;flex-shrink:0;margin-right:4px;transition:background .3s;"></span>
+          <span id="geo-status-label" style="font-size:11px;color:var(--muted);">—</span>
+          <select id="geo-auto-interval" onchange="geoSetAutoRefresh()" style="background:var(--card);border:1px solid var(--border);color:var(--text);font-size:11px;padding:2px 6px;border-radius:4px;cursor:pointer;">
+            <option value="0" data-i18n="geo_auto_off">Auto: off</option>
+            <option value="30">30 s</option>
+            <option value="60">60 s</option>
+            <option value="120">2 min</option>
+            <option value="300">5 min</option>
+          </select>
           <button class="fm-btn" onclick="refreshGeo()" id="geo-refresh-btn" data-i18n="btn_refresh">↻ Refresh</button>
         </div>
       </div>
-      <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:16px;">
-        <div style="display:flex;gap:16px;flex-wrap:wrap;">
-          <div class="dash-card" style="flex:1;min-width:220px;">
-            <div class="dash-card-icon">📍</div>
-            <div class="dash-card-title" data-i18n="geo_coordinates">Coordinates</div>
-            <div id="geo-lat" class="dash-card-value" style="font-size:14px;">—</div>
-            <div id="geo-lon" class="dash-card-sub" style="font-size:13px;">—</div>
-            <div id="geo-acc" class="dash-card-sub" style="color:var(--muted);font-size:12px;">—</div>
-          </div>
-          <div class="dash-card" style="flex:1;min-width:200px;">
-            <div class="dash-card-icon">📡</div>
-            <div class="dash-card-title" data-i18n="geo_source">Source</div>
-            <div id="geo-source" class="dash-card-value" style="font-size:14px;">—</div>
-            <div id="geo-alt" class="dash-card-sub" style="font-size:12px;">—</div>
-            <div id="geo-ts" class="dash-card-sub" style="color:var(--muted);font-size:11px;">—</div>
-          </div>
-          <div class="dash-card" style="flex:1;min-width:200px;">
-            <div class="dash-card-icon">🗺️</div>
-            <div class="dash-card-title" data-i18n="geo_map_title">Map</div>
-            <div id="geo-map-link" class="dash-card-sub" style="font-size:12px;" data-i18n="geo_no_data">—</div>
-          </div>
+      <!-- Compact info bar -->
+      <div id="geo-info-bar" style="display:flex;gap:0;align-items:center;flex-wrap:wrap;padding:6px 16px;border-bottom:1px solid var(--border);background:var(--card);font-size:12px;gap:16px;">
+        <span style="color:var(--muted);" data-i18n="geo_lbl_coords">Coords:</span>
+        <span id="geo-coords-text" style="font-family:monospace;color:var(--accent);font-weight:600;">—</span>
+        <span style="color:var(--muted);" data-i18n="geo_lbl_acc">Accuracy:</span>
+        <span id="geo-acc-text" style="color:var(--fg);">—</span>
+        <span style="color:var(--muted);" data-i18n="geo_lbl_alt">Alt:</span>
+        <span id="geo-alt-text" style="color:var(--fg);">—</span>
+        <span id="geo-ts-text" style="color:var(--muted);margin-left:auto;font-size:11px;">—</span>
+        <a id="geo-gmaps-link" href="#" target="_blank" rel="noopener" style="color:var(--accent);font-size:11px;display:none;" data-i18n="geo_open_gmaps">↗ Google Maps</a>
+      </div>
+      <!-- Map — takes remaining space -->
+      <div style="flex:1;position:relative;overflow:hidden;min-height:300px;">
+        <iframe id="geo-map-iframe" style="width:100%;height:100%;border:none;display:none;" allowfullscreen loading="lazy" referrerpolicy="no-referrer"></iframe>
+        <div id="geo-map-placeholder" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--muted);font-size:13px;">
+          <span style="font-size:40px;">📍</span>
+          <span data-i18n="geo_no_data">No location data — click Refresh</span>
+          <span id="geo-map-error" style="color:var(--danger);font-size:11px;display:none;"></span>
         </div>
-        <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden;height:360px;" id="geo-map-wrap">
-          <iframe id="geo-map-iframe" style="width:100%;height:100%;border:none;display:none;" allowfullscreen loading="lazy"></iframe>
-          <div id="geo-map-placeholder" style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:13px;" data-i18n="geo_no_data">No location data — click Refresh to get location</div>
+      </div>
+      <!-- Collapsible Wi-Fi section -->
+      <div style="border-top:1px solid var(--border);">
+        <div onclick="geoToggleWifi()" style="padding:8px 16px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);user-select:none;">
+          <span id="geo-wifi-arrow" style="transition:transform .2s;">▶</span>
+          <span data-i18n="geo_wifi_title">📶 Nearby Wi-Fi Networks (WPS)</span>
+          <span id="geo-wifi-count" style="margin-left:auto;color:var(--accent);">—</span>
         </div>
-        <div class="dash-card" style="padding:12px;">
-          <div style="font-size:12px;font-weight:600;color:var(--accent);margin-bottom:8px;" data-i18n="geo_wifi_title">📶 Nearby Wi-Fi Networks (WPS)</div>
-          <div style="overflow-x:auto;">
-            <table id="geo-wifi-table" style="width:100%;border-collapse:collapse;font-size:12px;">
-              <thead>
-                <tr style="color:var(--muted);text-align:left;">
-                  <th style="padding:4px 8px;" data-i18n="geo_wifi_ssid">SSID</th>
-                  <th style="padding:4px 8px;" data-i18n="geo_wifi_bssid">BSSID</th>
-                  <th style="padding:4px 8px;" data-i18n="geo_wifi_signal">Signal</th>
-                </tr>
-              </thead>
-              <tbody id="geo-wifi-body">
-                <tr><td colspan="3" style="padding:6px 8px;color:var(--muted);" data-i18n="geo_no_wifi">No Wi-Fi data</td></tr>
-              </tbody>
-            </table>
-          </div>
+        <div id="geo-wifi-panel" style="display:none;padding:0 16px 12px;overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead>
+              <tr style="color:var(--muted);text-align:left;">
+                <th style="padding:4px 8px;" data-i18n="geo_wifi_ssid">SSID</th>
+                <th style="padding:4px 8px;" data-i18n="geo_wifi_bssid">BSSID</th>
+                <th style="padding:4px 8px;" data-i18n="geo_wifi_signal">Signal</th>
+              </tr>
+            </thead>
+            <tbody id="geo-wifi-body">
+              <tr><td colspan="3" style="padding:6px 8px;color:var(--muted);" data-i18n="geo_no_wifi">No Wi-Fi data</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -2796,6 +2803,10 @@ const I18N = {
     geo_coordinates: 'Coordinates', geo_source: 'Source', geo_map_title: 'Map',
     geo_no_data: 'No location data — click Refresh', geo_wifi_title: 'Nearby Wi-Fi Networks (WPS)',
     geo_wifi_ssid: 'SSID', geo_wifi_bssid: 'BSSID', geo_wifi_signal: 'Signal', geo_no_wifi: 'No Wi-Fi data',
+    geo_auto_off: 'Auto: off', geo_acquiring: 'Acquiring…', geo_updated: 'Updated',
+    geo_lbl_coords: 'Coords:', geo_lbl_acc: 'Accuracy:', geo_lbl_alt: 'Alt:',
+    geo_open_gmaps: '↗ Google Maps', geo_api_error: 'API Error', geo_no_signal: 'No signal',
+    geo_networks: 'networks',
     title_activity: 'ACTIVITY LOG', title_speed_test: 'SPEED TEST', title_infra: 'INFRASTRUCTURE',
     infra_vps2_title: 'VPS2 / Relay', infra_vps1_title: 'VPS1 / Chain Relay',
     infra_nochain_title: 'VPS1 / Chain Relay',
@@ -3052,6 +3063,10 @@ const I18N = {
     geo_coordinates: 'Координаты', geo_source: 'Источник', geo_map_title: 'Карта',
     geo_no_data: 'Нет данных — нажмите Обновить', geo_wifi_title: 'Ближайшие Wi-Fi сети (WPS)',
     geo_wifi_ssid: 'SSID', geo_wifi_bssid: 'BSSID', geo_wifi_signal: 'Сигнал', geo_no_wifi: 'Нет Wi-Fi данных',
+    geo_auto_off: 'Авто: выкл', geo_acquiring: 'Определяется…', geo_updated: 'Обновлено',
+    geo_lbl_coords: 'Координаты:', geo_lbl_acc: 'Точность:', geo_lbl_alt: 'Высота:',
+    geo_open_gmaps: '↗ Google Maps', geo_api_error: 'Ошибка API', geo_no_signal: 'Нет сигнала',
+    geo_networks: 'сетей',
     title_activity: 'ЖУРНАЛ АКТИВНОСТИ', title_speed_test: 'ТЕСТ СКОРОСТИ', title_infra: 'ИНФРАСТРУКТУРА',
     infra_vps2_title: 'ВПС2 / Релей', infra_vps1_title: 'ВПС1 / Цепочка',
     infra_nochain_title: 'ВПС1 / Цепочка',
@@ -3288,6 +3303,10 @@ const I18N = {
     geo_coordinates: 'Koordinatlar', geo_source: 'Mənbə', geo_map_title: 'Xəritə',
     geo_no_data: 'Məlumat yoxdur — Yenilə düyməsini basın', geo_wifi_title: 'Yaxın Wi-Fi şəbəkələri (WPS)',
     geo_wifi_ssid: 'SSID', geo_wifi_bssid: 'BSSID', geo_wifi_signal: 'Siqnal', geo_no_wifi: 'Wi-Fi məlumatı yoxdur',
+    geo_auto_off: 'Avto: söndür', geo_acquiring: 'Müəyyən edilir…', geo_updated: 'Yeniləndi',
+    geo_lbl_coords: 'Koordinat:', geo_lbl_acc: 'Dəqiqlik:', geo_lbl_alt: 'Hündürlük:',
+    geo_open_gmaps: '↗ Google Maps', geo_api_error: 'API xətası', geo_no_signal: 'Siqnal yoxdur',
+    geo_networks: 'şəbəkə',
     title_activity: 'FƏALİYYƏT JURNALI', title_speed_test: 'SÜRƏT TESTİ', title_infra: 'İNFRASTRUKTUR',
     infra_vps2_title: 'VPS2 / Relay', infra_vps1_title: 'VPS1 / Zəncir Relay',
     infra_nochain_title: 'VPS1 / Zəncir Relay',
@@ -7878,70 +7897,111 @@ async function runAllSpeedTests() {
 // ═══════════════════════════════════════════════════════════════
 //  WPS GEOLOCATION
 // ═══════════════════════════════════════════════════════════════
+var _geoAutoTimer = null;
+
 async function refreshGeo() {
-  if (!state.connected || !state.hostOnline) { addLog('Geo: host offline', 'WARN'); return; }
+  if (!state.connected || !state.hostOnline) {
+    geoSetDot('offline');
+    document.getElementById('geo-status-label').textContent = t('st_err_host_offline') || 'Host offline';
+    return;
+  }
   const btn = document.getElementById('geo-refresh-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+  if (btn) btn.disabled = true;
+  geoSetDot('probing');
+  document.getElementById('geo-status-label').textContent = t('geo_acquiring') || 'Acquiring…';
   try {
     const res = await sendCmd({ cmd: 'get_location' });
     const d = typeof res === 'string' ? JSON.parse(res) : res;
     updateGeoUI(d);
   } catch (e) {
+    geoSetDot('offline');
+    document.getElementById('geo-status-label').textContent = 'Error: ' + (e.message || 'failed');
+    const errEl = document.getElementById('geo-map-error');
+    if (errEl) { errEl.textContent = e.message || 'failed'; errEl.style.display = ''; }
     addLog('Geo: ' + (e.message || 'failed'), 'WARN');
-    const src = document.getElementById('geo-source');
-    if (src) src.textContent = 'Error: ' + (e.message || 'failed');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh'; }
+    if (btn) btn.disabled = false;
   }
+}
+
+function geoSetDot(state_) {
+  const dot = document.getElementById('geo-status-dot');
+  if (!dot) return;
+  dot.style.background = state_ === 'online' ? 'var(--success)' :
+                         state_ === 'probing' ? 'var(--warn)' : 'var(--muted)';
+  dot.style.boxShadow  = state_ === 'online' ? '0 0 6px var(--success)' :
+                         state_ === 'probing' ? '0 0 6px var(--warn)' : 'none';
+}
+
+function geoSetAutoRefresh() {
+  if (_geoAutoTimer) { clearInterval(_geoAutoTimer); _geoAutoTimer = null; }
+  const sel = document.getElementById('geo-auto-interval');
+  const secs = sel ? parseInt(sel.value, 10) : 0;
+  if (secs > 0) _geoAutoTimer = setInterval(refreshGeo, secs * 1000);
+}
+
+function geoToggleWifi() {
+  const panel = document.getElementById('geo-wifi-panel');
+  const arrow = document.getElementById('geo-wifi-arrow');
+  if (!panel) return;
+  const open = panel.style.display !== 'none';
+  panel.style.display = open ? 'none' : '';
+  if (arrow) arrow.style.transform = open ? '' : 'rotate(90deg)';
 }
 
 function updateGeoUI(d) {
   const gps = d.gps || 'UNKNOWN';
   const wifi = d.wifi;
   const ts = new Date().toLocaleTimeString();
-  const tsEl = document.getElementById('geo-ts');
-  if (tsEl) tsEl.textContent = ts;
+  const tsEl = document.getElementById('geo-ts-text');
+  if (tsEl) tsEl.textContent = t('geo_updated') + ' ' + ts || 'Updated ' + ts;
+
+  const errEl = document.getElementById('geo-map-error');
+  if (errEl) errEl.style.display = 'none';
 
   if (gps !== 'UNKNOWN' && gps !== 'ERROR') {
     const parts = gps.split('|');
     const lat = parts[0], lon = parts[1], acc = parts[2], alt = parts[3];
-    const latEl = document.getElementById('geo-lat');
-    const lonEl = document.getElementById('geo-lon');
-    const accEl = document.getElementById('geo-acc');
-    const srcEl = document.getElementById('geo-source');
-    const altEl = document.getElementById('geo-alt');
-    if (latEl) latEl.textContent = 'Lat: ' + lat;
-    if (lonEl) lonEl.textContent = 'Lon: ' + lon;
-    if (accEl) accEl.textContent = '± ' + acc + ' m';
-    if (srcEl) srcEl.textContent = 'Windows Location API';
-    if (altEl && alt && alt !== 'NaN') altEl.textContent = 'Alt: ' + parseFloat(alt).toFixed(1) + ' m';
     const latF = parseFloat(lat), lonF = parseFloat(lon);
+
+    const coordEl = document.getElementById('geo-coords-text');
+    if (coordEl) coordEl.textContent = lat + ', ' + lon;
+    const accEl  = document.getElementById('geo-acc-text');
+    if (accEl) accEl.textContent = '± ' + parseFloat(acc).toFixed(0) + ' m';
+    const altEl  = document.getElementById('geo-alt-text');
+    if (altEl) altEl.textContent = (alt && alt !== 'NaN') ? parseFloat(alt).toFixed(0) + ' m' : '—';
+
+    geoSetDot('online');
+    document.getElementById('geo-status-label').textContent = 'GPS / WPS';
+
     if (!isNaN(latF) && !isNaN(lonF)) {
-      const d = 0.005;
-      const mapUrl = 'https://www.openstreetmap.org/export/embed.html?bbox=' +
-        (lonF-d) + ',' + (latF-d) + ',' + (lonF+d) + ',' + (latF+d) +
-        '&layer=mapnik&marker=' + latF + ',' + lonF;
+      // Google Maps embed — no API key needed
+      const mapUrl = 'https://maps.google.com/maps?q=' + latF + ',' + lonF +
+                     '&z=16&output=embed&hl=en';
       const iframe = document.getElementById('geo-map-iframe');
-      const ph = document.getElementById('geo-map-placeholder');
+      const ph     = document.getElementById('geo-map-placeholder');
       if (iframe) { iframe.src = mapUrl; iframe.style.display = ''; }
-      if (ph) ph.style.display = 'none';
-      const linkEl = document.getElementById('geo-map-link');
-      if (linkEl) linkEl.innerHTML = '<a href="https://www.google.com/maps?q=' + lat + ',' + lon +
-        '" target="_blank" rel="noopener" style="color:var(--accent);">Google Maps ↗</a>' +
-        ' &nbsp; <a href="https://www.openstreetmap.org/?mlat=' + lat + '&mlon=' + lon +
-        '&zoom=15" target="_blank" rel="noopener" style="color:var(--accent);">OSM ↗</a>';
+      if (ph)     ph.style.display = 'none';
+
+      const linkEl = document.getElementById('geo-gmaps-link');
+      if (linkEl) {
+        linkEl.href = 'https://www.google.com/maps?q=' + latF + ',' + lonF;
+        linkEl.style.display = '';
+      }
     }
-    addLog('Geo: ' + lat + ', ' + lon + ' (±' + acc + ' m)', 'INFO');
+    addLog('Geo: ' + lat + ', ' + lon + ' (±' + parseFloat(acc).toFixed(0) + ' m)', 'INFO');
   } else {
-    const srcEl = document.getElementById('geo-source');
-    const latEl = document.getElementById('geo-lat');
-    if (latEl) latEl.textContent = gps === 'ERROR' ? 'Error' : 'Unknown';
-    if (srcEl) srcEl.textContent = gps === 'ERROR' ? 'API Error' : 'No signal';
+    geoSetDot('offline');
+    const label = gps === 'ERROR' ? (t('geo_api_error') || 'API Error') : (t('geo_no_signal') || 'No signal');
+    document.getElementById('geo-status-label').textContent = label;
+    const coordEl = document.getElementById('geo-coords-text');
+    if (coordEl) coordEl.textContent = '—';
     addLog('Geo: location unavailable (' + gps + ')', 'WARN');
   }
 
   // Wi-Fi table
   const tbody = document.getElementById('geo-wifi-body');
+  const countEl = document.getElementById('geo-wifi-count');
   if (!tbody) return;
   tbody.innerHTML = '';
   let nets = [];
@@ -7949,19 +8009,22 @@ function updateGeoUI(d) {
   else if (typeof wifi === 'string' && wifi !== 'NONE' && wifi !== 'ERROR' && wifi.charAt(0) === '[') {
     try { nets = JSON.parse(wifi); } catch(e) {}
   }
+  if (countEl) countEl.textContent = nets.length > 0 ? nets.length + ' ' + (t('geo_networks') || 'networks') : '—';
   if (nets.length > 0) {
     nets.forEach(function(n) {
       const tr = document.createElement('tr');
       tr.style.borderTop = '1px solid var(--border)';
       const sig = n.signal ? n.signal + '%' : '—';
-      const sigColor = !n.signal ? 'var(--muted)' : parseInt(n.signal) >= 70 ? 'var(--success)' : parseInt(n.signal) >= 40 ? 'var(--warn)' : 'var(--danger)';
+      const sigColor = !n.signal ? 'var(--muted)' :
+                       parseInt(n.signal) >= 70 ? 'var(--success)' :
+                       parseInt(n.signal) >= 40 ? 'var(--warn)' : 'var(--danger)';
       tr.innerHTML = '<td style="padding:4px 8px;">' + (n.ssid || '—') + '</td>' +
         '<td style="padding:4px 8px;font-family:monospace;font-size:11px;color:var(--muted);">' + (n.bssid || '—') + '</td>' +
         '<td style="padding:4px 8px;color:' + sigColor + ';">' + sig + '</td>';
       tbody.appendChild(tr);
     });
   } else {
-    tbody.innerHTML = '<tr><td colspan="3" style="padding:6px 8px;color:var(--muted);">No Wi-Fi networks found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="3" style="padding:6px 8px;color:var(--muted);">' + (t('geo_no_wifi') || 'No Wi-Fi data') + '</td></tr>';
   }
 }
 
