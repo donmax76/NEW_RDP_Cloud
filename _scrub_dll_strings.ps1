@@ -30,6 +30,7 @@ $patterns = @(
     # OpenSSL speed-test / connectivity probe URLs (appear in memory scans,
     # classified as C2 / suspicious HTTP by some sandboxes)
     'speed.cloudflare.com/__down?bytes=5000000',
+    'speed.cloudflare.com/__down?bytes=1000000',
     'speed.cloudflare.com/__down?bytes=500000',
     'speed.cloudflare.com/__down?bytes=100000',
     'speed.cloudflare.com/__down?bytes=10000',
