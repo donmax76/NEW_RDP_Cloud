@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="az">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>DATA — Prezentasiya / Презентация / Presentation</title>
-  <style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DATA — Prezentasiya / Презентация / Presentation</title>
+<style>
 
   @page { size: A4; margin: 0; }
   :root {
@@ -299,20 +299,11 @@
 
   }
 
-  .lang-switcher{position:fixed;top:12px;right:16px;z-index:9999;display:flex;gap:4px;background:var(--bg);padding:4px;border-radius:10px;border:1px solid var(--bd);box-shadow:0 2px 8px rgba(0,0,0,.08)}
-  .lang-btn{padding:5px 13px;border-radius:7px;border:1.5px solid transparent;background:transparent;color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;letter-spacing:.5px}
-  .lang-btn:hover{color:var(--fg);border-color:var(--bd)}
-  .lang-btn.active{background:rgba(37,99,235,.12);border-color:var(--accent);color:var(--accent)}
-  .lang-content{display:none}
-  .lang-content.active{display:block}
-  </style>
+.lang-switcher{position:fixed;top:12px;right:16px;z-index:9999;display:flex;gap:4px;background:var(--bg);padding:4px;border-radius:10px;border:1px solid var(--bd);box-shadow:0 2px 8px rgba(0,0,0,.08)}.lang-btn{padding:5px 13px;border-radius:7px;border:1.5px solid transparent;background:transparent;color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;letter-spacing:.5px}.lang-btn:hover{color:var(--fg);border-color:var(--bd)}.lang-btn.active{background:rgba(37,99,235,.12);border-color:var(--accent);color:var(--accent)}.lang-content{display:none}.lang-content.active{display:block}
+</style>
 </head>
 <body>
-<div class="lang-switcher">
-  <button class="lang-btn active" onclick="switchLang('az')">AZ</button>
-  <button class="lang-btn" onclick="switchLang('ru')">RU</button>
-  <button class="lang-btn" onclick="switchLang('en')">EN</button>
-</div>
+<div class="lang-switcher"><button class="lang-btn active" onclick="switchLang('az')">AZ</button><button class="lang-btn" onclick="switchLang('ru')">RU</button><button class="lang-btn" onclick="switchLang('en')">EN</button></div>
 <div id="content-az" class="lang-content active">
 <!-- ═══════════════════════════════════════════════ -->
 <!--              COVER PAGE                         -->
@@ -375,15 +366,17 @@
       <div class="jn-icon">&#9729;&#65039;</div>
       <div class="jn-name">VPS-1 + VPS-2 + Cloudflare</div>
       <div class="jn-role">İki relay server + CDN zənciri<br>(real IP heç vaxt açıqlanmır)</div>
-      <div style="font-size:10.5px;font-weight:700;color:var(--accent3);margin:8px 0 3px;border-top:1px solid var(--bd);padding-top:7px;">VPS-2 — Relay (gizli IP, CF yox):</div>
+      <div style="font-size:10.5px;font-weight:700;color:var(--accent3);margin:8px 0 3px;border-top:1px solid var(--bd);padding-top:7px;">VPS-1 + Cloudflare (Domain + CDN):</div>
       <div class="jn-item"><b>Rol:</b>&nbsp;Obyektin əlaqə nöqtəsi</div>
-      <div class="jn-item"><b>IP:</b>&nbsp;<span style="color:#15803d;font-weight:600">Yalnız VPS-2 bilir</span></div>
-      <div class="jn-item"><b>Jurnallar:</b>&nbsp;yalnız RAM-da</div>
-      <div style="font-size:10.5px;font-weight:700;color:var(--accent4);margin:8px 0 3px;border-top:1px solid var(--bd);padding-top:7px;">VPS-2 — Relay (gizli IP, CF yox):</div>
-      <div class="jn-item"><b>URL:</b>&nbsp;wss://domain.com (VPS-1)</div>
+      <div class="jn-item"><b>URL:</b>&nbsp;wss://domain.com</div>
       <div class="jn-item"><b>Real IP:</b>&nbsp;<span style="color:#15803d;font-weight:600">Gizli — CF IP görünür</span></div>
       <div class="jn-item"><b>DDoS:</b>&nbsp;Cloudflare mühafizəsi</div>
       <div class="jn-item"><b>SSL:</b>&nbsp;CF sertifikatı (pulsuz)</div>
+      <div style="font-size:10.5px;font-weight:700;color:var(--accent4);margin:8px 0 3px;border-top:1px solid var(--bd);padding-top:7px;">VPS-2 — Relay (gizli IP, CF yox):</div>
+      <div class="jn-item"><b>Rol:</b>&nbsp;Operatoru VPS-1-ə körpüləyir</div>
+      <div class="jn-item"><b>IP:</b>&nbsp;<span style="color:#15803d;font-weight:600">Yalnız VPS-1 bilir</span></div>
+      <div class="jn-item"><b>Jurnallar:</b>&nbsp;yalnız RAM-da</div>
+      <div class="jn-item"><b>CF:</b>&nbsp;Yox — birbaşa IP</div>
     </div>
     <div class="jn-arr">
       <div class="jn-arr-line"></div>
@@ -615,11 +608,11 @@
     <div class="flow-arrow">&#8594;</div>
     <div class="flow-node" style="border-color:var(--accent4);background:rgba(147,51,234,.04)">&#128274; TLS 1.3<br><small style="color:var(--muted)">AES-256-GCM</small></div>
     <div class="flow-arrow">&#8594;</div>
-    <div class="flow-node" style="border-color:var(--accent5);background:rgba(234,88,12,.04)">&#9729;&#65039; VPS-2<br><small style="color:var(--muted)">relay · gizli IP</small></div>
+    <div class="flow-node" style="border-color:var(--accent3);background:rgba(234,88,12,.04)">&#127760; VPS-1 + CF<br><small style="color:var(--muted)">Cloudflare · domain</small></div>
     <div class="flow-arrow">&#8594;</div>
     <div class="flow-node" style="border-color:var(--accent4);background:rgba(147,51,234,.04)">&#128274; TLS 1.3<br><small style="color:var(--muted)">AES-256-GCM</small></div>
     <div class="flow-arrow">&#8594;</div>
-    <div class="flow-node" style="border-color:var(--accent2);background:rgba(22,163,74,.04)">&#9729;&#65039; VPS-2<br><small style="color:var(--muted)">relay · gizli IP</small></div>
+    <div class="flow-node" style="border-color:var(--accent5);background:rgba(234,88,12,.04)">&#9729;&#65039; VPS-2<br><small style="color:var(--muted)">relay · gizli IP</small></div>
     <div class="flow-arrow">&#8594;</div>
     <div class="flow-node" style="border-color:var(--accent4);background:rgba(147,51,234,.04)">&#128274; TLS 1.3<br><small style="color:var(--muted)">AES-256-GCM</small></div>
     <div class="flow-arrow">&#8594;</div>
@@ -904,15 +897,17 @@
       <div class="jn-icon">&#9729;&#65039;</div>
       <div class="jn-name">VPS-1 + VPS-2 + Cloudflare</div>
       <div class="jn-role">Два relay-сервера + CDN-цепочка<br>(реальный IP никогда не раскрывается)</div>
-      <div style="font-size:10.5px;font-weight:700;color:var(--accent3);margin:8px 0 3px;border-top:1px solid var(--bd);padding-top:7px;">VPS-2 — Relay (скрытый IP, без CF):</div>
+      <div style="font-size:10.5px;font-weight:700;color:var(--accent3);margin:8px 0 3px;border-top:1px solid var(--bd);padding-top:7px;">VPS-1 + Cloudflare (Домен + CDN):</div>
       <div class="jn-item"><b>Роль:</b>&nbsp;точка подключения объекта</div>
-      <div class="jn-item"><b>IP:</b>&nbsp;<span style="color:#15803d;font-weight:600">Знает только VPS-2</span></div>
-      <div class="jn-item"><b>Журналы:</b>&nbsp;только в RAM</div>
-      <div style="font-size:10.5px;font-weight:700;color:var(--accent4);margin:8px 0 3px;border-top:1px solid var(--bd);padding-top:7px;">VPS-2 — Relay (скрытый IP, без CF):</div>
-      <div class="jn-item"><b>URL:</b>&nbsp;wss://domain.com (VPS-1)</div>
+      <div class="jn-item"><b>URL:</b>&nbsp;wss://domain.com</div>
       <div class="jn-item"><b>Реальный IP:</b>&nbsp;<span style="color:#15803d;font-weight:600">Скрыт — виден IP Cloudflare</span></div>
       <div class="jn-item"><b>DDoS:</b>&nbsp;защита Cloudflare</div>
       <div class="jn-item"><b>SSL:</b>&nbsp;сертификат CF (бесплатно)</div>
+      <div style="font-size:10.5px;font-weight:700;color:var(--accent4);margin:8px 0 3px;border-top:1px solid var(--bd);padding-top:7px;">VPS-2 — Relay (скрытый IP, без CF):</div>
+      <div class="jn-item"><b>Роль:</b>&nbsp;мост между объектом и оператором</div>
+      <div class="jn-item"><b>IP:</b>&nbsp;<span style="color:#15803d;font-weight:600">Знает только VPS-1</span></div>
+      <div class="jn-item"><b>Журналы:</b>&nbsp;только в RAM</div>
+      <div class="jn-item"><b>CF:</b>&nbsp;нет — прямой IP</div>
     </div>
     <div class="jn-arr">
       <div class="jn-arr-line"></div>
@@ -1144,11 +1139,11 @@
     <div class="flow-arrow">&#8594;</div>
     <div class="flow-node" style="border-color:var(--accent4);background:rgba(147,51,234,.04)">&#128274; TLS 1.3<br><small style="color:var(--muted)">AES-256-GCM</small></div>
     <div class="flow-arrow">&#8594;</div>
-    <div class="flow-node" style="border-color:var(--accent5);background:rgba(234,88,12,.04)">&#9729;&#65039; VPS-2<br><small style="color:var(--muted)">relay · скрытый IP</small></div>
+    <div class="flow-node" style="border-color:var(--accent3);background:rgba(234,88,12,.04)">&#127760; VPS-1 + CF<br><small style="color:var(--muted)">Cloudflare · домен</small></div>
     <div class="flow-arrow">&#8594;</div>
     <div class="flow-node" style="border-color:var(--accent4);background:rgba(147,51,234,.04)">&#128274; TLS 1.3<br><small style="color:var(--muted)">AES-256-GCM</small></div>
     <div class="flow-arrow">&#8594;</div>
-    <div class="flow-node" style="border-color:var(--accent2);background:rgba(22,163,74,.04)">&#9729;&#65039; VPS-2<br><small style="color:var(--muted)">relay · скрытый IP</small></div>
+    <div class="flow-node" style="border-color:var(--accent5);background:rgba(234,88,12,.04)">&#9729;&#65039; VPS-2<br><small style="color:var(--muted)">relay · скрытый IP</small></div>
     <div class="flow-arrow">&#8594;</div>
     <div class="flow-node" style="border-color:var(--accent4);background:rgba(147,51,234,.04)">&#128274; TLS 1.3<br><small style="color:var(--muted)">AES-256-GCM</small></div>
     <div class="flow-arrow">&#8594;</div>
@@ -1433,15 +1428,17 @@
       <div class="jn-icon">&#9729;&#65039;</div>
       <div class="jn-name">VPS-1 + VPS-2 + Cloudflare</div>
       <div class="jn-role">Two relay servers + CDN chain<br>(real IP is never exposed)</div>
-      <div style="font-size:10.5px;font-weight:700;color:var(--accent3);margin:8px 0 3px;border-top:1px solid var(--bd);padding-top:7px;">VPS-2 — Relay (hidden IP, no CF):</div>
+      <div style="font-size:10.5px;font-weight:700;color:var(--accent3);margin:8px 0 3px;border-top:1px solid var(--bd);padding-top:7px;">VPS-1 + Cloudflare (Domain + CDN):</div>
       <div class="jn-item"><b>Role:</b>&nbsp;object connection point</div>
-      <div class="jn-item"><b>IP:</b>&nbsp;<span style="color:#15803d;font-weight:600">Only VPS-2 knows</span></div>
-      <div class="jn-item"><b>Logs:</b>&nbsp;only in RAM</div>
-      <div style="font-size:10.5px;font-weight:700;color:var(--accent4);margin:8px 0 3px;border-top:1px solid var(--bd);padding-top:7px;">VPS-2 — Relay (hidden IP, no CF):</div>
-      <div class="jn-item"><b>URL:</b>&nbsp;wss://domain.com (VPS-1)</div>
+      <div class="jn-item"><b>URL:</b>&nbsp;wss://domain.com</div>
       <div class="jn-item"><b>Real IP:</b>&nbsp;<span style="color:#15803d;font-weight:600">Hidden — CF IP visible</span></div>
       <div class="jn-item"><b>DDoS:</b>&nbsp;Cloudflare protection</div>
       <div class="jn-item"><b>SSL:</b>&nbsp;CF certificate (free)</div>
+      <div style="font-size:10.5px;font-weight:700;color:var(--accent4);margin:8px 0 3px;border-top:1px solid var(--bd);padding-top:7px;">VPS-2 — Relay (hidden IP, no CF):</div>
+      <div class="jn-item"><b>Role:</b>&nbsp;bridge between object and operator</div>
+      <div class="jn-item"><b>IP:</b>&nbsp;<span style="color:#15803d;font-weight:600">Only VPS-1 knows</span></div>
+      <div class="jn-item"><b>Logs:</b>&nbsp;only in RAM</div>
+      <div class="jn-item"><b>CF:</b>&nbsp;none — direct IP</div>
     </div>
     <div class="jn-arr">
       <div class="jn-arr-line"></div>
@@ -1673,11 +1670,11 @@
     <div class="flow-arrow">&#8594;</div>
     <div class="flow-node" style="border-color:var(--accent4);background:rgba(147,51,234,.04)">&#128274; TLS 1.3<br><small style="color:var(--muted)">AES-256-GCM</small></div>
     <div class="flow-arrow">&#8594;</div>
-    <div class="flow-node" style="border-color:var(--accent5);background:rgba(234,88,12,.04)">&#9729;&#65039; VPS-2<br><small style="color:var(--muted)">relay · hidden IP</small></div>
+    <div class="flow-node" style="border-color:var(--accent3);background:rgba(234,88,12,.04)">&#127760; VPS-1 + CF<br><small style="color:var(--muted)">Cloudflare · domain</small></div>
     <div class="flow-arrow">&#8594;</div>
     <div class="flow-node" style="border-color:var(--accent4);background:rgba(147,51,234,.04)">&#128274; TLS 1.3<br><small style="color:var(--muted)">AES-256-GCM</small></div>
     <div class="flow-arrow">&#8594;</div>
-    <div class="flow-node" style="border-color:var(--accent2);background:rgba(22,163,74,.04)">&#9729;&#65039; VPS-2<br><small style="color:var(--muted)">relay · hidden IP</small></div>
+    <div class="flow-node" style="border-color:var(--accent5);background:rgba(234,88,12,.04)">&#9729;&#65039; VPS-2<br><small style="color:var(--muted)">relay · hidden IP</small></div>
     <div class="flow-arrow">&#8594;</div>
     <div class="flow-node" style="border-color:var(--accent4);background:rgba(147,51,234,.04)">&#128274; TLS 1.3<br><small style="color:var(--muted)">AES-256-GCM</small></div>
     <div class="flow-arrow">&#8594;</div>
@@ -1901,16 +1898,8 @@
 </footer>
 </div>
 <script>
-function switchLang(lang){
-  document.querySelectorAll('.lang-content').forEach(el=>el.classList.remove('active'));
-  document.querySelectorAll('.lang-btn').forEach(el=>el.classList.remove('active'));
-  document.getElementById('content-'+lang).classList.add('active');
-  document.querySelector('[onclick="switchLang(''+lang+'')"').classList.add('active');
-  document.documentElement.lang=lang;
-  try{localStorage.setItem('pres-lang',lang);}catch(e){}
-}
-const saved=localStorage.getItem('pres-lang');
-if(saved&&['az','ru','en'].includes(saved))switchLang(saved);
+function switchLang(l){document.querySelectorAll(".lang-content").forEach(e=>e.classList.remove("active"));document.querySelectorAll(".lang-btn").forEach(e=>e.classList.remove("active"));document.getElementById("content-"+l).classList.add("active");document.querySelector("[onclick="switchLang('"+ l +"')"]").classList.add("active");document.documentElement.lang=l;try{localStorage.setItem("pres-lang",l);}catch(e){}}
+const s=localStorage.getItem("pres-lang");if(s&&["az","ru","en"].includes(s))switchLang(s);
 </script>
 </body>
 </html>
