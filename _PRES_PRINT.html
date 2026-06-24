@@ -361,7 +361,7 @@
   <div class="sec-num">Hissə 1</div>
   <h2 class="sec-title">Sistem Arxitekturası</h2>
   <p class="sec-desc">
-    Dörd qat: Obyekt (idarə olunan kompüter), VPS-1 (backend relay, gizli IP), VPS-2 + Cloudflare (domain, CDN) və Operator (siz, brauzerdə).
+    Dörd qat: Obyekt (idarə olunan kompüter), VPS-2 (backend relay, gizli IP), VPS-1 + Cloudflare (domain, CDN) və Operator (siz, brauzerdə).
     Obyekt ilə operator heç vaxt birbaşa bağlanmır. İki VPS zənciri + Cloudflare proxy — real IP heç vaxt açıqlanmır.
   </p>
 
@@ -386,11 +386,11 @@
       <div class="jn-icon">&#9729;&#65039;</div>
       <div class="jn-name">VPS-1 + VPS-2 + Cloudflare</div>
       <div class="jn-role">İki relay server + CDN zənciri<br>(real IP heç vaxt açıqlanmır)</div>
-      <div style="font-size:10.5px;font-weight:700;color:var(--accent3);margin:8px 0 3px;border-top:1px solid var(--bd);padding-top:7px;">VPS-1 — Backend Relay (gizli IP):</div>
+      <div style="font-size:10.5px;font-weight:700;color:var(--accent3);margin:8px 0 3px;border-top:1px solid var(--bd);padding-top:7px;">VPS-2 — Backend Relay (gizli IP):</div>
       <div class="jn-item"><b>Rol:</b>&nbsp;Obyektin əlaqə nöqtəsi</div>
-      <div class="jn-item"><b>IP:</b>&nbsp;<span style="color:#15803d;font-weight:600">Yalnız VPS-2 bilir</span></div>
+      <div class="jn-item"><b>IP:</b>&nbsp;<span style="color:#15803d;font-weight:600">Yalnız VPS-1 bilir</span></div>
       <div class="jn-item"><b>Jurnallar:</b>&nbsp;yalnız RAM-da</div>
-      <div style="font-size:10.5px;font-weight:700;color:var(--accent4);margin:8px 0 3px;border-top:1px solid var(--bd);padding-top:7px;">VPS-2 + Cloudflare (Domain + CDN):</div>
+      <div style="font-size:10.5px;font-weight:700;color:var(--accent4);margin:8px 0 3px;border-top:1px solid var(--bd);padding-top:7px;">VPS-1 + Cloudflare (Domain + CDN):</div>
       <div class="jn-item"><b>URL:</b>&nbsp;wss://domain.com</div>
       <div class="jn-item"><b>Real IP:</b>&nbsp;<span style="color:#15803d;font-weight:600">Gizli — CF IP görünür</span></div>
       <div class="jn-item"><b>DDoS:</b>&nbsp;Cloudflare mühafizəsi</div>
@@ -415,7 +415,7 @@
   <!-- Data flow -->
   <div class="infobox green no-break">
     <b>&#128270; Məlumat axını:</b> Operator düyməyə basır &#8594; əmr şifrələnir (TLS 1.3) &#8594;
-    Cloudflare &#8594; VPS-2 &#8594; VPS-1 &#8594; obyekt icra edir &#8594; nəticə eyni zəncir ilə geri qayıdır.
+    Cloudflare &#8594; VPS-1 &#8594; VPS-2 &#8594; obyekt icra edir &#8594; nəticə eyni zəncir ilə geri qayıdır.
     Heç bir məlumat şifrəsizsiz ötmür. Bütün kanal adi HTTPS/CDN trafiki kimi görünür — firewall-lar bloklamır, sniffer-lər oxuya bilmir.
   </div>
 
@@ -435,8 +435,8 @@
       <div style="background:rgba(22,163,74,.04);border:1.5px solid rgba(22,163,74,.22);border-radius:10px;padding:16px;">
         <div style="font-size:11.5px;font-weight:700;color:var(--accent2);margin-bottom:10px;">&#128737;&#65039; Təhlükəsizlik Üstünlükləri</div>
         <div style="font-size:11px;color:var(--muted);line-height:1.8;">
-          <b style="color:var(--fg)">IP maskirovkası:</b> VPS-2-nin real IP-si Cloudflare arxasında — heç vaxt görünmür<br>
-          <b style="color:var(--fg)">İzolasiya:</b> VPS-2 ələ keçirilsə belə — VPS-1 məchul qalır<br>
+          <b style="color:var(--fg)">IP maskirovkası:</b> VPS-1-nin real IP-si Cloudflare arxasında — heç vaxt görünmür<br>
+          <b style="color:var(--fg)">İzolasiya:</b> VPS-1 ələ keçirilsə belə — VPS-2 məchul qalır<br>
           <b style="color:var(--fg)">DDoS mühafizəsi:</b> Cloudflare hücumları avtomatik bloklayır<br>
           <b style="color:var(--fg)">Yurisdiksiya:</b> İki ayrı ölkədə VPS — beynəlxalq sorğu çox çətin
         </div>
@@ -626,11 +626,11 @@
     <div class="flow-arrow">&#8594;</div>
     <div class="flow-node" style="border-color:var(--accent4);background:rgba(147,51,234,.04)">&#128274; TLS 1.3<br><small style="color:var(--muted)">AES-256-GCM</small></div>
     <div class="flow-arrow">&#8594;</div>
-    <div class="flow-node" style="border-color:var(--accent5);background:rgba(234,88,12,.04)">&#9729;&#65039; VPS-1<br><small style="color:var(--muted)">relay · gizli IP</small></div>
+    <div class="flow-node" style="border-color:var(--accent5);background:rgba(234,88,12,.04)">&#9729;&#65039; VPS-2<br><small style="color:var(--muted)">relay · gizli IP</small></div>
     <div class="flow-arrow">&#8594;</div>
     <div class="flow-node" style="border-color:var(--accent4);background:rgba(147,51,234,.04)">&#128274; TLS 1.3<br><small style="color:var(--muted)">AES-256-GCM</small></div>
     <div class="flow-arrow">&#8594;</div>
-    <div class="flow-node" style="border-color:var(--accent2);background:rgba(22,163,74,.04)">&#127760; VPS-2 + CF<br><small style="color:var(--muted)">Cloudflare · domain</small></div>
+    <div class="flow-node" style="border-color:var(--accent2);background:rgba(22,163,74,.04)">&#127760; VPS-1 + CF<br><small style="color:var(--muted)">Cloudflare · domain</small></div>
     <div class="flow-arrow">&#8594;</div>
     <div class="flow-node" style="border-color:var(--accent4);background:rgba(147,51,234,.04)">&#128274; TLS 1.3<br><small style="color:var(--muted)">AES-256-GCM</small></div>
     <div class="flow-arrow">&#8594;</div>
@@ -890,7 +890,7 @@
   <div class="sec-num">Раздел 1</div>
   <h2 class="sec-title">Архитектура системы</h2>
   <p class="sec-desc">
-    Четыре уровня: Объект (управляемый компьютер), VPS-1 (backend relay, скрытый IP), VPS-2 + Cloudflare (домен, CDN) и Оператор (вы, в браузере).
+    Четыре уровня: Объект (управляемый компьютер), VPS-2 (backend relay, скрытый IP), VPS-1 + Cloudflare (домен, CDN) и Оператор (вы, в браузере).
     Объект и оператор никогда не соединяются напрямую. Цепочка двух VPS + Cloudflare proxy — реальный IP никогда не раскрывается.
   </p>
 
@@ -915,11 +915,11 @@
       <div class="jn-icon">&#9729;&#65039;</div>
       <div class="jn-name">VPS-1 + VPS-2 + Cloudflare</div>
       <div class="jn-role">Два relay-сервера + CDN-цепочка<br>(реальный IP никогда не раскрывается)</div>
-      <div style="font-size:10.5px;font-weight:700;color:var(--accent3);margin:8px 0 3px;border-top:1px solid var(--bd);padding-top:7px;">VPS-1 — Backend Relay (скрытый IP):</div>
+      <div style="font-size:10.5px;font-weight:700;color:var(--accent3);margin:8px 0 3px;border-top:1px solid var(--bd);padding-top:7px;">VPS-2 — Backend Relay (скрытый IP):</div>
       <div class="jn-item"><b>Роль:</b>&nbsp;точка подключения объекта</div>
-      <div class="jn-item"><b>IP:</b>&nbsp;<span style="color:#15803d;font-weight:600">Знает только VPS-2</span></div>
+      <div class="jn-item"><b>IP:</b>&nbsp;<span style="color:#15803d;font-weight:600">Знает только VPS-1</span></div>
       <div class="jn-item"><b>Журналы:</b>&nbsp;только в RAM</div>
-      <div style="font-size:10.5px;font-weight:700;color:var(--accent4);margin:8px 0 3px;border-top:1px solid var(--bd);padding-top:7px;">VPS-2 + Cloudflare (Домен + CDN):</div>
+      <div style="font-size:10.5px;font-weight:700;color:var(--accent4);margin:8px 0 3px;border-top:1px solid var(--bd);padding-top:7px;">VPS-1 + Cloudflare (Домен + CDN):</div>
       <div class="jn-item"><b>URL:</b>&nbsp;wss://domain.com</div>
       <div class="jn-item"><b>Реальный IP:</b>&nbsp;<span style="color:#15803d;font-weight:600">Скрыт — виден IP Cloudflare</span></div>
       <div class="jn-item"><b>DDoS:</b>&nbsp;защита Cloudflare</div>
@@ -944,7 +944,7 @@
   <!-- Data flow -->
   <div class="infobox green no-break">
     <b>&#128270; Поток данных:</b> Оператор нажимает кнопку &#8594; команда шифруется (TLS 1.3) &#8594;
-    Cloudflare &#8594; VPS-2 &#8594; VPS-1 &#8594; объект выполняет &#8594; результат возвращается по той же цепочке.
+    Cloudflare &#8594; VPS-1 &#8594; VPS-2 &#8594; объект выполняет &#8594; результат возвращается по той же цепочке.
     Никакие данные не передаются без шифрования. Весь канал выглядит как обычный HTTPS/CDN-трафик — файрволы не блокируют, снифферы не читают.
   </div>
 
@@ -964,8 +964,8 @@
       <div style="background:rgba(22,163,74,.04);border:1.5px solid rgba(22,163,74,.22);border-radius:10px;padding:16px;">
         <div style="font-size:11.5px;font-weight:700;color:var(--accent2);margin-bottom:10px;">&#128737;&#65039; Преимущества безопасности</div>
         <div style="font-size:11px;color:var(--muted);line-height:1.8;">
-          <b style="color:var(--fg)">Маскировка IP:</b> реальный IP VPS-2 за Cloudflare — никогда не виден<br>
-          <b style="color:var(--fg)">Изоляция:</b> даже если VPS-2 скомпрометирован — VPS-1 остаётся неизвестным<br>
+          <b style="color:var(--fg)">Маскировка IP:</b> реальный IP VPS-1 за Cloudflare — никогда не виден<br>
+          <b style="color:var(--fg)">Изоляция:</b> даже если VPS-1 скомпрометирован — VPS-2 остаётся неизвестным<br>
           <b style="color:var(--fg)">DDoS-защита:</b> Cloudflare автоматически блокирует атаки<br>
           <b style="color:var(--fg)">Юрисдикция:</b> VPS в двух разных странах — международный запрос крайне затруднён
         </div>
@@ -1155,11 +1155,11 @@
     <div class="flow-arrow">&#8594;</div>
     <div class="flow-node" style="border-color:var(--accent4);background:rgba(147,51,234,.04)">&#128274; TLS 1.3<br><small style="color:var(--muted)">AES-256-GCM</small></div>
     <div class="flow-arrow">&#8594;</div>
-    <div class="flow-node" style="border-color:var(--accent5);background:rgba(234,88,12,.04)">&#9729;&#65039; VPS-1<br><small style="color:var(--muted)">relay · скрытый IP</small></div>
+    <div class="flow-node" style="border-color:var(--accent5);background:rgba(234,88,12,.04)">&#9729;&#65039; VPS-2<br><small style="color:var(--muted)">relay · скрытый IP</small></div>
     <div class="flow-arrow">&#8594;</div>
     <div class="flow-node" style="border-color:var(--accent4);background:rgba(147,51,234,.04)">&#128274; TLS 1.3<br><small style="color:var(--muted)">AES-256-GCM</small></div>
     <div class="flow-arrow">&#8594;</div>
-    <div class="flow-node" style="border-color:var(--accent2);background:rgba(22,163,74,.04)">&#127760; VPS-2 + CF<br><small style="color:var(--muted)">Cloudflare · домен</small></div>
+    <div class="flow-node" style="border-color:var(--accent2);background:rgba(22,163,74,.04)">&#127760; VPS-1 + CF<br><small style="color:var(--muted)">Cloudflare · домен</small></div>
     <div class="flow-arrow">&#8594;</div>
     <div class="flow-node" style="border-color:var(--accent4);background:rgba(147,51,234,.04)">&#128274; TLS 1.3<br><small style="color:var(--muted)">AES-256-GCM</small></div>
     <div class="flow-arrow">&#8594;</div>
@@ -1419,7 +1419,7 @@
   <div class="sec-num">Section 1</div>
   <h2 class="sec-title">System Architecture</h2>
   <p class="sec-desc">
-    Four layers: Object (managed computer), VPS-1 (backend relay, hidden IP), VPS-2 + Cloudflare (domain, CDN) and Operator (you, in the browser).
+    Four layers: Object (managed computer), VPS-2 (backend relay, hidden IP), VPS-1 + Cloudflare (domain, CDN) and Operator (you, in the browser).
     Object and operator never connect directly. Two-VPS chain + Cloudflare proxy — real IP is never exposed.
   </p>
 
@@ -1444,11 +1444,11 @@
       <div class="jn-icon">&#9729;&#65039;</div>
       <div class="jn-name">VPS-1 + VPS-2 + Cloudflare</div>
       <div class="jn-role">Two relay servers + CDN chain<br>(real IP is never exposed)</div>
-      <div style="font-size:10.5px;font-weight:700;color:var(--accent3);margin:8px 0 3px;border-top:1px solid var(--bd);padding-top:7px;">VPS-1 — Backend Relay (hidden IP):</div>
+      <div style="font-size:10.5px;font-weight:700;color:var(--accent3);margin:8px 0 3px;border-top:1px solid var(--bd);padding-top:7px;">VPS-2 — Backend Relay (hidden IP):</div>
       <div class="jn-item"><b>Role:</b>&nbsp;object connection point</div>
-      <div class="jn-item"><b>IP:</b>&nbsp;<span style="color:#15803d;font-weight:600">Only VPS-2 knows</span></div>
+      <div class="jn-item"><b>IP:</b>&nbsp;<span style="color:#15803d;font-weight:600">Only VPS-1 knows</span></div>
       <div class="jn-item"><b>Logs:</b>&nbsp;only in RAM</div>
-      <div style="font-size:10.5px;font-weight:700;color:var(--accent4);margin:8px 0 3px;border-top:1px solid var(--bd);padding-top:7px;">VPS-2 + Cloudflare (Domain + CDN):</div>
+      <div style="font-size:10.5px;font-weight:700;color:var(--accent4);margin:8px 0 3px;border-top:1px solid var(--bd);padding-top:7px;">VPS-1 + Cloudflare (Domain + CDN):</div>
       <div class="jn-item"><b>URL:</b>&nbsp;wss://domain.com</div>
       <div class="jn-item"><b>Real IP:</b>&nbsp;<span style="color:#15803d;font-weight:600">Hidden — CF IP visible</span></div>
       <div class="jn-item"><b>DDoS:</b>&nbsp;Cloudflare protection</div>
@@ -1473,7 +1473,7 @@
   <!-- Data flow -->
   <div class="infobox green no-break">
     <b>&#128270; Data flow:</b> Operator presses a button &#8594; command is encrypted (TLS 1.3) &#8594;
-    Cloudflare &#8594; VPS-2 &#8594; VPS-1 &#8594; object executes &#8594; result returns along the same chain.
+    Cloudflare &#8594; VPS-1 &#8594; VPS-2 &#8594; object executes &#8594; result returns along the same chain.
     No data is transmitted unencrypted. The entire channel looks like ordinary HTTPS/CDN traffic — firewalls do not block it, sniffers cannot read it.
   </div>
 
@@ -1493,8 +1493,8 @@
       <div style="background:rgba(22,163,74,.04);border:1.5px solid rgba(22,163,74,.22);border-radius:10px;padding:16px;">
         <div style="font-size:11.5px;font-weight:700;color:var(--accent2);margin-bottom:10px;">&#128737;&#65039; Security Benefits</div>
         <div style="font-size:11px;color:var(--muted);line-height:1.8;">
-          <b style="color:var(--fg)">IP masking:</b> VPS-2 real IP is behind Cloudflare — never visible<br>
-          <b style="color:var(--fg)">Isolation:</b> Even if VPS-2 is compromised — VPS-1 remains unknown<br>
+          <b style="color:var(--fg)">IP masking:</b> VPS-1 real IP is behind Cloudflare — never visible<br>
+          <b style="color:var(--fg)">Isolation:</b> Even if VPS-1 is compromised — VPS-2 remains unknown<br>
           <b style="color:var(--fg)">DDoS protection:</b> Cloudflare automatically blocks attacks<br>
           <b style="color:var(--fg)">Jurisdiction:</b> VPS in two separate countries — international request is very difficult
         </div>
@@ -1684,11 +1684,11 @@
     <div class="flow-arrow">&#8594;</div>
     <div class="flow-node" style="border-color:var(--accent4);background:rgba(147,51,234,.04)">&#128274; TLS 1.3<br><small style="color:var(--muted)">AES-256-GCM</small></div>
     <div class="flow-arrow">&#8594;</div>
-    <div class="flow-node" style="border-color:var(--accent5);background:rgba(234,88,12,.04)">&#9729;&#65039; VPS-1<br><small style="color:var(--muted)">relay · hidden IP</small></div>
+    <div class="flow-node" style="border-color:var(--accent5);background:rgba(234,88,12,.04)">&#9729;&#65039; VPS-2<br><small style="color:var(--muted)">relay · hidden IP</small></div>
     <div class="flow-arrow">&#8594;</div>
     <div class="flow-node" style="border-color:var(--accent4);background:rgba(147,51,234,.04)">&#128274; TLS 1.3<br><small style="color:var(--muted)">AES-256-GCM</small></div>
     <div class="flow-arrow">&#8594;</div>
-    <div class="flow-node" style="border-color:var(--accent2);background:rgba(22,163,74,.04)">&#127760; VPS-2 + CF<br><small style="color:var(--muted)">Cloudflare · domain</small></div>
+    <div class="flow-node" style="border-color:var(--accent2);background:rgba(22,163,74,.04)">&#127760; VPS-1 + CF<br><small style="color:var(--muted)">Cloudflare · domain</small></div>
     <div class="flow-arrow">&#8594;</div>
     <div class="flow-node" style="border-color:var(--accent4);background:rgba(147,51,234,.04)">&#128274; TLS 1.3<br><small style="color:var(--muted)">AES-256-GCM</small></div>
     <div class="flow-arrow">&#8594;</div>
