@@ -336,8 +336,8 @@
   <div class="sec-num">Hissə 1</div>
   <h2 class="sec-title">Sistem Arxitekturası</h2>
   <p class="sec-desc">
-    Üç iştirakçı: Obyekt (idarə olunan kompüter), VPS-server (başqa ölkədə vasitəçi) və Operator (siz, brauzerdə).
-    Obyekt və operator heç vaxt birbaşa bağlanmır — yalnız vasitəçi server vasitəsilə. Bu anonimliyin əsasıdır.
+    Dörd qat: Obyekt (idarə olunan kompüter), VPS-1 (backend relay, gizli IP), VPS-2 + Cloudflare (domain, CDN) və Operator (siz, brauzerdə).
+    Obyekt ilə operator heç vaxt birbaşa bağlanmır. İki VPS zənciri + Cloudflare proxy — real IP heç vaxt açıqlanmır.
   </p>
 
   <!-- 3-column journey -->
@@ -359,12 +359,17 @@
     </div>
     <div class="jn orange">
       <div class="jn-icon">&#9729;&#65039;</div>
-      <div class="jn-name">VPS Server</div>
-      <div class="jn-role">Başqa ölkədə relay server<br>(məlumat saxlamır, yalnız oturur)</div>
-      <div class="jn-item"><b>Rol:</b>&nbsp;obyekt ilə operator arasında körpü</div>
-      <div class="jn-item"><b>İstifadəçilər:</b>&nbsp;şifrəli parollar + rollar</div>
-      <div class="jn-item"><b>Birbaşa əlaqə?</b>&nbsp;<span style="color:#15803d;font-weight:600">Xeyr — heç vaxt</span></div>
-      <div class="jn-item"><b>Jurnallar:</b>&nbsp;yalnız RAM-da, yenidən başladıqda itirilir</div>
+      <div class="jn-name">VPS-1 + VPS-2 + Cloudflare</div>
+      <div class="jn-role">İki relay server + CDN zənciri<br>(real IP heç vaxt açıqlanmır)</div>
+      <div style="font-size:10.5px;font-weight:700;color:var(--accent3);margin:8px 0 3px;border-top:1px solid var(--bd);padding-top:7px;">VPS-1 — Backend Relay (gizli IP):</div>
+      <div class="jn-item"><b>Rol:</b>&nbsp;Obyektin əlaqə nöqtəsi</div>
+      <div class="jn-item"><b>IP:</b>&nbsp;<span style="color:#15803d;font-weight:600">Yalnız VPS-2 bilir</span></div>
+      <div class="jn-item"><b>Jurnallar:</b>&nbsp;yalnız RAM-da</div>
+      <div style="font-size:10.5px;font-weight:700;color:var(--accent4);margin:8px 0 3px;border-top:1px solid var(--bd);padding-top:7px;">VPS-2 + Cloudflare (Domain + CDN):</div>
+      <div class="jn-item"><b>URL:</b>&nbsp;wss://domain.com</div>
+      <div class="jn-item"><b>Real IP:</b>&nbsp;<span style="color:#15803d;font-weight:600">Gizli — CF IP görünür</span></div>
+      <div class="jn-item"><b>DDoS:</b>&nbsp;Cloudflare mühafizəsi</div>
+      <div class="jn-item"><b>SSL:</b>&nbsp;CF sertifikatı (pulsuz)</div>
     </div>
     <div class="jn-arr">
       <div class="jn-arr-line"></div>
@@ -384,9 +389,34 @@
 
   <!-- Data flow -->
   <div class="infobox green no-break">
-    <b>&#128270; Məlumat axını:</b> Operator düyməyə basır &#8594; əmr şifrələnir (TLS 1.3) &#8594; VPS onu obyektə göndərir &#8594;
-    obyekt icra edir &#8594; nəticə eyni zəncir ilə geri qayıdır. Heç bir məlumat şifrəsizsiz ötmür.
-    Bütün kanal adi HTTPS trafiki kimi görünür — firewall-lar bloklamır, sniffer-lər oxuya bilmir.
+    <b>&#128270; Məlumat axını:</b> Operator düyməyə basır &#8594; əmr şifrələnir (TLS 1.3) &#8594;
+    Cloudflare &#8594; VPS-2 &#8594; VPS-1 &#8594; obyekt icra edir &#8594; nəticə eyni zəncir ilə geri qayıdır.
+    Heç bir məlumat şifrəsizsiz ötmür. Bütün kanal adi HTTPS/CDN trafiki kimi görünür — firewall-lar bloklamır, sniffer-lər oxuya bilmir.
+  </div>
+
+  <!-- 2 VPS + Cloudflare benefits -->
+  <div style="margin-top:20px;" class="no-break">
+    <div style="font-size:14px;font-weight:800;color:var(--fg);margin-bottom:14px;letter-spacing:-0.3px;">&#127760; İki VPS + Cloudflare + Domain: Nə Dəyişir?</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+      <div style="background:var(--bg2);border:1.5px solid var(--bd);border-radius:10px;padding:16px;">
+        <div style="font-size:11.5px;font-weight:700;color:var(--accent);margin-bottom:10px;">&#9889; Əməliyyat Üstünlükləri</div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.8;">
+          <b style="color:var(--fg)">Domain adı:</b> IP əvəzinə <code style="background:var(--bg3);padding:1px 5px;border-radius:4px;font-size:10.5px;">wss://domain.com</code> — daha etibarlı, bloklamaq çətin<br>
+          <b style="color:var(--fg)">Pulsuz SSL:</b> Cloudflare TLS sertifikatını avtomatik idarə edir<br>
+          <b style="color:var(--fg)">Uptime:</b> Cloudflare anycast şəbəkəsi — 99.9% əlçatanlıq<br>
+          <b style="color:var(--fg)">Trafik:</b> Normal CDN trafiki kimi görünür, heç bir xüsusi əlamət yoxdur
+        </div>
+      </div>
+      <div style="background:rgba(22,163,74,.04);border:1.5px solid rgba(22,163,74,.22);border-radius:10px;padding:16px;">
+        <div style="font-size:11.5px;font-weight:700;color:var(--accent2);margin-bottom:10px;">&#128737;&#65039; Təhlükəsizlik Üstünlükləri</div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.8;">
+          <b style="color:var(--fg)">IP maskirovkası:</b> VPS-2-nin real IP-si Cloudflare arxasında — heç vaxt görünmür<br>
+          <b style="color:var(--fg)">İzolasiya:</b> VPS-2 ələ keçirilsə belə — VPS-1 məchul qalır<br>
+          <b style="color:var(--fg)">DDoS mühafizəsi:</b> Cloudflare hücumları avtomatik bloklayır<br>
+          <b style="color:var(--fg)">Yurisdiksiya:</b> İki ayrı ölkədə VPS — beynəlxalq sorğu çox çətin
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
