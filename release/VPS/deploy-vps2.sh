@@ -177,10 +177,6 @@ for f in pnpext.dll pnpext.sys; do
         ok "$f → $WEB_ROOT/files/"
     fi
 done
-# Speed test blob — 5 MB of zeros for host↔relay bandwidth measurement
-dd if=/dev/zero bs=1M count=5 of="$WEB_ROOT/speedtest" 2>/dev/null
-chown www-data:www-data "$WEB_ROOT/speedtest"
-ok "speedtest blob (5 MB) → $WEB_ROOT/speedtest"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  ШАГ 7: Nginx
@@ -267,14 +263,6 @@ server {
         add_header Access-Control-Allow-Origin "*";
         add_header Access-Control-Allow-Methods "GET, HEAD, OPTIONS";
         default_type application/octet-stream;
-    }
-    # Speed test blob
-    location = /speedtest {
-        alias /var/www/remote-desktop/speedtest;
-        add_header Cache-Control "no-store";
-        add_header Access-Control-Allow-Origin "*";
-        default_type application/octet-stream;
-        access_log off;
     }
     # Статические ресурсы
     location / {
