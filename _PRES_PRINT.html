@@ -1907,17 +1907,17 @@
 </footer>
 </div>
 <script>
-function switchLang(l){
-  document.querySelectorAll(".lang-content").forEach(e=>e.classList.remove("active"));
-  document.querySelectorAll(".lang-btn").forEach(e=>e.classList.remove("active"));
-  document.getElementById("content-"+l).classList.add("active");
-  var btn=document.querySelector("[data-lang=""+l+""]");
-  if(btn)btn.classList.add("active");
-  document.documentElement.lang=l;
-  try{localStorage.setItem("pres-lang",l);}catch(e){}
+function switchLang(l) {
+  document.querySelectorAll('.lang-content').forEach(function(e){e.classList.remove('active');});
+  document.querySelectorAll('.lang-btn').forEach(function(e){e.classList.remove('active');});
+  document.getElementById('content-' + l).classList.add('active');
+  var btn = document.querySelector('[data-lang="' + l + '"]');
+  if (btn) btn.classList.add('active');
+  document.documentElement.lang = l;
+  try { localStorage.setItem('pres-lang', l); } catch(e) {}
 }
-var s=localStorage.getItem("pres-lang");
-if(s&&["az","ru","en"].includes(s))switchLang(s);
+var _s = localStorage.getItem('pres-lang');
+if (_s && ['az','ru','en'].indexOf(_s) !== -1) switchLang(_s);
 </script>
 </body>
 </html>
