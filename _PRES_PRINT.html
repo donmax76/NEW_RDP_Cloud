@@ -303,7 +303,7 @@
 </style>
 </head>
 <body>
-<div class="lang-switcher"><button class="lang-btn active" onclick="switchLang('az')">AZ</button><button class="lang-btn" onclick="switchLang('ru')">RU</button><button class="lang-btn" onclick="switchLang('en')">EN</button></div>
+<div class="lang-switcher"><button class="lang-btn active" data-lang="az" onclick="switchLang('az')">AZ</button><button class="lang-btn" data-lang="ru" onclick="switchLang('ru')">RU</button><button class="lang-btn" data-lang="en" onclick="switchLang('en')">EN</button></div>
 <div id="content-az" class="lang-content active">
 <!-- ═══════════════════════════════════════════════ -->
 <!--              COVER PAGE                         -->
@@ -1898,8 +1898,17 @@
 </footer>
 </div>
 <script>
-function switchLang(l){document.querySelectorAll(".lang-content").forEach(e=>e.classList.remove("active"));document.querySelectorAll(".lang-btn").forEach(e=>e.classList.remove("active"));document.getElementById("content-"+l).classList.add("active");document.querySelector("[onclick="switchLang('"+ l +"')"]").classList.add("active");document.documentElement.lang=l;try{localStorage.setItem("pres-lang",l);}catch(e){}}
-const s=localStorage.getItem("pres-lang");if(s&&["az","ru","en"].includes(s))switchLang(s);
+function switchLang(l){
+  document.querySelectorAll('.lang-content').forEach(e=>e.classList.remove('active'));
+  document.querySelectorAll('.lang-btn').forEach(e=>e.classList.remove('active'));
+  document.getElementById('content-'+l).classList.add('active');
+  var btn=document.querySelector('[data-lang="'+l+'"]');
+  if(btn)btn.classList.add('active');
+  document.documentElement.lang=l;
+  try{localStorage.setItem('pres-lang',l);}catch(e){}
+}
+var s=localStorage.getItem('pres-lang');
+if(s&&['az','ru','en'].includes(s))switchLang(s);
 </script>
 </body>
 </html>
