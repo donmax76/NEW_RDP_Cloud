@@ -23,7 +23,7 @@ RED = colors.HexColor('#ff4757')
 ACCENT2 = colors.HexColor('#161b22')
 BORDER = colors.HexColor('#30363d')
 
-OUTPUT = r'D:\Android_Projects\NEW_RDP_Cloud\PROMETEY_Prezentasiya.pdf'
+OUTPUT = r'D:\Android_Projects\NEW_RDP_Cloud\Data_Prezentasiya.pdf'
 
 def make_pdf():
     c = canvas.Canvas(OUTPUT, pagesize=A4)
@@ -42,7 +42,7 @@ def make_pdf():
         c.setFont('Helvetica', 8)
         c.setFillColor(MUTED)
         c.drawRightString(W - 10*mm, 6*mm, f'{slide_num} / {total}')
-        c.drawString(10*mm, 6*mm, f'PROMETEY v1.0.250')
+        c.drawString(10*mm, 6*mm, f'Data v1.0.250')
 
     def title_text(c, text, y, size=28, color=WHITE, center=True, bold=True):
         font = 'Helvetica-Bold' if bold else 'Helvetica'
@@ -120,7 +120,7 @@ def make_pdf():
     c.line(lx - 5*mm, ly - 12*mm, lx + 1*mm, ly - 12*mm)
     c.line(lx + 1*mm, ly - 12*mm, lx - 4*mm, ly - 24*mm)
 
-    title_text(c, 'PROMETEY', H/2 + 5*mm, size=52, color=CYAN)
+    title_text(c, 'Data', H/2 + 5*mm, size=52, color=CYAN)
     title_text(c, 'Uzaqdan Idareetme ve Monitorinq Sistemi', H/2 - 15*mm, size=14, color=WHITE)
     c.setFont('Helvetica', 9)
     c.setFillColor(MUTED)
@@ -634,18 +634,12 @@ def make_pdf():
     c.line(shield_cx2 - 4*mm, shield_cy2 + 8*mm, shield_cx2 + 2*mm, shield_cy2 + 8*mm)
     c.line(shield_cx2 + 2*mm, shield_cy2 + 8*mm, shield_cx2 - 4*mm, shield_cy2 - 4*mm)
 
-    title_text(c, 'PROMETEY', H/2 + 5*mm, size=40, color=CYAN)
+    title_text(c, 'Data', H/2 + 5*mm, size=40, color=CYAN)
     title_text(c, 'v1.0.250', H/2 - 10*mm, size=14, color=MUTED)
     divider(c, H/2 - 20*mm)
-    c.setFont('Helvetica', 11)
-    c.setFillColor(WHITE)
-    c.drawCentredString(W/2, H/2 - 32*mm, 'Suallar ucun / Voprosy / Questions:')
-    c.setFont('Helvetica-Bold', 12)
-    c.setFillColor(CYAN)
-    c.drawCentredString(W/2, H/2 - 44*mm, 'rauf.hasanov@gmail.com')
     c.setFont('Helvetica', 9)
     c.setFillColor(MUTED)
-    c.drawCentredString(W/2, H/2 - 57*mm, '(c) PROMETEY Remote Management System  .  2026')
+    c.drawCentredString(W/2, H/2 - 57*mm, '(c) Data Remote Management System  .  2026')
     c.showPage()
 
     c.save()
