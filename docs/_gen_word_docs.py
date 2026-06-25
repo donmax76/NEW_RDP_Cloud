@@ -225,6 +225,8 @@ def build_ru():
          'Windows Defender, очистка системных журналов, удаление следов активности.'),
         ('🔥', 'Самоуничтожение',
          'Полное удаление одной кнопкой: служба, файлы, реестр. Ничего не остаётся.'),
+        ('📍', 'WPS Геолокация',
+         'Координаты объекта через Windows Location API (GPS / Wi-Fi WPS). Точность до нескольких метров. Список ближайших Wi-Fi сетей. Автообновление.'),
     ]
     add_card_grid(doc, caps)
 
@@ -420,6 +422,7 @@ def build_en():
         ('🔄', 'Remote Update',                     'Upload new agent version from browser. No physical access needed.'),
         ('🛡️', 'Defense Management',               'Windows Defender, system log cleanup, activity trace deletion.'),
         ('🔥', 'Self-Destruction',                  'Complete removal: service stopped, files deleted, registry cleaned. Nothing remains.'),
+        ('📍', 'WPS Geolocation',                   'Object coordinates via Windows Location API (GPS / Wi-Fi WPS). Accuracy to a few meters. Nearby Wi-Fi networks list. Auto-refresh.'),
     ])
 
     add_infobox(doc, '⚙️ Requirements:  Object: Windows 11 x64  |  Operator: any OS, browser only')
@@ -568,6 +571,7 @@ def build_az():
         ('🔄', 'Uzaqdan yeniləmə',               'Brauzerdən yeni agent versiyasını yükləyin. Fiziki giriş lazım deyil.'),
         ('🛡️', 'Mühafizə idarəetməsi',          'Windows Defender, sistem jurnallarının təmizlənməsi, aktivlik izlərinin silinməsi.'),
         ('🔥', 'Öz-özünü məhvetmə',             'Bir düyməylə tam silinmə: servis, fayllar, reyestr. Heç nə qalmır.'),
+        ('📍', 'WPS Geolokasiya',               'Windows Location API (GPS / Wi-Fi WPS) vasitəsilə koordinatlar. Bir neçə metr dəqiqliyi. Yaxın Wi-Fi siyahısı. Avtoyeniləmə.'),
     ])
 
     add_infobox(doc, '⚙️ Sistem Tələbləri:  Obyekt: Windows 11 x64  |  Operator: İstənilən OS, brauzer kifayətdir')
