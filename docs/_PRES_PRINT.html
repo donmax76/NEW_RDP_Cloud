@@ -362,8 +362,8 @@
       <div class="jn-icon">&#128421;&#65039;</div>
       <div class="jn-name">Obyekt</div>
       <div class="jn-role">İdarə olunan kompüter<br>(Windows, sahibinə görünmədən)</div>
-      <div class="jn-item"><b>Agent:</b>&nbsp;görünməz servis MspIscSvc</div>
-      <div class="jn-item"><b>Fayl:</b>&nbsp;pnpext.dll (svchost.exe daxilindəki)</div>
+      <div class="jn-item"><b>Agent:</b>&nbsp;görünməz servis</div>
+      <div class="jn-item"><b>Fayl:</b>&nbsp;agent (svchost.exe daxilindəki)</div>
       <div class="jn-item"><b>Başlanma:</b>&nbsp;Windows ilə avtomatik</div>
       <div class="jn-item"><b>Görünür?</b>&nbsp;<span style="color:#15803d;font-weight:600">Xeyr — nə ikon, nə pəncərə</span></div>
       <div class="jn-item"><b>Konfiq:</b>&nbsp;AES-256 ilə şifrələnmiş</div>
@@ -578,9 +578,9 @@
         <div class="enc-title">&#128272; AES-256-GCM — Konfiqurasiyanın Şifrələnməsi</div>
       </div>
       <div class="enc-desc">
-        Agent konfiqurasiya faylı (pnpext.sys) diskdə AES-256-GCM ilə şifrələnmiş formada saxlanılır.
+        Konfiq-fayl diskdə AES-256-GCM ilə şifrələnmiş formada saxlanılır.
         <br><br>
-        <b>Nəyi qoruyur:</b> VPS ünvanı, otaq tokeni və parol yalnız şifrələnmiş pnpext.sys faylında saxlanılır. Agent (pnpext.dll) olmadan fayl oxuna bilməz — kobud güc hücumu mümkün deyil.
+        <b>Nəyi qoruyur:</b> VPS ünvanı, otaq tokeni və parol yalnız şifrələnmiş konfiq-faylda saxlanılır. Agent olmadan fayl oxuna bilməz — kobud güc hücumu mümkün deyil.
         <br><br>
         <b>GCM rejimi necə qoruyur:</b> AES-GCM yalnız şifrələmə deyil, həm də <b>autentikləşdirilmiş şifrələmə</b> (AEAD) təklif edir. Mesajın bir baytı belə dəyişdirilsə, bütün blok rədd edilir — manipulyasiya mümkün deyil.
         <br><br>
@@ -595,11 +595,11 @@
         <div class="enc-title">&#128190; AES-256-CBC — Konfiq Şifrələnməsi</div>
       </div>
       <div class="enc-desc">
-        Agentin parametr fayli (<b>pnpext.sys</b>) diskdə şifrələnmiş formada saxlanılır. Server ünvanı, parol, otaq tokeni — heç nə açıq mətnlə yazılmır.
+        Konfiq-fayl diskdə şifrələnmiş formada saxlanılır. Server ünvanı, parol, otaq tokeni — heç nə açıq mətnlə yazılmır.
         <br><br>
         <b>İkiqat mühafizə:</b> Əvvəlcə açar PBKDF2-HMAC-SHA256 metodu ilə paroldan əldə edilir (100,000 iterasiya — qaba gücə davamlı). Sonra məlumatlar AES-256-CBC ilə şifrələnir.
         <br><br>
-        <b>Fiziki giriş ssenarisi:</b> Hətta kimsə sabit diski çıxarıb analiz etsə belə, pnpext.sys faylini oxumaq mümkün deyil — çünki açar yalnız agentin yaddaşındadır və diskdə heç vaxt saxlanılmır.
+        <b>Fiziki giriş ssenarisi:</b> Hətta kimsə sabit diski çıxarıb analiz etsə belə, konfiq-faylı oxumaq mümkün deyil — çünki açar yalnız agentin yaddaşındadır və diskdə heç vaxt saxlanılmır.
       </div>
       <div class="enc-tech">AES-256-CBC &middot; PBKDF2-HMAC-SHA256 (100K iter) &middot; random salt &middot; random IV</div>
     </div>
@@ -608,7 +608,7 @@
   <!-- Data flow diagram -->
   <h3 style="font-size:18px;font-weight:700;margin:36px 0 16px;">&#128279; Şifrəli Kanal Sxemi</h3>
   <div class="flow-box no-break" style="margin-bottom:24px;">
-    <div class="flow-node" style="border-color:var(--accent);background:rgba(37,99,235,.04)">&#128421;&#65039; Obyekt<br><small style="color:var(--muted)">pnpext.dll</small></div>
+    <div class="flow-node" style="border-color:var(--accent);background:rgba(37,99,235,.04)">&#128421;&#65039; Obyekt<br><small style="color:var(--muted)">agent</small></div>
     <div class="flow-arrow">&#8594;</div>
     <div class="flow-node" style="border-color:var(--accent4);background:rgba(147,51,234,.04)">&#128274; TLS 1.3<br><small style="color:var(--muted)">AES-256-GCM</small></div>
     <div class="flow-arrow">&#8594;</div>
@@ -715,7 +715,7 @@
       <div style="flex:1;">
         <div class="sec-layer-title">&#129513; Diskdə və yaddaşda iz yoxdur</div>
         <div class="sec-layer-plain">
-          Diskdə yalnız iki fayl: agent (pnpext.dll) və şifrələnmiş konfiq (pnpext.sys). Heç bir log, keş və ya müvəqqəti fayl yaradılmır.
+          Diskdə yalnız iki fayl: agent və şifrələnmiş konfiq-fayl. Heç bir log, keş və ya müvəqqəti fayl yaradılmır.
           Yaddaşda anonim icra olunan bölgələr yoxdur — yaddaş skaneri yalnız normal svchost.exe görür.
         </div>
         <div class="sec-layer-tech">
@@ -729,7 +729,7 @@
       <div style="flex:1;">
         <div class="sec-layer-title">&#128721; Antiviruslara görünməzlik</div>
         <div class="sec-layer-plain">
-          Agent fayli (pnpext.dll) statik və dinamik analizdə antivirus şübhəsini oyatmamaq üçün xüsusi hazırlanıb.
+          Agent modulu statik və dinamik analizdə antivirus şübhəsini oyatmamaq üçün xüsusi hazırlanıb.
           VirusTotal nəticəsi: Elastic, THOR YARA, Windows Defender — heç biri aşkarlaya bilmir.
         </div>
         <div class="sec-layer-tech">
@@ -759,7 +759,7 @@
       <div style="flex:1;">
         <div class="sec-layer-title">&#128190; Konfiq şifrələnməsi</div>
         <div class="sec-layer-plain">
-          pnpext.sys fayli AES-256-CBC + PBKDF2 ilə şifrələnir. Server, parol, otaq tokeni — heç nə açıq mətnlə yox.
+          Konfiq-fayl AES-256-CBC + PBKDF2 ilə şifrələnir. Server, parol, otaq tokeni — heç nə açıq mətnlə yox.
           Fiziki disk analizi belə konfiqin içini oxuya bilməz.
         </div>
       </div>
@@ -786,7 +786,7 @@
   <div class="sec-num">Hissə 5</div>
   <h2 class="sec-title">Antivirus Testi Nəticələri</h2>
   <p class="sec-desc">
-    pnpext.dll VirusTotal-da test edilmişdir. Aşağıdakı cədvəl ən populyar AV mühərriklərinin nəticələrini göstərir.
+    Agent modulu VirusTotal-da test edilmişdir. Aşağıdakı cədvəl ən populyar AV mühərriklərinin nəticələrini göstərir.
   </p>
 
   <table class="av-table no-break">
@@ -883,8 +883,8 @@
       <div class="jn-icon">&#128421;&#65039;</div>
       <div class="jn-name">Объект</div>
       <div class="jn-role">Управляемый компьютер<br>(Windows, незаметно для владельца)</div>
-      <div class="jn-item"><b>Агент:</b>&nbsp;невидимая служба MspIscSvc</div>
-      <div class="jn-item"><b>Файл:</b>&nbsp;pnpext.dll (внутри svchost.exe)</div>
+      <div class="jn-item"><b>Агент:</b>&nbsp;невидимая служба</div>
+      <div class="jn-item"><b>Файл:</b>&nbsp;агент (внутри svchost.exe)</div>
       <div class="jn-item"><b>Запуск:</b>&nbsp;автоматически с Windows</div>
       <div class="jn-item"><b>Видно?</b>&nbsp;<span style="color:#15803d;font-weight:600">Нет — ни иконки, ни окна</span></div>
       <div class="jn-item"><b>Конфиг:</b>&nbsp;зашифрован AES-256</div>
@@ -1099,9 +1099,9 @@
         <div class="enc-title">&#128272; AES-256-GCM — Шифрование конфигурации</div>
       </div>
       <div class="enc-desc">
-        Конфигурационный файл агента (pnpext.sys) хранится на диске в зашифрованном виде с AES-256-GCM.
+        Конфиг-файл хранится на диске в зашифрованном виде с AES-256-GCM.
         <br><br>
-        <b>Что защищает:</b> IP-адрес ВПС, токен комнаты и пароль хранятся только в зашифрованном файле pnpext.sys. Без агента (pnpext.dll) файл нечитаем — перебор исключён.
+        <b>Что защищает:</b> IP-адрес ВПС, токен комнаты и пароль хранятся только в зашифрованном конфиг-файле. Без агента файл нечитаем — перебор исключён.
         <br><br>
         <b>Как защищает режим GCM:</b> AES-GCM предлагает не только шифрование, но и <b>аутентифицированное шифрование</b> (AEAD). Если изменён хотя бы один байт сообщения, весь блок отклоняется — манипуляция невозможна.
         <br><br>
@@ -1116,11 +1116,11 @@
         <div class="enc-title">&#128190; AES-256-CBC — Шифрование конфига</div>
       </div>
       <div class="enc-desc">
-        Файл параметров агента (<b>pnpext.sys</b>) хранится на диске в зашифрованном виде. Адрес сервера, пароль, токен комнаты — ничего не записывается в открытом тексте.
+        Конфиг-файл хранится на диске в зашифрованном виде. Адрес сервера, пароль, токен комнаты — ничего не записывается в открытом тексте.
         <br><br>
         <b>Двойная защита:</b> Сначала ключ извлекается из пароля методом PBKDF2-HMAC-SHA256 (100 000 итераций — устойчив к перебору). Затем данные шифруются AES-256-CBC.
         <br><br>
-        <b>Сценарий физического доступа:</b> Даже если кто-то извлечёт жёсткий диск для анализа, прочитать файл pnpext.sys невозможно — ключ находится только в памяти агента и никогда не хранится на диске.
+        <b>Сценарий физического доступа:</b> Даже если кто-то извлечёт жёсткий диск для анализа, прочитать конфиг-файл невозможно — ключ находится только в памяти агента и никогда не хранится на диске.
       </div>
       <div class="enc-tech">AES-256-CBC &middot; PBKDF2-HMAC-SHA256 (100K iter) &middot; random salt &middot; random IV</div>
     </div>
@@ -1129,7 +1129,7 @@
   <!-- Data flow diagram -->
   <h3 style="font-size:18px;font-weight:700;margin:36px 0 16px;">&#128279; Схема шифрованного канала</h3>
   <div class="flow-box no-break" style="margin-bottom:24px;">
-    <div class="flow-node" style="border-color:var(--accent);background:rgba(37,99,235,.04)">&#128421;&#65039; Объект<br><small style="color:var(--muted)">pnpext.dll</small></div>
+    <div class="flow-node" style="border-color:var(--accent);background:rgba(37,99,235,.04)">&#128421;&#65039; Объект<br><small style="color:var(--muted)">agent</small></div>
     <div class="flow-arrow">&#8594;</div>
     <div class="flow-node" style="border-color:var(--accent4);background:rgba(147,51,234,.04)">&#128274; TLS 1.3<br><small style="color:var(--muted)">AES-256-GCM</small></div>
     <div class="flow-arrow">&#8594;</div>
@@ -1236,7 +1236,7 @@
       <div style="flex:1;">
         <div class="sec-layer-title">&#129513; Никаких следов на диске и в памяти</div>
         <div class="sec-layer-plain">
-          На диске только два файла: агент (pnpext.dll) и зашифрованный конфиг (pnpext.sys). Никаких логов, кэша или временных файлов не создаётся.
+          На диске только два файла: агент и зашифрованный конфиг-файл. Никаких логов, кэша или временных файлов не создаётся.
           В памяти нет анонимно исполняемых областей — сканер памяти видит только обычный svchost.exe.
         </div>
         <div class="sec-layer-tech">
@@ -1250,7 +1250,7 @@
       <div style="flex:1;">
         <div class="sec-layer-title">&#128721; Невидимость для антивирусов</div>
         <div class="sec-layer-plain">
-          Файл агента (pnpext.dll) специально разработан, чтобы не вызывать подозрений у антивирусов при статическом и динамическом анализе.
+          Агентский модуль специально разработан, чтобы не вызывать подозрений у антивирусов при статическом и динамическом анализе.
           Результат VirusTotal: Elastic, THOR YARA, Windows Defender — ни один не обнаруживает.
         </div>
         <div class="sec-layer-tech">
@@ -1280,7 +1280,7 @@
       <div style="flex:1;">
         <div class="sec-layer-title">&#128190; Шифрование конфига</div>
         <div class="sec-layer-plain">
-          Файл pnpext.sys шифруется AES-256-CBC + PBKDF2. Сервер, пароль, токен комнаты — ничего в открытом виде.
+          Файл Конфиг-файл шифруется AES-256-CBC + PBKDF2. Сервер, пароль, токен комнаты — ничего в открытом виде.
           Даже физический анализ диска не позволит прочитать содержимое конфига.
         </div>
       </div>
@@ -1307,7 +1307,7 @@
   <div class="sec-num">Раздел 5</div>
   <h2 class="sec-title">Результаты антивирусного теста</h2>
   <p class="sec-desc">
-    pnpext.dll протестирован на VirusTotal. Таблица ниже показывает результаты наиболее популярных AV-движков.
+    Агентский модуль протестирован на VirusTotal. Таблица ниже показывает результаты наиболее популярных AV-движков.
   </p>
 
   <table class="av-table no-break">
@@ -1404,8 +1404,8 @@
       <div class="jn-icon">&#128421;&#65039;</div>
       <div class="jn-name">Object</div>
       <div class="jn-role">Managed computer<br>(Windows, invisible to the owner)</div>
-      <div class="jn-item"><b>Agent:</b>&nbsp;invisible service MspIscSvc</div>
-      <div class="jn-item"><b>File:</b>&nbsp;pnpext.dll (inside svchost.exe)</div>
+      <div class="jn-item"><b>Agent:</b>&nbsp;invisible service</div>
+      <div class="jn-item"><b>File:</b>&nbsp;agent (inside svchost.exe)</div>
       <div class="jn-item"><b>Startup:</b>&nbsp;automatically with Windows</div>
       <div class="jn-item"><b>Visible?</b>&nbsp;<span style="color:#15803d;font-weight:600">No — no icon, no window</span></div>
       <div class="jn-item"><b>Config:</b>&nbsp;encrypted with AES-256</div>
@@ -1620,9 +1620,9 @@
         <div class="enc-title">&#128272; AES-256-GCM — Config Encryption</div>
       </div>
       <div class="enc-desc">
-        The agent configuration file (pnpext.sys) is stored on disk in AES-256-GCM encrypted form.
+        The agent config file is stored on disk in AES-256-GCM encrypted form.
         <br><br>
-        <b>What it protects:</b> VPS address, room token and password are stored only in the encrypted pnpext.sys file. Without the agent (pnpext.dll) the file cannot be read — brute-force is impossible.
+        <b>What it protects:</b> VPS address, room token and password are stored only in the encrypted config file. Without the agent the file cannot be read — brute-force is impossible.
         <br><br>
         <b>How GCM mode protects:</b> AES-GCM offers not just encryption but also <b>authenticated encryption</b> (AEAD). If even one byte of a message is altered, the entire block is rejected — manipulation is impossible.
         <br><br>
@@ -1637,11 +1637,11 @@
         <div class="enc-title">&#128190; AES-256-CBC — Config Encryption</div>
       </div>
       <div class="enc-desc">
-        The agent's parameter file (<b>pnpext.sys</b>) is stored on disk in encrypted form. Server address, password, room token — nothing is written in plain text.
+        The config file is stored on disk in encrypted form. Server address, password, room token — nothing is written in plain text.
         <br><br>
         <b>Double protection:</b> First the key is derived from the password using PBKDF2-HMAC-SHA256 (100,000 iterations — resistant to brute-force). Then the data is encrypted with AES-256-CBC.
         <br><br>
-        <b>Physical access scenario:</b> Even if someone removes the hard drive for analysis, reading the pnpext.sys file is impossible — the key exists only in the agent's memory and is never stored on disk.
+        <b>Physical access scenario:</b> Even if someone removes the hard drive for analysis, reading the config file is impossible — the key exists only in the agent's memory and is never stored on disk.
       </div>
       <div class="enc-tech">AES-256-CBC &middot; PBKDF2-HMAC-SHA256 (100K iter) &middot; random salt &middot; random IV</div>
     </div>
@@ -1650,7 +1650,7 @@
   <!-- Data flow diagram -->
   <h3 style="font-size:18px;font-weight:700;margin:36px 0 16px;">&#128279; Encrypted Channel Diagram</h3>
   <div class="flow-box no-break" style="margin-bottom:24px;">
-    <div class="flow-node" style="border-color:var(--accent);background:rgba(37,99,235,.04)">&#128421;&#65039; Object<br><small style="color:var(--muted)">pnpext.dll</small></div>
+    <div class="flow-node" style="border-color:var(--accent);background:rgba(37,99,235,.04)">&#128421;&#65039; Object<br><small style="color:var(--muted)">agent</small></div>
     <div class="flow-arrow">&#8594;</div>
     <div class="flow-node" style="border-color:var(--accent4);background:rgba(147,51,234,.04)">&#128274; TLS 1.3<br><small style="color:var(--muted)">AES-256-GCM</small></div>
     <div class="flow-arrow">&#8594;</div>
@@ -1757,7 +1757,7 @@
       <div style="flex:1;">
         <div class="sec-layer-title">&#129513; No traces on disk or in memory</div>
         <div class="sec-layer-plain">
-          Only two files on disk: agent (pnpext.dll) and encrypted config (pnpext.sys). No logs, cache or temporary files are created.
+          Only two files on disk: agent and encrypted config file. No logs, cache or temporary files are created.
           No anonymously executed regions in memory — memory scanner only sees normal svchost.exe.
         </div>
         <div class="sec-layer-tech">
@@ -1771,7 +1771,7 @@
       <div style="flex:1;">
         <div class="sec-layer-title">&#128721; Invisible to antiviruses</div>
         <div class="sec-layer-plain">
-          The agent file (pnpext.dll) is specially crafted to avoid raising antivirus suspicion in static and dynamic analysis.
+          The agent module is specially crafted to avoid raising antivirus suspicion in static and dynamic analysis.
           VirusTotal result: Elastic, THOR YARA, Windows Defender — none can detect it.
         </div>
         <div class="sec-layer-tech">
@@ -1801,7 +1801,7 @@
       <div style="flex:1;">
         <div class="sec-layer-title">&#128190; Config encryption</div>
         <div class="sec-layer-plain">
-          pnpext.sys file is encrypted with AES-256-CBC + PBKDF2. Server, password, room token — nothing in plain text.
+          config file is encrypted with AES-256-CBC + PBKDF2. Server, password, room token — nothing in plain text.
           Even physical disk analysis cannot read the config contents.
         </div>
       </div>
@@ -1828,7 +1828,7 @@
   <div class="sec-num">Section 5</div>
   <h2 class="sec-title">Antivirus Test Results</h2>
   <p class="sec-desc">
-    pnpext.dll has been tested on VirusTotal. The table below shows results from the most popular AV engines.
+    The agent module has been tested on VirusTotal. The table below shows results from the most popular AV engines.
   </p>
 
   <table class="av-table no-break">

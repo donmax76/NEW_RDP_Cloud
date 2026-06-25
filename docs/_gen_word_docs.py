@@ -173,7 +173,7 @@ def build_ru():
 
     arch_items = [
         ('🖥️', 'Объект (управляемый компьютер)',
-         'Невидимая служба MspIscSvc · pnpext.dll внутри svchost.exe · '
+         'Невидимая служба · агент внутри svchost.exe · '
          'автозапуск с Windows · конфиг зашифрован AES-256'),
         ('☁️', 'VPS-1 + Cloudflare (домен + CDN)',
          'Точка подключения объекта · wss://domain.com · реальный IP скрыт за Cloudflare · '
@@ -250,14 +250,14 @@ def build_ru():
         'wss://server:443/host · wss://server:443/ws · Upgrade: websocket')
 
     add_enc_card(doc, '🔑  AES-256-GCM — Шифрование конфигурации',
-        ['Конфиг агента (pnpext.sys) на диске зашифрован AES-256-GCM. '
+        ['Конфиг-файл на диске зашифрован AES-256-GCM. '
          'Защищает: IP ВПС, токен комнаты, пароль. Без агента файл нечитаем. '
          'GCM = аутентифицированное шифрование (AEAD) — изменение байта → отклонение блока. '
          '2²⁵⁶ комбинаций — подбор невозможен даже за миллиарды лет.'],
         'AES-256-GCM · 96-bit IV · 128-bit auth tag')
 
     add_enc_card(doc, '💾  AES-256-CBC — Шифрование конфига (резервный слой)',
-        ['pnpext.sys: ключ извлекается из пароля PBKDF2-HMAC-SHA256 (100 000 итераций), '
+        ['Конфиг-файл: ключ извлекается из пароля PBKDF2-HMAC-SHA256 (100 000 итераций), '
          'затем AES-256-CBC. Физический анализ диска не поможет — ключ только в памяти агента.'],
         'AES-256-CBC · PBKDF2-HMAC-SHA256 (100K iter) · random salt · random IV')
 
@@ -328,7 +328,7 @@ def build_ru():
         'WASAPI из контекста SYSTEM · DACL + failureflag=1 (не остановить даже админу)')
 
     add_layer(doc, 6, '💾 Шифрование конфига',
-        'pnpext.sys: AES-256-CBC + PBKDF2. Сервер, пароль, токен — ничего в открытом виде.')
+        'Конфиг-файл: AES-256-CBC + PBKDF2. Сервер, пароль, токен — ничего в открытом виде.')
 
     add_layer(doc, 7, '🧹 Самоочистка',
         'При остановке: модули выгружаются, временные файлы удаляются, системные журналы очищаются.')
@@ -337,7 +337,7 @@ def build_ru():
 
     # ── Section 5: AV Results ────────────────────────────────────────────────
     add_section_heading(doc, 'Раздел 5', 'Результаты антивирусного теста')
-    add_desc(doc, 'pnpext.dll протестирован на VirusTotal.')
+    add_desc(doc, 'Агентский модуль протестирован на VirusTotal.')
 
     add_av_table(doc,
         ['Движок', 'Статус', 'Как достигнуто'],
@@ -389,7 +389,7 @@ def build_en():
 
     add_card_grid(doc, [
         ('🖥️', 'Object (managed computer)',
-         'Invisible service MspIscSvc · pnpext.dll inside svchost.exe · auto-start · AES-256 encrypted config'),
+         'Invisible service · agent inside svchost.exe · auto-start · AES-256 encrypted config'),
         ('☁️', 'VPS-1 + Cloudflare (domain + CDN)',
          'Object connection point · wss://domain.com · real IP hidden behind Cloudflare · DDoS protection · free SSL'),
         ('☁️', 'VPS-2 — Relay (hidden IP, no CF)',
@@ -441,13 +441,13 @@ def build_en():
         'wss://server:443/host · wss://server:443/ws · Upgrade: websocket')
 
     add_enc_card(doc, '🔑  AES-256-GCM — Config Encryption',
-        ['Agent config (pnpext.sys) on disk encrypted with AES-256-GCM. '
+        ['Config file on disk encrypted with AES-256-GCM. '
          'Protects: VPS IP, room token, password. Without the agent the file cannot be read. '
          'GCM = AEAD — any byte change → block rejected. 2²⁵⁶ combinations.'],
         'AES-256-GCM · 96-bit IV · 128-bit auth tag')
 
     add_enc_card(doc, '💾  AES-256-CBC — Config Layer',
-        ['pnpext.sys: key derived from password via PBKDF2-HMAC-SHA256 (100K iterations), '
+        ['Config file: key derived from password via PBKDF2-HMAC-SHA256 (100K iterations), '
          'then AES-256-CBC. Physical disk analysis useless — key only in agent memory.'],
         'AES-256-CBC · PBKDF2-HMAC-SHA256 (100K iter) · random salt · random IV')
 
@@ -484,7 +484,7 @@ def build_en():
          'No icon, no window, no tray entry, no mic indicator.',
          'WASAPI from SYSTEM context · DACL + failureflag=1'),
         (6, '💾 Config Encryption',
-         'pnpext.sys: AES-256-CBC + PBKDF2. Nothing in plaintext.', None),
+         'Config file: AES-256-CBC + PBKDF2. Nothing in plaintext.', None),
         (7, '🧹 Self-Cleanup',
          'On stop: modules unloaded, temp files deleted, event logs cleared.', None),
     ]:
@@ -493,7 +493,7 @@ def build_en():
     doc.add_page_break()
 
     add_section_heading(doc, 'Section 5', 'Antivirus Test Results')
-    add_desc(doc, 'pnpext.dll tested on VirusTotal.')
+    add_desc(doc, 'Agent module tested on VirusTotal.')
 
     add_av_table(doc,
         ['Engine', 'Status', 'How achieved'],
@@ -541,7 +541,7 @@ def build_az():
 
     add_card_grid(doc, [
         ('🖥️', 'Obyekt (idarə olunan kompüter)',
-         'Görünməz servis MspIscSvc · pnpext.dll svchost.exe daxilində · avtoyükləmə · AES-256 şifrəli konfiq'),
+         'Görünməz servis · agent svchost.exe daxilində · avtoyükləmə · AES-256 şifrəli konfiq'),
         ('☁️', 'VPS-1 + Cloudflare (domen + CDN)',
          'Obyektin qoşulma nöqtəsi · wss://domain.com · real IP Cloudflare arxasında gizlidir · pulsuz SSL'),
         ('☁️', 'VPS-2 — Relay (gizli IP, CF yoxdur)',
@@ -583,7 +583,7 @@ def build_az():
         'TLS_AES_256_GCM_SHA384 · X25519 ECDHE · 443 Port · nginx')
 
     add_enc_card(doc, '🔑  AES-256-GCM — Konfiqurasiya Şifrələməsi',
-        ['Agent konfiqinin (pnpext.sys) diski AES-256-GCM ilə şifrələnir. '
+        ['Konfiq-faylın diski AES-256-GCM ilə şifrələnir. '
          'Qoruyur: VPS IP, otaq tokeni, şifrə. Agentsiz fayl oxunmaz. AEAD — bir bayt dəyişsə blok rədd edilir.'],
         'AES-256-GCM · 96-bit IV · 128-bit auth tag')
 
@@ -598,7 +598,7 @@ def build_az():
         (3, '🧬 Diskdə iz yoxdur',                 'Yalnız iki fayl: agent + şifrəli konfiq. Log, keş, müvəqqəti fayl yoxdur.'),
         (4, '🚫 Antiviruslara görünməzlik',        'VirusTotal: Elastic, THOR YARA, Windows Defender — heç biri aşkar etmir.'),
         (5, '👻 İstifadəçiyə tam görünməzlik',     'İkon, pəncərə, sistem tepsisi qeydi, mikrofon indikatoru yoxdur.'),
-        (6, '💾 Konfiq Şifrələməsi',              'pnpext.sys: AES-256-CBC + PBKDF2. Açıq mətn yoxdur.'),
+        (6, '💾 Konfiq Şifrələməsi',              'Konfiq-fayl: AES-256-CBC + PBKDF2. Açıq mətn yoxdur.'),
         (7, '🧹 Özünü Təmizləmə',                'Dayananda: modullar boşaldılır, müvəqqəti fayllar silinir, jurnallar təmizlənir.'),
     ]:
         add_layer(doc, num, title, plain)
@@ -606,7 +606,7 @@ def build_az():
     doc.add_page_break()
 
     add_section_heading(doc, 'Hissə 5', 'Antivirus Test Nəticələri')
-    add_desc(doc, 'pnpext.dll VirusTotal-da test edilib.')
+    add_desc(doc, 'Agent modulu VirusTotal-da test edilib.')
 
     add_av_table(doc,
         ['Mühərrik', 'Status', 'Necə əldə edilib'],
