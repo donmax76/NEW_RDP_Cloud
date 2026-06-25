@@ -274,16 +274,11 @@
       border-radius: 8px !important;
     }
 
-    /* Every direct child of a section must stay on one page — catches inline-styled divs too */
-    .section > * {
-      page-break-inside: avoid !important;
-      break-inside: avoid !important;
-    }
-
-    /* Named content blocks — belt-and-suspenders */
+    /* Individual blocks must not be cut in half — but sections can flow across pages freely */
     .feat-card, .enc-card, .sec-layer, .sniff-card, .infobox,
     .journey, .flow-box, .av-table tr, .no-break,
-    .feat-grid, .enc-grid, .sniff-grid, .sec-layers {
+    .feat-grid, .enc-grid, .sniff-grid, .sec-layers,
+    .jn, .jn-arr, .enc-card {
       page-break-inside: avoid !important;
       break-inside: avoid !important;
     }
