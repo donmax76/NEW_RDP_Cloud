@@ -242,21 +242,30 @@
 
   /* ── Print overrides ── */
   @media print {
-    html, body { background: #fff !important; }
-    body { padding: 0 12mm !important; }
+    @page { size: A4 portrait; margin: 10mm 14mm; }
+    html, body { background: #fff !important; padding: 0 !important; margin: 0 !important; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
     * { animation: none !important; transition: none !important; }
     img { max-width: 100% !important; height: auto !important; }
 
-    .cover { height: 297mm !important; padding: 60px 50px !important; }
+    /* Cover = exactly one A4 page (297mm − 10mm top − 10mm bottom = 277mm usable) */
+    .cover {
+      height: 277mm !important;
+      padding: 50px 40px !important;
+      box-sizing: border-box !important;
+      overflow: hidden !important;
+      page-break-after: always !important;
+      break-after: page !important;
+    }
 
     hr.divider { display: none !important; }
 
+    /* Each section starts on a fresh page */
     .section {
       page-break-before: always !important;
       break-before: page !important;
-      padding-top: 22mm !important;
-      padding-bottom: 12mm !important;
+      padding-top: 10mm !important;
+      padding-bottom: 8mm !important;
     }
 
     /* sec-layers: remove overflow:hidden so break-inside:avoid works */
@@ -265,8 +274,16 @@
       border-radius: 8px !important;
     }
 
+    /* Every direct child of a section must stay on one page — catches inline-styled divs too */
+    .section > * {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+    }
+
+    /* Named content blocks — belt-and-suspenders */
     .feat-card, .enc-card, .sec-layer, .sniff-card, .infobox,
-    .journey, .flow-box, .av-table tr {
+    .journey, .flow-box, .av-table tr, .no-break,
+    .feat-grid, .enc-grid, .sniff-grid, .sec-layers {
       page-break-inside: avoid !important;
       break-inside: avoid !important;
     }
@@ -276,15 +293,15 @@
       break-after: avoid !important;
     }
 
-    /* Keep grids/layers attached to section header — don't allow break before them */
-    .feat-grid, .enc-grid, .sniff-grid, .sec-layers {
+    /* Keep grids/layers attached to section header */
+    .feat-grid, .enc-grid, .sniff-grid, .sec-layers, .journey {
       page-break-before: avoid !important;
       break-before: avoid !important;
     }
 
     .av-table thead { page-break-after: avoid !important; break-after: avoid !important; }
 
-    p { orphans: 4; widows: 4; }
+    p { orphans: 3; widows: 3; }
 
     /* Fix DATA gradient title — background-clip:text renders as solid bar in print */
     .cover-title {
