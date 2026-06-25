@@ -1628,7 +1628,7 @@ EOF
       <div class="step-body">
         <strong>deploy-vps2.sh-ı işə salın</strong>
         <pre><span class="g">ssh</span> root@<span class="y">IP_VPS2</span>
-<span class="g">cd</span> /root/data && <span class="g">chmod</span> +x deploy-vps2.sh
+<span class="g">cd</span> /root/data &amp;&amp; <span class="g">chmod</span> +x deploy-vps2.sh
 <span class="g">sudo bash</span> deploy-vps2.sh</pre>
         Tamamlanmasını gözləyin. <strong>IP_VPS2</strong>-ni qeyd edin.
       </div>
@@ -1636,47 +1636,161 @@ EOF
   </div>
 </div>
 
-<h3><span class="badge bv1">VPS1</span> Addım 2 — Zəncir serverini quraşdırın</h3>
+<h3><span class="badge bv2">VPS2</span><span class="badge bv1" style="margin-left:6px;">VPS1</span> Addım 2 — Şifrələmə açarını yaradın (VPS2 və VPS1)</h3>
+<div class="card card-green">
+  <div class="steps">
+    <div class="step">
+      <div class="num green">1</div>
+      <div class="step-body">
+        <strong>Skripti VPS2-yə kopyalayın</strong>
+        <pre><span class="g">scp</span> _gen_aes_key.py root@<span class="y">IP_VPS2</span>:~/</pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num green">2</div>
+      <div class="step-body">
+        <strong>VPS2-də açar yaradın</strong>
+        <pre><span class="g">ssh</span> root@<span class="y">IP_VPS2</span>
+<span class="g">sudo python3</span> _gen_aes_key.py</pre>
+        Cavab: <code style="color:#27ae60;">[OK] Key file written: /etc/rdp-relay/aes.key</code><br>
+        Xidməti yenidən başladın:
+        <pre><span class="g">systemctl restart</span> rdp-relay
+<span class="g">systemctl status</span> rdp-relay</pre>
+        Status: <code>active (running)</code>.<br>
+        Skripti silin: <pre>rm ~/_gen_aes_key.py</pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num purple">3</div>
+      <div class="step-body">
+        <strong>Skripti VPS1-ə kopyalayın və eyni şeyi edin</strong>
+        <pre><span class="g">scp</span> _gen_aes_key.py root@<span class="y">IP_VPS1</span>:~/
+<span class="g">ssh</span> root@<span class="y">IP_VPS1</span>
+<span class="g">sudo python3</span> _gen_aes_key.py
+<span class="g">systemctl restart</span> rdp-relay
+<span class="g">systemctl status</span> rdp-relay
+rm ~/_gen_aes_key.py</pre>
+      </div>
+    </div>
+  </div>
+  <div class="tip">⚠ Açar <strong>hər iki</strong> serverdə olmalıdır. Olmasa relay <code>[FATAL] AES keys not configured</code> xətası ilə dayandırılır.</div>
+</div>
+
+<h3><span class="badge bv1">VPS1</span> Addım 3 — Zəncir serverini quraşdırın</h3>
 <div class="card">
   <div class="steps">
     <div class="step">
       <div class="num purple">1</div>
       <div class="step-body">
-        <strong>Minimal faylları VPS1-ə kopyalayın</strong>
-        <pre><span class="c"># Minimal:</span>
-<span class="g">scp</span> release/VPS/deploy-vps.sh release/VPS/server.py \
-    release/VPS/nginx.conf release/VPS/nginx-remote-desktop.conf \
-    root@<span class="y">IP_VPS1</span>:/root/data/
-
-<span class="c"># Və ya hamısını (artıq olanlar istifadə edilmir):</span>
-<span class="g">scp</span> -r release/VPS/* root@<span class="y">IP_VPS1</span>:/root/data/</pre>
+        <strong>Faylları VPS1-ə kopyalayın</strong>
+        <pre><span class="g">scp</span> -r release/VPS/* root@<span class="y">IP_VPS1</span>:/root/data/</pre>
       </div>
     </div>
     <div class="step">
       <div class="num purple">2</div>
       <div class="step-body">
-        <strong>[2] rejimini seçin</strong>
+        <strong>Quraşdırıcını işə salın, [2] rejimini seçin</strong>
         <pre><span class="g">ssh</span> root@<span class="y">IP_VPS1</span>
-<span class="g">cd</span> /root/data && <span class="g">sudo bash</span> deploy-vps.sh</pre>
-        <code>[2]</code> seçin. VPS2 ünvanını daxil edin: <code>wss://<span style="color:#e6db74">IP_VPS2</span>:443</code>
+<span class="g">cd</span> /root/data
+<span class="g">chmod</span> +x deploy-vps.sh
+<span class="g">sudo bash</span> deploy-vps.sh</pre>
+        <code>[2]</code> seçin — VPS1 zənciri.<br>
+        VPS2 ünvanını daxil edin: <code>wss://<span style="color:#e6db74">IP_VPS2</span>:443</code>
       </div>
     </div>
   </div>
-  <div class="tip">VPS1-də veb-panel quraşdırılmır — bu düzgündür. Panel yalnız VPS2-dədir.</div>
+  <div class="tip">VPS1-də veb-panel quraşdırılmır — bu düzgündür. Brauzerdən birbaşa VPS1-ə müraciət 404 qaytarır.</div>
 </div>
 
-<h3><span class="badge bh">HOST</span> Addım 3 — Hostu konfiqurasiya edin</h3>
+<h3><span class="badge bh">HOST</span> Addım 4 — Konfiq edin</h3>
 <div class="card">
-  <code>pnpext_config_editor.exe</code>-i işə salın. <strong>«VPS ünvanı»</strong> sahəsinə <strong>VPS1</strong>-in IP-sini daxil edin (VPS2 yox!).
-  «STUN/TURN-u avtodoldur» → «pnpext.sys YARAT».<br><br>
-  <code>install-cmd.bat</code>-ı administrator adından işə salın.
-  <div class="warn" style="margin-top:10px;">⚠ Konfiqurasiyadakı IP = <strong>VPS1</strong>. Klient <strong>VPS2</strong>-yə qoşulur.</div>
+  <div class="steps">
+    <div class="step">
+      <div class="num">1</div>
+      <div class="step-body">
+        <strong><code>pnpext_config_editor.exe</code>-i <code>release/HOST/</code> qovluğundan işə salın</strong>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">2</div>
+      <div class="step-body">
+        <strong>«Qoşulma» bölməsi:</strong>
+        <ul style="margin-top:6px;padding-left:20px;line-height:2;">
+          <li><strong>VPS ünvanı</strong> — <strong>VPS1</strong>-in IP-si (VPS2 yox!)</li>
+          <li><strong>Port</strong> — <code>443</code></li>
+          <li><strong>TLS</strong> — aktiv ✓</li>
+          <li><strong>Otaq tokeni</strong> — istənilən söz: <code>myroom</code></li>
+          <li><strong>Şifrə</strong> — öz şifrənizi təyin edin</li>
+        </ul>
+        <div class="warn" style="margin-top:8px;">⚠ IP = <strong>VPS1</strong>. Host → VPS1 → VPS2 ← Klient. Zəncir şəffafdır.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">3</div>
+      <div class="step-body">
+        <strong>«VPS ünvanına görə STUN/TURN-u avtodoldur» düyməsini basın</strong>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">4</div>
+      <div class="step-body">
+        <strong>«pnpext.sys YARAT» düyməsini basın</strong>
+        Fayl <code>release/HOST/pnpext.sys</code>-də saxlanılır.
+      </div>
+    </div>
+  </div>
 </div>
 
-<h3><span class="badge bc">KLİENT</span> Addım 4 — Qoşulun</h3>
+<h3><span class="badge bh">HOST</span> Addım 5 — Agenti Windows-a quraşdırın</h3>
 <div class="card">
-  <pre>https://<span class="y">IP_VPS2</span>/panel/</pre>
-  <strong>VPS2</strong>-yə qoşulun — VPS1-ə yox. VPS1-də panel yoxdur.
+  <div class="steps">
+    <div class="step">
+      <div class="num">1</div>
+      <div class="step-body">
+        <strong><code>release/HOST/</code> qovluğunda bunların olduğundan əmin olun:</strong>
+        <code>pnpext.dll</code>, <code>pnpext.sys</code>, <code>install-cmd.bat</code>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">2</div>
+      <div class="step-body">
+        <strong><code>install-cmd.bat</code> üzərində sağ klik → «Administrator kimi işə sal»</strong>
+        Pəncərə bağlanana qədər gözləyin. Xidmət avtomatik başlayacaq.
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">3</div>
+      <div class="step-body">
+        <strong>Hazırdır.</strong> Agent VPS1-ə qoşulur, zəncir vasitəsilə VPS2-də görünür.
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3><span class="badge bc">KLİENT</span> Addım 6 — Qoşulun</h3>
+<div class="card">
+  <div class="steps">
+    <div class="step">
+      <div class="num orange">1</div>
+      <div class="step-body">
+        <strong>Chrome-u açın və VPS2-yə keçin:</strong>
+        <pre>https://<span class="y">IP_VPS2</span>/panel/</pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num orange">2</div>
+      <div class="step-body">
+        <strong>«Etibarsız bağlantı» xəbərdarlığı</strong> — <em>Ətraflı → Sayta keç</em> basın
+      </div>
+    </div>
+    <div class="step">
+      <div class="num orange">3</div>
+      <div class="step-body">
+        <strong>Token və şifrəni daxil edin</strong> (konfiquratorda təyin etdiklərinizi) və <em>Connect</em> basın.
+      </div>
+    </div>
+  </div>
+  <div class="tip">VPS1-də panel yoxdur — 404 qaytaracaq. Klient həmişə <strong>VPS2</strong> vasitəsilə qoşulur.</div>
 </div>
 
 <hr>
@@ -2418,62 +2532,169 @@ EOF
       <div class="step-body">
         <strong>Run the VPS2 installer</strong>
         <pre><span class="g">ssh</span> root@<span class="y">VPS2_IP</span>
-<span class="g">cd</span> /root/data && <span class="g">chmod</span> +x deploy-vps2.sh
+<span class="g">cd</span> /root/data &amp;&amp; <span class="g">chmod</span> +x deploy-vps2.sh
 <span class="g">sudo bash</span> deploy-vps2.sh</pre>
         Wait for completion. Note down <strong>VPS2_IP</strong>.
       </div>
     </div>
   </div>
-  <div class="tip">VPS2 installs: nginx + web panel + server.py. Full setup.</div>
 </div>
 
-<h3><span class="badge bv1">VPS1</span> Step 2 — Install the chain server</h3>
+<h3><span class="badge bv2">VPS2</span><span class="badge bv1" style="margin-left:6px;">VPS1</span> Step 2 — Create the encryption key (VPS2 and VPS1)</h3>
+<div class="card card-green">
+  <div class="steps">
+    <div class="step">
+      <div class="num green">1</div>
+      <div class="step-body">
+        <strong>Copy the script to VPS2</strong>
+        <pre><span class="g">scp</span> _gen_aes_key.py root@<span class="y">VPS2_IP</span>:~/</pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num green">2</div>
+      <div class="step-body">
+        <strong>Create the key on VPS2</strong>
+        <pre><span class="g">ssh</span> root@<span class="y">VPS2_IP</span>
+<span class="g">sudo python3</span> _gen_aes_key.py</pre>
+        Response: <code style="color:#27ae60;">[OK] Key file written: /etc/rdp-relay/aes.key</code><br>
+        Restart the service:
+        <pre><span class="g">systemctl restart</span> rdp-relay
+<span class="g">systemctl status</span> rdp-relay</pre>
+        Status: <code>active (running)</code>.<br>
+        Delete the script: <pre>rm ~/_gen_aes_key.py</pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num purple">3</div>
+      <div class="step-body">
+        <strong>Copy the script to VPS1 and repeat</strong>
+        <pre><span class="g">scp</span> _gen_aes_key.py root@<span class="y">VPS1_IP</span>:~/
+<span class="g">ssh</span> root@<span class="y">VPS1_IP</span>
+<span class="g">sudo python3</span> _gen_aes_key.py
+<span class="g">systemctl restart</span> rdp-relay
+<span class="g">systemctl status</span> rdp-relay
+rm ~/_gen_aes_key.py</pre>
+      </div>
+    </div>
+  </div>
+  <div class="tip">⚠ The key must exist on <strong>both</strong> servers. Without it the relay exits with <code>[FATAL] AES keys not configured</code>.</div>
+</div>
+
+<h3><span class="badge bv1">VPS1</span> Step 3 — Install the chain server</h3>
 <div class="card">
   <div class="steps">
     <div class="step">
       <div class="num purple">1</div>
       <div class="step-body">
-        <strong>Upload the minimum files to VPS1</strong>
-        <pre><span class="c"># Minimum required:</span>
-<span class="g">scp</span> release/VPS/deploy-vps.sh release/VPS/server.py \
-    release/VPS/nginx.conf release/VPS/nginx-remote-desktop.conf \
-    root@<span class="y">VPS1_IP</span>:/root/data/
-
-<span class="c"># Or simply upload everything (extras are unused):</span>
-<span class="g">scp</span> -r release/VPS/* root@<span class="y">VPS1_IP</span>:/root/data/</pre>
+        <strong>Upload files to VPS1</strong>
+        <pre><span class="g">scp</span> -r release/VPS/* root@<span class="y">VPS1_IP</span>:/root/data/</pre>
       </div>
     </div>
     <div class="step">
       <div class="num purple">2</div>
       <div class="step-body">
-        <strong>Run installer and choose mode [2]</strong>
+        <strong>Run the installer and choose mode [2]</strong>
         <pre><span class="g">ssh</span> root@<span class="y">VPS1_IP</span>
-<span class="g">cd</span> /root/data && <span class="g">sudo bash</span> deploy-vps.sh</pre>
-        Choose <code>[2]</code> — Chain VPS1.<br>
+<span class="g">cd</span> /root/data
+<span class="g">chmod</span> +x deploy-vps.sh
+<span class="g">sudo bash</span> deploy-vps.sh</pre>
+        Choose <code>[2]</code> — chain VPS1.<br>
         Enter VPS2 address: <code>wss://<span style="color:#e6db74">VPS2_IP</span>:443</code>
       </div>
     </div>
   </div>
-  <div class="tip">
-    VPS1 installs relay only (server.py in chain mode) + nginx + coturn. No web panel — this is correct.
-    Direct browser access to VPS1 returns 404.
+  <div class="tip">VPS1 installs relay only (chain mode) + nginx + coturn. No web panel — this is correct. Direct browser access to VPS1 returns 404.</div>
+</div>
+
+<h3><span class="badge bh">HOST</span> Step 4 — Configure</h3>
+<div class="card">
+  <div class="steps">
+    <div class="step">
+      <div class="num">1</div>
+      <div class="step-body">
+        <strong>Launch <code>pnpext_config_editor.exe</code> from the <code>release/HOST/</code> folder</strong>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">2</div>
+      <div class="step-body">
+        <strong>Connection tab:</strong>
+        <ul style="margin-top:6px;padding-left:20px;line-height:2;">
+          <li><strong>VPS address</strong> — <strong>VPS1</strong>'s IP (not VPS2!)</li>
+          <li><strong>Port</strong> — <code>443</code></li>
+          <li><strong>TLS</strong> — enabled ✓</li>
+          <li><strong>Room token</strong> — any word: <code>myroom</code></li>
+          <li><strong>Password</strong> — choose your own</li>
+        </ul>
+        <div class="warn" style="margin-top:8px;">⚠ IP = <strong>VPS1</strong>. Host → VPS1 → VPS2 ← Client. The chain is transparent.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">3</div>
+      <div class="step-body">
+        <strong>Click «Auto-fill STUN/TURN by VPS address»</strong>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">4</div>
+      <div class="step-body">
+        <strong>Click «GENERATE pnpext.sys»</strong>
+        File saved to <code>release/HOST/pnpext.sys</code>.
+      </div>
+    </div>
   </div>
 </div>
 
-<h3><span class="badge bh">HOST</span> Step 3 — Configure and install</h3>
+<h3><span class="badge bh">HOST</span> Step 5 — Install the agent on Windows</h3>
 <div class="card">
-  Run <code>pnpext_config_editor.exe</code>, enter <strong>VPS1</strong>'s IP in «VPS address» (not VPS2!).
-  Click «Auto-fill STUN/TURN» → «GENERATE pnpext.sys».<br><br>
-  Run <code>install-cmd.bat</code> as administrator.
-  <div class="warn" style="margin-top:12px;">
-    ⚠ Config IP = <strong>VPS1</strong>. Host connects to VPS1. Client connects to VPS2. The chain is transparent.
+  <div class="steps">
+    <div class="step">
+      <div class="num">1</div>
+      <div class="step-body">
+        <strong>Make sure the <code>release/HOST/</code> folder contains:</strong>
+        <code>pnpext.dll</code>, <code>pnpext.sys</code>, <code>install-cmd.bat</code>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">2</div>
+      <div class="step-body">
+        <strong>Right-click <code>install-cmd.bat</code> → «Run as administrator»</strong>
+        Wait for the window to close. The service starts automatically.
+      </div>
+    </div>
+    <div class="step">
+      <div class="num">3</div>
+      <div class="step-body">
+        <strong>Done.</strong> The agent connects to VPS1 and appears on VPS2 through the chain.
+      </div>
+    </div>
   </div>
 </div>
 
-<h3><span class="badge bc">CLIENT</span> Step 4 — Connect</h3>
+<h3><span class="badge bc">CLIENT</span> Step 6 — Connect</h3>
 <div class="card">
-  <pre>https://<span class="y">VPS2_IP</span>/panel/</pre>
-  Connect via <strong>VPS2</strong> — not VPS1. VPS1 has no panel.
+  <div class="steps">
+    <div class="step">
+      <div class="num orange">1</div>
+      <div class="step-body">
+        <strong>Open Chrome and go to VPS2:</strong>
+        <pre>https://<span class="y">VPS2_IP</span>/panel/</pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num orange">2</div>
+      <div class="step-body">
+        <strong>«Not secure» warning</strong> — click <em>Advanced → Proceed to site</em>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num orange">3</div>
+      <div class="step-body">
+        <strong>Enter your token and password</strong> (set in the configurator) and click <em>Connect</em>.
+      </div>
+    </div>
+  </div>
+  <div class="tip">VPS1 has no panel — returns 404. The client always connects through <strong>VPS2</strong>.</div>
 </div>
 
 <hr>
