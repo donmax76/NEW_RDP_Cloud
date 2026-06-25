@@ -320,7 +320,7 @@
     </p>
     <div class="chips">
       <span class="chip chip-b">&#128274; Full traffic encryption</span>
-      <span class="chip chip-g">&#129513; Modules load into memory</span>
+      <span class="chip chip-g">&#128272; Config encrypted at rest</span>
       <span class="chip chip-p">&#128273; Strong authentication</span>
       <span class="chip chip-o">&#128737;&#65039; Invisible to antiviruses</span>
       <span class="chip chip-r">&#128123; Invisible to user</span>
@@ -571,13 +571,13 @@
       <div class="enc-desc">
         The agent configuration file (pnpext.sys) is stored on disk in AES-256-GCM encrypted form.
         <br><br>
-        <b>Key mechanism:</b> A unique <b>per-room key</b> is generated for each object (host). This key exists only in the target object's memory. Even with full access to VPS, modules cannot be decrypted — the key is not stored on VPS.
+        <b>What it protects:</b> VPS address, room token and password are stored only in the encrypted pnpext.sys file. Without the agent (pnpext.dll) the file cannot be read — brute-force is impossible.
         <br><br>
         <b>How GCM mode protects:</b> AES-GCM offers not just encryption but also <b>authenticated encryption</b> (AEAD). If even one byte of a message is altered, the entire block is rejected — manipulation is impossible.
         <br><br>
         <b>256-bit key strength:</b> 2<sup>256</sup> possible combinations — more than all atoms in the universe. Even the most powerful supercomputer would spend more than billions of years finding this key.
       </div>
-      <div class="enc-tech">AES-256-GCM &middot; 96-bit IV &middot; 128-bit auth tag &middot; per-room key derivation</div>
+      <div class="enc-tech">AES-256-GCM &middot; 96-bit IV &middot; 128-bit auth tag</div>
     </div>
 
     <div class="enc-card no-break">

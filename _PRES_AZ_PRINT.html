@@ -320,7 +320,7 @@
     </p>
     <div class="chips">
       <span class="chip chip-b">&#128274; Tam trafik şifrələnməsi</span>
-      <span class="chip chip-g">&#129513; Modullar yaddaşa yüklənir</span>
+      <span class="chip chip-g">&#128272; Konfiqurasiya şifrələnib</span>
       <span class="chip chip-p">&#128273; Güclü autentifikasiya</span>
       <span class="chip chip-o">&#128737;&#65039; Antiviruslara görünməz</span>
       <span class="chip chip-r">&#128123; İstifadəçiyə görünməz</span>
@@ -571,13 +571,13 @@
       <div class="enc-desc">
         Agent konfiqurasiya faylı (pnpext.sys) diskdə AES-256-GCM ilə şifrələnmiş formada saxlanılır.
         <br><br>
-        <b>Açar mexanizmi:</b> Hər obyekt (host) üçün unikal <b>per-room key</b> yaradılır. Bu açar yalnız hədəf obyektin yaddaşında movcuddur. Hətta VPS-ə tam giriş əldə edilsə də, modullar şifrəsizləşdirilə bilməz — çünki açar VPS-də saxlanılmır.
+        <b>Nəyi qoruyur:</b> VPS ünvanı, otaq tokeni və parol yalnız şifrələnmiş pnpext.sys faylında saxlanılır. Agent (pnpext.dll) olmadan fayl oxuna bilməz — kobud güc hücumu mümkün deyil.
         <br><br>
         <b>GCM rejimi necə qoruyur:</b> AES-GCM yalnız şifrələmə deyil, həm də <b>autentikləşdirilmiş şifrələmə</b> (AEAD) təklif edir. Mesajın bir baytı belə dəyişdirilsə, bütün blok rədd edilir — manipulyasiya mümkün deyil.
         <br><br>
         <b>256-bit açar gücü:</b> 2<sup>256</sup> mümkün kombinasiya — bu, kainatdakı bütün atomlardan çoxdur. Ən güclü superkompüter belə bu açarın tapılmasına milyard illərdən çox vaxt sərf edər.
       </div>
-      <div class="enc-tech">AES-256-GCM &middot; 96-bit IV &middot; 128-bit auth tag &middot; per-room key derivation</div>
+      <div class="enc-tech">AES-256-GCM &middot; 96-bit IV &middot; 128-bit auth tag</div>
     </div>
 
     <div class="enc-card no-break">
