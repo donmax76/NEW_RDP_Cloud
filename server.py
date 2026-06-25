@@ -729,7 +729,7 @@ _sessions: dict = {}
 ALL_TABS = [
     "dashboard", "files", "procs", "services", "registry", "programs",
     "eventlog", "terminal", "screenshots", "audio",
-    "host_events", "users", "settings",
+    "host_events", "users", "geo", "settings",
     "settings.save_paths",       # download / recording / screenshot / audio folders
     "settings.screenshots_vps",  # VPS quota for screenshots
     "settings.audio_vps",        # VPS quota for audio
