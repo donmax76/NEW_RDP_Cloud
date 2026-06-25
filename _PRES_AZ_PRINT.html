@@ -566,10 +566,10 @@
     <div class="enc-card no-break">
       <div class="enc-card-head">
         <div class="enc-dot" style="background:var(--accent4);"></div>
-        <div class="enc-title">&#128272; AES-256-GCM — Modul Şifrələnməsi</div>
+        <div class="enc-title">&#128272; AES-256-GCM — Konfiqurasiyanın Şifrələnməsi</div>
       </div>
       <div class="enc-desc">
-        Stage-2 modulları (fayl meneceri, proses idarəetməsi, mühafizə) VPS-də AES-256-GCM ilə şifrələnmiş formada saxlanılır.
+        Agent konfiqurasiya faylı (pnpext.sys) diskdə AES-256-GCM ilə şifrələnmiş formada saxlanılır.
         <br><br>
         <b>Açar mexanizmi:</b> Hər obyekt (host) üçün unikal <b>per-room key</b> yaradılır. Bu açar yalnız hədəf obyektin yaddaşında movcuddur. Hətta VPS-ə tam giriş əldə edilsə də, modullar şifrəsizləşdirilə bilməz — çünki açar VPS-də saxlanılmır.
         <br><br>
@@ -710,7 +710,7 @@
           Yaddaşda anonim icra olunan bölgələr yoxdur — yaddaş skaneri yalnız normal svchost.exe görür.
         </div>
         <div class="sec-layer-tech">
-          <b style="color:var(--accent4)">Reflective Load</b> — stage-2 modulları VPS-dən şifrəli yüklənir, RAM-da şifrəsizləşdirilir, PE başlıqları silinir. Forensics skaneri iz tapmaz.
+          <b style="color:var(--accent4)">TLS + AES-256-GCM</b> — bütün trafik ötürülmə zamanı şifrələnir; konfiqurasiya faylı diskdə şifrəli saxlanılır. Heç bir açıq mətn etimadnaməsi diskdə yoxdur.
         </div>
       </div>
     </div>

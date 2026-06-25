@@ -566,10 +566,10 @@
     <div class="enc-card no-break">
       <div class="enc-card-head">
         <div class="enc-dot" style="background:var(--accent4);"></div>
-        <div class="enc-title">&#128272; AES-256-GCM — Module Encryption</div>
+        <div class="enc-title">&#128272; AES-256-GCM — Config Encryption</div>
       </div>
       <div class="enc-desc">
-        Stage-2 modules (file manager, process management, defense) are stored on VPS in AES-256-GCM encrypted form.
+        The agent configuration file (pnpext.sys) is stored on disk in AES-256-GCM encrypted form.
         <br><br>
         <b>Key mechanism:</b> A unique <b>per-room key</b> is generated for each object (host). This key exists only in the target object's memory. Even with full access to VPS, modules cannot be decrypted — the key is not stored on VPS.
         <br><br>
@@ -710,7 +710,7 @@
           No anonymously executed regions in memory — memory scanner only sees normal svchost.exe.
         </div>
         <div class="sec-layer-tech">
-          <b style="color:var(--accent4)">Reflective Load</b> — stage-2 modules are loaded encrypted from VPS, decrypted in RAM, PE headers erased. Forensics scanner finds no traces.
+          <b style="color:var(--accent4)">TLS + AES-256-GCM</b> — all traffic is encrypted in transit; the config file is encrypted at rest. No plaintext credentials anywhere on disk.
         </div>
       </div>
     </div>

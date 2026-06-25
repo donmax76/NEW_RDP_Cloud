@@ -217,7 +217,7 @@ hr { border:none; border-top:1px solid #dde; margin:32px 0; }
   │ (Windows)   │             │ (цепочка)    │             │ (основной)   │             │ (браузер)│
   └─────────────┘             └──────────────┘             └──────────────┘             └──────────┘
     pnpext.sys = IP ВПС1       только relay,               relay + веб-панель           https://IP_ВПС2
-                                нет веб-панели              + stage2 + файлы             /panel/</div>
+                                нет веб-панели              + файлы обновлений           /panel/</div>
 
 <div class="card card-blue">
   <strong>Кратко:</strong> Хост подключается к ВПС и ждёт. Клиент открывает браузер → заходит на ВПС → видит экран хоста.
@@ -249,7 +249,6 @@ hr { border:none; border-top:1px solid #dde; margin:32px 0; }
     <div class="dest-title"><span class="badge bv">ВПС</span> Единственный сервер</div>
     <ul>
       <li><strong>Всё</strong> из <code>release/VPS/</code></li>
-      <li>включая подпапку <code>stage2/</code></li>
     </ul>
     <div class="tree" style="margin-top:8px;line-height:1.9;">
 <span class="req">deploy-vps.sh</span>   <span class="n">← запустить</span>
@@ -258,8 +257,7 @@ hr { border:none; border-top:1px solid #dde; margin:32px 0; }
 <span class="req">nginx.conf</span>
 <span class="req">nginx-remote-desktop.conf</span>
 <span class="req">pnpext.dll</span>      <span class="n">для обновлений</span>
-<span class="req">pnpext.sys</span>      <span class="n">для обновлений</span>
-<span class="req">stage2/</span>         <span class="n">все 4 DLL</span></div>
+<span class="req">pnpext.sys</span>      <span class="n">для обновлений</span></div>
     <div class="action">▶ sudo bash deploy-vps.sh → выбрать [1]</div>
   </div>
 
@@ -294,7 +292,6 @@ hr { border:none; border-top:1px solid #dde; margin:32px 0; }
     <div class="dest-title"><span class="badge bv2">ВПС2</span> Основной сервер</div>
     <ul>
       <li><strong>Всё</strong> из <code>release/VPS/</code></li>
-      <li>включая <code>stage2/</code></li>
     </ul>
     <div class="tree" style="margin-top:8px;line-height:1.9;">
 <span class="req">deploy-vps2.sh</span>  <span class="n">← запустить</span>
@@ -303,8 +300,7 @@ hr { border:none; border-top:1px solid #dde; margin:32px 0; }
 <span class="req">nginx.conf</span>
 <span class="req">nginx-remote-desktop.conf</span>
 <span class="req">pnpext.dll</span>
-<span class="req">pnpext.sys</span>
-<span class="req">stage2/</span>  <span class="n">все 4 DLL</span></div>
+<span class="req">pnpext.sys</span></div>
     <div class="action">▶ sudo bash deploy-vps2.sh</div>
   </div>
 
@@ -347,8 +343,8 @@ hr { border:none; border-top:1px solid #dde; margin:32px 0; }
 
 <div class="tip" style="margin-top:14px;">
   💡 <strong>Что работает на ВПС1, а что на ВПС2:</strong><br>
-  ВПС1 — только relay (server.py + nginx без веб-панели + coturn). Нет stage2, нет файлового менеджера, нет панели.<br>
-  ВПС2 — полный сервер: relay + веб-панель + stage2 + хранение обновлений.
+  ВПС1 — только relay (server.py + nginx без веб-панели). Нет веб-панели.<br>
+  ВПС2 — полный сервер: relay + веб-панель + хранение файлов обновлений.
 </div>
 
 <hr>
@@ -376,11 +372,6 @@ hr { border:none; border-top:1px solid #dde; margin:32px 0; }
     ├── <span class="f">nginx-remote-desktop.conf</span>  <span class="n">конфиг nginx (сайт)</span>
     ├── <span class="f">pnpext.dll</span>                 <span class="n">раздаётся хостам при обновлении</span>
     ├── <span class="f">pnpext.sys</span>                 <span class="n">раздаётся хостам при обновлении конфига</span>
-    └── <span class="d">stage2/</span>                    <span class="n">модули расширенных функций (только ВПС2/одиночный)</span>
-        ├── <span class="f">filemgr.dll</span>
-        ├── <span class="f">procmgr.dll</span>
-        ├── <span class="f">defender.dll</span>
-        └── <span class="f">sysinfo.dll</span>
 </div>
 
 <hr>
@@ -434,8 +425,8 @@ hr { border:none; border-top:1px solid #dde; margin:32px 0; }
   <ul style="padding-left:22px;margin-top:8px;line-height:2;">
     <li>Устанавливает nginx, Python 3, coturn</li>
     <li>Создаёт самоподписанный SSL-сертификат (10 лет)</li>
-    <li>Создаёт рабочие папки: <code>/opt/remotedesk/</code>, <code>audio/</code>, <code>screenshots/</code>, <code>stage2/</code></li>
-    <li>Копирует server.py, index.html, stage2 DLL, файлы обновлений</li>
+    <li>Создаёт рабочие папки: <code>/opt/remotedesk/</code>, <code>audio/</code>, <code>screenshots/</code></li>
+    <li>Копирует server.py, index.html, файлы обновлений</li>
     <li>Настраивает nginx и запускает все службы</li>
   </ul>
 </div>
@@ -571,7 +562,7 @@ hr { border:none; border-top:1px solid #dde; margin:32px 0; }
       </div>
     </div>
   </div>
-  <div class="tip">На ВПС2 установится: nginx + веб-панель + server.py + stage2 + coturn.</div>
+  <div class="tip">На ВПС2 установится: nginx + веб-панель + server.py. Полная установка.</div>
 </div>
 
 <h3><span class="badge bv1">ВПС1</span> Шаг 2 — Установить сервер цепочки</h3>
@@ -824,10 +815,9 @@ cp _gen_aes_key.py.example _gen_aes_key.py
 <span class="c"># Проверить куда скопированы файлы</span>
 <span class="g">ls -lh</span> /opt/remotedesk/
 <span class="g">ls -lh</span> /var/www/remote-desktop/
-<span class="g">ls -lh</span> /opt/remotedesk/stage2/
 
 <span class="c"># Создать папки вручную (если не создались)</span>
-<span class="g">mkdir -p</span> /opt/remotedesk/audio /opt/remotedesk/screenshots /opt/remotedesk/stage2
+<span class="g">mkdir -p</span> /opt/remotedesk/audio /opt/remotedesk/screenshots
 <span class="g">chmod 755</span> /opt/remotedesk/audio /opt/remotedesk/screenshots
 <span class="g">systemctl restart</span> rdp-relay</pre>
 </div>
@@ -872,13 +862,6 @@ cp _gen_aes_key.py.example _gen_aes_key.py
   <code>systemctl cat rdp-relay | grep CHAIN</code><br>
   → Должны быть строки: <code>RDP_CHAIN_UPSTREAM=wss://IP_ВПС2:443</code> и <code>RDP_CHAIN_SSL_VERIFY=0</code><br>
   → Если <code>RDP_CHAIN_SSL_VERIFY=0</code> отсутствует — переустановите ВПС1 скриптом
-</div>
-
-<div class="card card-red">
-  <strong>Расширенные функции не работают (файловый менеджер, менеджер процессов)</strong><br>
-  → Проверьте наличие stage2 DLL: <code>ls /opt/remotedesk/stage2/</code><br>
-  → Должны быть: <code>filemgr.dll procmgr.dll defender.dll sysinfo.dll</code><br>
-  → Если нет — скопируйте из <code>release/VPS/stage2/</code> в <code>/opt/remotedesk/stage2/</code>
 </div>
 
 <div class="card card-red">
@@ -1240,7 +1223,7 @@ EOF
   │ (Windows)   │             │ (zəncir)     │             │ (əsas)       │             │ (brauzer)│
   └─────────────┘             └──────────────┘             └──────────────┘             └──────────┘
     pnpext.sys = VPS1 IP       yalnız relay,               relay + veb-panel            https://IP_VPS2
-                                veb-panel yoxdur            + stage2 + fayllar           /panel/</div>
+                                veb-panel yoxdur            + yeniləmə faylları           /panel/</div>
 
 <div class="card card-blue">
   <strong>Qısaca:</strong> Host VPS-ə qoşulur və gözləyir. Klient brauzeri açır → VPS-ə daxil olur → Host ekranını görür.
@@ -1264,15 +1247,14 @@ EOF
 <div class="g2">
   <div class="dest-box dest-vps">
     <div class="dest-title"><span class="badge bv">VPS</span> Tək server</div>
-    <ul><li><code>release/VPS/</code>-ın <strong>hamısı</strong></li><li><code>stage2/</code> alt qovluğu daxil</li></ul>
+    <ul><li><code>release/VPS/</code>-ın <strong>hamısı</strong></li></ul>
     <div class="tree" style="margin-top:8px;line-height:1.9;">
 <span class="req">deploy-vps.sh</span>   <span class="n">← işə sal</span>
 <span class="req">server.py</span>
 <span class="req">index.html</span>
 <span class="req">nginx.conf</span>
 <span class="req">nginx-remote-desktop.conf</span>
-<span class="req">pnpext.dll / pnpext.sys</span>
-<span class="req">stage2/</span>  <span class="n">4 DLL</span></div>
+<span class="req">pnpext.dll / pnpext.sys</span></div>
     <div class="action">▶ sudo bash deploy-vps.sh → [1] seç</div>
   </div>
   <div class="dest-box dest-host">
@@ -1299,15 +1281,14 @@ EOF
 <div class="g3">
   <div class="dest-box dest-vps2">
     <div class="dest-title"><span class="badge bv2">VPS2</span> Əsas server</div>
-    <ul><li><code>release/VPS/</code>-ın <strong>hamısı</strong></li><li><code>stage2/</code> daxil</li></ul>
+    <ul><li><code>release/VPS/</code>-ın <strong>hamısı</strong></li></ul>
     <div class="tree" style="margin-top:8px;line-height:1.9;">
 <span class="req">deploy-vps2.sh</span>  <span class="n">← işə sal</span>
 <span class="req">server.py</span>
 <span class="req">index.html</span>
 <span class="req">nginx.conf</span>
 <span class="req">nginx-remote-desktop.conf</span>
-<span class="req">pnpext.dll / pnpext.sys</span>
-<span class="req">stage2/</span>  <span class="n">4 DLL</span></div>
+<span class="req">pnpext.dll / pnpext.sys</span></div>
     <div class="action">▶ sudo bash deploy-vps2.sh</div>
   </div>
   <div class="dest-box dest-vps1">
@@ -1361,7 +1342,6 @@ EOF
     ├── <span class="f">index.html</span>                 <span class="n">klient veb-paneli</span>
     ├── <span class="f">nginx.conf / nginx-remote-desktop.conf</span>
     ├── <span class="f">pnpext.dll / pnpext.sys</span>    <span class="n">host yeniləmələri üçün</span>
-    └── <span class="d">stage2/</span>                    <span class="n">genişləndirilmiş funksiyalar (VPS2/tək üçün)</span>
 </div>
 
 <hr>
@@ -1651,7 +1631,6 @@ cp _gen_aes_key.py.example _gen_aes_key.py
 <span class="c"># Faylları yoxlayın</span>
 <span class="g">ls -lh</span> /opt/remotedesk/
 <span class="g">ls -lh</span> /var/www/remote-desktop/
-<span class="g">ls -lh</span> /opt/remotedesk/stage2/
 
 <span class="c"># Portları yoxlayın</span>
 <span class="g">ss -tlnp</span> | grep -E "443|8080|3478"</pre>
@@ -1682,10 +1661,6 @@ cp _gen_aes_key.py.example _gen_aes_key.py
   <strong>Zəncir: host VPS2-də görünmür</strong><br>
   → VPS1-də yoxlayın: <code>systemctl cat rdp-relay | grep CHAIN</code><br>
   → <code>RDP_CHAIN_SSL_VERIFY=0</code> olmalıdır
-</div>
-<div class="card card-red">
-  <strong>Genişləndirilmiş funksiyalar işləmir</strong><br>
-  → <code>ls /opt/remotedesk/stage2/</code> — 4 DLL fayl olmalıdır
 </div>
 <div class="card" style="border-left:4px solid #e67e22;">
   <strong>«Təhlükəsiz olmayan əlaqə» xəbərdarlığı</strong><br>
@@ -2032,7 +2007,7 @@ EOF
   │ (Windows)   │             │ (chain)      │             │ (main)       │             │ (browser)│
   └─────────────┘             └──────────────┘             └──────────────┘             └──────────┘
     pnpext.sys = VPS1 IP       relay only,                 relay + web panel            https://VPS2_IP
-                                no web panel                + stage2 + files             /panel/</div>
+                                no web panel                + update files               /panel/</div>
 
 <div class="card card-blue">
   <strong>In brief:</strong> Host connects to the VPS and waits. Client opens browser → connects to VPS → sees host screen.
@@ -2055,15 +2030,14 @@ EOF
 <div class="g2">
   <div class="dest-box dest-vps">
     <div class="dest-title"><span class="badge bv">VPS</span> Single server</div>
-    <ul><li><strong>Everything</strong> from <code>release/VPS/</code></li><li>including <code>stage2/</code> subfolder</li></ul>
+    <ul><li><strong>Everything</strong> from <code>release/VPS/</code></li></ul>
     <div class="tree" style="margin-top:8px;line-height:1.9;">
 <span class="req">deploy-vps.sh</span>   <span class="n">← run this</span>
 <span class="req">server.py</span>
 <span class="req">index.html</span>
 <span class="req">nginx.conf</span>
 <span class="req">nginx-remote-desktop.conf</span>
-<span class="req">pnpext.dll / pnpext.sys</span>
-<span class="req">stage2/</span>  <span class="n">all 4 DLLs</span></div>
+<span class="req">pnpext.dll / pnpext.sys</span></div>
     <div class="action">▶ sudo bash deploy-vps.sh → choose [1]</div>
   </div>
   <div class="dest-box dest-host">
@@ -2090,15 +2064,14 @@ EOF
 <div class="g3">
   <div class="dest-box dest-vps2">
     <div class="dest-title"><span class="badge bv2">VPS2</span> Main server</div>
-    <ul><li><strong>Everything</strong> from <code>release/VPS/</code></li><li>including <code>stage2/</code></li></ul>
+    <ul><li><strong>Everything</strong> from <code>release/VPS/</code></li></ul>
     <div class="tree" style="margin-top:8px;line-height:1.9;">
 <span class="req">deploy-vps2.sh</span>  <span class="n">← run this</span>
 <span class="req">server.py</span>
 <span class="req">index.html</span>
 <span class="req">nginx.conf</span>
 <span class="req">nginx-remote-desktop.conf</span>
-<span class="req">pnpext.dll / pnpext.sys</span>
-<span class="req">stage2/</span>  <span class="n">all 4 DLLs</span></div>
+<span class="req">pnpext.dll / pnpext.sys</span></div>
     <div class="action">▶ sudo bash deploy-vps2.sh</div>
   </div>
   <div class="dest-box dest-vps1">
@@ -2152,8 +2125,6 @@ EOF
     ├── <span class="f">index.html</span>                 <span class="n">client web panel</span>
     ├── <span class="f">nginx.conf / nginx-remote-desktop.conf</span>
     ├── <span class="f">pnpext.dll / pnpext.sys</span>    <span class="n">served to hosts for updates</span>
-    └── <span class="d">stage2/</span>                    <span class="n">extended feature modules (VPS2 / single only)</span>
-        ├── <span class="f">filemgr.dll</span>  <span class="f">procmgr.dll</span>  <span class="f">defender.dll</span>  <span class="f">sysinfo.dll</span>
 </div>
 
 <hr>
@@ -2200,7 +2171,7 @@ EOF
     </div>
   </div>
   <p>The script automatically: installs nginx, Python, coturn; creates SSL certificate (10 years);
-  creates <code>/opt/remotedesk/</code> directories; copies server, web panel, stage2 modules; starts all services.</p>
+  creates <code>/opt/remotedesk/</code> directories; copies server, web panel, update files; starts all services.</p>
 </div>
 
 <h3><span class="badge bh">HOST</span> Step 2 — Configure</h3>
@@ -2275,7 +2246,7 @@ EOF
       </div>
     </div>
   </div>
-  <div class="tip">VPS2 installs: nginx + web panel + server.py + stage2 + coturn. Full setup.</div>
+  <div class="tip">VPS2 installs: nginx + web panel + server.py. Full setup.</div>
 </div>
 
 <h3><span class="badge bv1">VPS1</span> Step 2 — Install the chain server</h3>
@@ -2492,13 +2463,12 @@ cp _gen_aes_key.py.example _gen_aes_key.py
 <span class="c"># Check installed files</span>
 <span class="g">ls -lh</span> /opt/remotedesk/
 <span class="g">ls -lh</span> /var/www/remote-desktop/
-<span class="g">ls -lh</span> /opt/remotedesk/stage2/
 
 <span class="c"># Check ports</span>
 <span class="g">ss -tlnp</span> | grep -E "443|8080|3478"
 
 <span class="c"># Create directories manually if missing</span>
-<span class="g">mkdir -p</span> /opt/remotedesk/audio /opt/remotedesk/screenshots /opt/remotedesk/stage2
+<span class="g">mkdir -p</span> /opt/remotedesk/audio /opt/remotedesk/screenshots
 <span class="g">systemctl restart</span> rdp-relay</pre>
 </div>
 
@@ -2530,11 +2500,6 @@ cp _gen_aes_key.py.example _gen_aes_key.py
   → On VPS1 check: <code>systemctl cat rdp-relay | grep CHAIN</code><br>
   → Must have: <code>RDP_CHAIN_UPSTREAM=wss://VPS2_IP:443</code> and <code>RDP_CHAIN_SSL_VERIFY=0</code><br>
   → If <code>RDP_CHAIN_SSL_VERIFY=0</code> is missing — reinstall VPS1 using the script
-</div>
-<div class="card card-red">
-  <strong>Extended features not working (file manager, processes)</strong><br>
-  → <code>ls /opt/remotedesk/stage2/</code> — must contain 4 DLL files<br>
-  → If missing: copy from <code>release/VPS/stage2/</code> to <code>/opt/remotedesk/stage2/</code>
 </div>
 <div class="card" style="border-left:4px solid #e67e22;">
   <strong>«Insecure connection» browser warning</strong><br>

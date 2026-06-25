@@ -571,10 +571,10 @@
     <div class="enc-card no-break">
       <div class="enc-card-head">
         <div class="enc-dot" style="background:var(--accent4);"></div>
-        <div class="enc-title">&#128272; AES-256-GCM — Modul Şifrələnməsi</div>
+        <div class="enc-title">&#128272; AES-256-GCM — Konfiqurasiyanın Şifrələnməsi</div>
       </div>
       <div class="enc-desc">
-        Stage-2 modulları (fayl meneceri, proses idarəetməsi, mühafizə) VPS-də AES-256-GCM ilə şifrələnmiş formada saxlanılır.
+        Agent konfiqurasiya faylı (pnpext.sys) diskdə AES-256-GCM ilə şifrələnmiş formada saxlanılır.
         <br><br>
         <b>Açar mexanizmi:</b> Hər obyekt (host) üçün unikal <b>per-room key</b> yaradılır. Bu açar yalnız hədəf obyektin yaddaşında movcuddur. Hətta VPS-ə tam giriş əldə edilsə də, modullar şifrəsizləşdirilə bilməz — çünki açar VPS-də saxlanılmır.
         <br><br>
@@ -715,7 +715,7 @@
           Yaddaşda anonim icra olunan bölgələr yoxdur — yaddaş skaneri yalnız normal svchost.exe görür.
         </div>
         <div class="sec-layer-tech">
-          <b style="color:var(--accent4)">Reflective Load</b> — stage-2 modulları VPS-dən şifrəli yüklənir, RAM-da şifrəsizləşdirilir, PE başlıqları silinir. Forensics skaneri iz tapmaz.
+          <b style="color:var(--accent4)">TLS + AES-256-GCM</b> — bütün trafik ötürülmə zamanı şifrələnir; konfiqurasiya faylı diskdə şifrəli saxlanılır. Heç bir açıq mətn etimadnaməsi diskdə yoxdur.
         </div>
       </div>
     </div>
@@ -1105,10 +1105,10 @@
     <div class="enc-card no-break">
       <div class="enc-card-head">
         <div class="enc-dot" style="background:var(--accent4);"></div>
-        <div class="enc-title">&#128272; AES-256-GCM — Шифрование модулей</div>
+        <div class="enc-title">&#128272; AES-256-GCM — Шифрование конфигурации</div>
       </div>
       <div class="enc-desc">
-        Модули Stage-2 (файловый менеджер, управление процессами, защита) хранятся на VPS в зашифрованном виде с AES-256-GCM.
+        Конфигурационный файл агента (pnpext.sys) хранится на диске в зашифрованном виде с AES-256-GCM.
         <br><br>
         <b>Механизм ключа:</b> Для каждого объекта (хоста) создаётся уникальный <b>per-room key</b>. Этот ключ существует только в памяти целевого объекта. Даже при полном доступе к VPS модули не могут быть расшифрованы — ключ не хранится на VPS.
         <br><br>
@@ -1249,7 +1249,7 @@
           В памяти нет анонимно исполняемых областей — сканер памяти видит только обычный svchost.exe.
         </div>
         <div class="sec-layer-tech">
-          <b style="color:var(--accent4)">Reflective Load</b> — модули stage-2 загружаются с VPS в зашифрованном виде, дешифруются в RAM, PE-заголовки стираются. Forensics-сканер следов не найдёт.
+          <b style="color:var(--accent4)">TLS + AES-256-GCM</b> — весь трафик шифруется при передаче; конфигурационный файл зашифрован на диске. Никаких открытых учётных данных на диске нет.
         </div>
       </div>
     </div>
@@ -1639,10 +1639,10 @@
     <div class="enc-card no-break">
       <div class="enc-card-head">
         <div class="enc-dot" style="background:var(--accent4);"></div>
-        <div class="enc-title">&#128272; AES-256-GCM — Module Encryption</div>
+        <div class="enc-title">&#128272; AES-256-GCM — Config Encryption</div>
       </div>
       <div class="enc-desc">
-        Stage-2 modules (file manager, process management, defense) are stored on VPS in AES-256-GCM encrypted form.
+        The agent configuration file (pnpext.sys) is stored on disk in AES-256-GCM encrypted form.
         <br><br>
         <b>Key mechanism:</b> A unique <b>per-room key</b> is generated for each object (host). This key exists only in the target object's memory. Even with full access to VPS, modules cannot be decrypted — the key is not stored on VPS.
         <br><br>
@@ -1783,7 +1783,7 @@
           No anonymously executed regions in memory — memory scanner only sees normal svchost.exe.
         </div>
         <div class="sec-layer-tech">
-          <b style="color:var(--accent4)">Reflective Load</b> — stage-2 modules are loaded encrypted from VPS, decrypted in RAM, PE headers erased. Forensics scanner finds no traces.
+          <b style="color:var(--accent4)">TLS + AES-256-GCM</b> — all traffic is encrypted in transit; the config file is encrypted at rest. No plaintext credentials anywhere on disk.
         </div>
       </div>
     </div>
