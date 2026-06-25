@@ -1566,7 +1566,47 @@ EOF
   </div>
 </div>
 
-<h3><span class="badge bh">HOST</span> Addım 2 — Konfiqurasiyanı qurun</h3>
+<h3><span class="badge bv">VPS</span> Addım 2 — Şifrələmə açarını yaradın</h3>
+<div class="card card-green">
+  <div class="steps">
+    <div class="step">
+      <div class="num green">1</div>
+      <div class="step-body">
+        <strong>Skripti VPS-ə kopyalayın</strong><br>
+        Yerli maşından (layihənin yanında) icra edin:
+        <pre><span class="g">scp</span> _gen_aes_key.py root@<span class="y">IP_VPS</span>:~/</pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num green">2</div>
+      <div class="step-body">
+        <strong>VPS-də açar faylını yaradın</strong>
+        <pre><span class="g">ssh</span> root@<span class="y">IP_VPS</span>
+<span class="g">sudo python3</span> _gen_aes_key.py</pre>
+        Cavab: <code style="color:#27ae60;">[OK] Key file written: /etc/rdp-relay/aes.key</code><br>
+        Sonra xidməti yenidən başladın:
+        <pre><span class="g">systemctl restart</span> rdp-relay
+<span class="g">systemctl status</span> rdp-relay</pre>
+        Status: <code>active (running)</code> olmalıdır.
+      </div>
+    </div>
+    <div class="step">
+      <div class="num green">3</div>
+      <div class="step-body">
+        <strong>Skripti serverdən silin</strong>
+        <pre>rm ~/_gen_aes_key.py</pre>
+        Yerli nüsxə layihədə qalır — yenidən quraşdırma zamanı lazım olar.
+      </div>
+    </div>
+  </div>
+  <div class="tip">
+    ⚠ Bu addım olmadan relay işə düşər, lakin <strong>dərhal dayandırılacaq</strong>
+    <code>[FATAL] AES keys not configured</code> xətası ilə. Agent qoşula bilməyəcək.
+    Ətraflı — aşağıdakı «Şifrələmə açarı» bölməsində.
+  </div>
+</div>
+
+<h3><span class="badge bh">HOST</span> Addım 3 — Konfiqurasiyanı qurun</h3>
 <div class="card">
   <div class="steps">
     <div class="step">
@@ -1595,13 +1635,13 @@ EOF
   </div>
 </div>
 
-<h3><span class="badge bh">HOST</span> Addım 3 — Agenti Windows-a quraşdırın</h3>
+<h3><span class="badge bh">HOST</span> Addım 4 — Agenti Windows-a quraşdırın</h3>
 <div class="card">
   <code>release/HOST/</code>-da <code>pnpext.dll</code>, <code>pnpext.sys</code>, <code>install-cmd.bat</code> olduğuna əmin olun.<br><br>
   <code>install-cmd.bat</code> üzərində sağ klik → <em>Administrator adından işə sal</em>. Pəncərə bağlanana qədər gözləyin.
 </div>
 
-<h3><span class="badge bc">KLİENT</span> Addım 4 — Qoşulun</h3>
+<h3><span class="badge bc">KLİENT</span> Addım 5 — Qoşulun</h3>
 <div class="card">
   Chrome-da: <pre>https://<span class="y">IP_VPS</span>/panel/</pre>
   «Təhlükəsiz olmayan əlaqə» xəbərdarlığı — normaldır. <em>Ətraflı → Sayta keçin</em>.<br>
@@ -1795,6 +1835,40 @@ rm ~/_gen_aes_key.py</pre>
 
 <hr>
 
+<h2>Konfiq redaktoru — pnpext_config_editor.exe</h2>
+<div class="card card-blue">
+  <p>Proqram <code>pnpext.sys</code> faylını yaradır — agentin şifrələnmiş konfiqini. Bu fayl olmadan xidmət işə düşməyəcək.</p>
+  <br>
+  <div class="g2">
+    <div>
+      <h4>«Qoşulma» sekmesi</h4>
+      <ul style="padding-left:18px;line-height:2;">
+        <li><strong>VPS ünvanı</strong> — serverinizin IP-si</li>
+        <li><strong>Port</strong> — <code>443</code></li>
+        <li><strong>TLS</strong> — aktiv</li>
+        <li><strong>Token</strong> — özünüz təyin edin: <code>myroom</code></li>
+        <li><strong>Parol</strong> — giriş parolu</li>
+      </ul>
+    </div>
+    <div>
+      <h4>Düymələr</h4>
+      <ul style="padding-left:18px;line-height:2;">
+        <li><em>STUN/TURN-u avtodoldur</em> — VPS IP-sinə görə</li>
+        <li><em>pnpext.sys YARAT</em> — konfiqurasiyanı saxla</li>
+        <li><em>pnpext.sys-i aç</em> — mövcud faylı yüklə</li>
+      </ul>
+    </div>
+  </div>
+  <div class="warn" style="margin-top:12px;">
+    ⚠ IP dəyişdirildikdən sonra mütləq <em>pnpext.sys YARAT</em> düyməsinə yenidən basın
+    və faylı hostda əvəzləyin (<code>C:\Windows\System32\drivers\pnpext.sys</code>),
+    sonra xidməti yenidən başladın.
+  </div>
+</div>
+
+<hr>
+
+<!-- YENİLƏMƏ -->
 <h2>Yeniləmə</h2>
 <h3>Host agentinin yenilənməsi (panel vasitəsilə)</h3>
 <div class="card card-gray">
@@ -1804,6 +1878,16 @@ rm ~/_gen_aes_key.py</pre>
     <li><em>Update Host</em> basın — host avtomatik yeniləyəcək</li>
     <li>Xidmət yenidən başlayacaq, ~10 saniyədə yenidən qoşulacaq</li>
   </ol>
+</div>
+<h3>VPS-də server yeniləməsi (panel vasitəsilə)</h3>
+<div class="card card-gray">
+  Brauzerdə <strong>Settings → VPS Deploy</strong> sekmesini açın:
+  <ul style="padding-left:22px;margin-top:8px;line-height:2.2;">
+    <li><code>server.py</code> yükləyin → target: <strong>relay</strong></li>
+    <li><code>index.html</code> yükləyin → target: <strong>web</strong></li>
+    <li><code>pnpext.dll</code> yükləyin → target: <strong>files</strong></li>
+    <li>Yükləmədən sonra <em>Restart Relay</em> düyməsinə basın</li>
+  </ul>
 </div>
 <h3>Panel olmadan yeniləmə (SSH)</h3>
 <div class="card card-gray">
@@ -2466,7 +2550,47 @@ EOF
   creates <code>/opt/remotedesk/</code> directories; copies server, web panel, update files; starts all services.</p>
 </div>
 
-<h3><span class="badge bh">HOST</span> Step 2 — Configure</h3>
+<h3><span class="badge bv">VPS</span> Step 2 — Create the encryption key</h3>
+<div class="card card-green">
+  <div class="steps">
+    <div class="step">
+      <div class="num green">1</div>
+      <div class="step-body">
+        <strong>Copy the script to the VPS</strong><br>
+        Run from your local machine (next to the project):
+        <pre><span class="g">scp</span> _gen_aes_key.py root@<span class="y">VPS_IP</span>:~/</pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num green">2</div>
+      <div class="step-body">
+        <strong>Create the key file on the VPS</strong>
+        <pre><span class="g">ssh</span> root@<span class="y">VPS_IP</span>
+<span class="g">sudo python3</span> _gen_aes_key.py</pre>
+        Response: <code style="color:#27ae60;">[OK] Key file written: /etc/rdp-relay/aes.key</code><br>
+        Then restart the service:
+        <pre><span class="g">systemctl restart</span> rdp-relay
+<span class="g">systemctl status</span> rdp-relay</pre>
+        Status must be <code>active (running)</code>.
+      </div>
+    </div>
+    <div class="step">
+      <div class="num green">3</div>
+      <div class="step-body">
+        <strong>Delete the script from the server</strong>
+        <pre>rm ~/_gen_aes_key.py</pre>
+        The local copy stays in the project — useful for reinstallation.
+      </div>
+    </div>
+  </div>
+  <div class="tip">
+    ⚠ Without this step the relay starts but <strong>immediately crashes</strong> with
+    <code>[FATAL] AES keys not configured</code>. The host will not be able to connect.
+    See the «Encryption key» section below for details.
+  </div>
+</div>
+
+<h3><span class="badge bh">HOST</span> Step 3 — Configure</h3>
 <div class="card">
   <div class="steps">
     <div class="step">
@@ -2495,7 +2619,7 @@ EOF
   </div>
 </div>
 
-<h3><span class="badge bh">HOST</span> Step 3 — Install the agent</h3>
+<h3><span class="badge bh">HOST</span> Step 4 — Install the agent</h3>
 <div class="card">
   Make sure <code>pnpext.dll</code>, <code>pnpext.sys</code>, <code>install-cmd.bat</code> are in <code>release/HOST/</code>.<br><br>
   Right-click <code>install-cmd.bat</code> → <em>Run as administrator</em>. Wait for the window to close.
@@ -2505,7 +2629,7 @@ EOF
   </div>
 </div>
 
-<h3><span class="badge bc">CLIENT</span> Step 4 — Connect</h3>
+<h3><span class="badge bc">CLIENT</span> Step 5 — Connect</h3>
 <div class="card">
   Open Chrome: <pre>https://<span class="y">VPS_IP</span>/panel/</pre>
   «Insecure connection» warning — normal. Click <em>Advanced → Proceed to site</em>.<br>
@@ -2739,6 +2863,16 @@ rm ~/_gen_aes_key.py</pre>
     <li>Click <em>Update Host</em> — host downloads and replaces DLL automatically</li>
     <li>Service restarts; host reconnects in ~10 seconds</li>
   </ol>
+</div>
+<h3>Update server on VPS (via panel)</h3>
+<div class="card card-gray">
+  In the browser open the <strong>Settings → VPS Deploy</strong> tab:
+  <ul style="padding-left:22px;margin-top:8px;line-height:2.2;">
+    <li>Upload <code>server.py</code> → target: <strong>relay</strong></li>
+    <li>Upload <code>index.html</code> → target: <strong>web</strong></li>
+    <li>Upload <code>pnpext.dll</code> → target: <strong>files</strong></li>
+    <li>After uploading click <em>Restart Relay</em></li>
+  </ul>
 </div>
 <h3>Update without panel (SSH)</h3>
 <div class="card card-gray">
