@@ -1676,7 +1676,7 @@ EOF
   </div>
 </div>
 
-<h3><span class="badge bv2">VPS2</span><span class="badge bv1" style="margin-left:6px;">VPS1</span> Addım 2 — Şifrələmə açarını yaradın (VPS2 və VPS1)</h3>
+<h3><span class="badge bv2">VPS2</span> Addım 2 — Şifrələmə açarını yaradın (VPS2)</h3>
 <div class="card card-green">
   <div class="steps">
     <div class="step">
@@ -1696,24 +1696,17 @@ EOF
         Xidməti yenidən başladın:
         <pre><span class="g">systemctl restart</span> rdp-relay
 <span class="g">systemctl status</span> rdp-relay</pre>
-        Status: <code>active (running)</code>.<br>
-        Skripti silin: <pre>rm ~/_gen_aes_key.py</pre>
+        Status: <code>active (running)</code>.
       </div>
     </div>
     <div class="step">
-      <div class="num purple">3</div>
+      <div class="num green">3</div>
       <div class="step-body">
-        <strong>Skripti VPS1-ə kopyalayın və eyni şeyi edin</strong>
-        <pre><span class="g">scp</span> _gen_aes_key.py root@<span class="y">IP_VPS1</span>:~/
-<span class="g">ssh</span> root@<span class="y">IP_VPS1</span>
-<span class="g">sudo python3</span> _gen_aes_key.py
-<span class="g">systemctl restart</span> rdp-relay
-<span class="g">systemctl status</span> rdp-relay
-rm ~/_gen_aes_key.py</pre>
+        <strong>Skripti serverdən silin</strong>
+        <pre>rm ~/_gen_aes_key.py</pre>
       </div>
     </div>
   </div>
-  <div class="tip">⚠ Açar <strong>hər iki</strong> serverdə olmalıdır. Olmasa relay <code>[FATAL] AES keys not configured</code> xətası ilə dayandırılır.</div>
 </div>
 
 <h3><span class="badge bv1">VPS1</span> Addım 3 — Zəncir serverini quraşdırın</h3>
@@ -1742,7 +1735,41 @@ rm ~/_gen_aes_key.py</pre>
   <div class="tip">VPS1-də veb-panel quraşdırılmır — bu düzgündür. Brauzerdən birbaşa VPS1-ə müraciət 404 qaytarır.</div>
 </div>
 
-<h3><span class="badge bh">HOST</span> Addım 4 — Konfiq edin</h3>
+<h3><span class="badge bv1">VPS1</span> Addım 4 — Şifrələmə açarını yaradın (VPS1)</h3>
+<div class="card card-green">
+  <div class="steps">
+    <div class="step">
+      <div class="num purple">1</div>
+      <div class="step-body">
+        <strong>Skripti VPS1-ə kopyalayın</strong>
+        <pre><span class="g">scp</span> _gen_aes_key.py root@<span class="y">IP_VPS1</span>:~/</pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num purple">2</div>
+      <div class="step-body">
+        <strong>VPS1-də açar yaradın</strong>
+        <pre><span class="g">ssh</span> root@<span class="y">IP_VPS1</span>
+<span class="g">sudo python3</span> _gen_aes_key.py</pre>
+        Cavab: <code style="color:#27ae60;">[OK] Key file written: /etc/rdp-relay/aes.key</code><br>
+        Xidməti yenidən başladın:
+        <pre><span class="g">systemctl restart</span> rdp-relay
+<span class="g">systemctl status</span> rdp-relay</pre>
+        Status: <code>active (running)</code>.
+      </div>
+    </div>
+    <div class="step">
+      <div class="num purple">3</div>
+      <div class="step-body">
+        <strong>Skripti serverdən silin</strong>
+        <pre>rm ~/_gen_aes_key.py</pre>
+      </div>
+    </div>
+  </div>
+  <div class="tip">⚠ Açar <strong>hər iki</strong> serverdə olmalıdır. Olmasa relay <code>[FATAL] AES keys not configured</code> xətası ilə dayandırılır.</div>
+</div>
+
+<h3><span class="badge bh">HOST</span> Addım 5 — Konfiq edin</h3>
 <div class="card">
   <div class="steps">
     <div class="step">
@@ -1781,7 +1808,7 @@ rm ~/_gen_aes_key.py</pre>
   </div>
 </div>
 
-<h3><span class="badge bh">HOST</span> Addım 5 — Agenti Windows-a quraşdırın</h3>
+<h3><span class="badge bh">HOST</span> Addım 6 — Agenti Windows-a quraşdırın</h3>
 <div class="card">
   <div class="steps">
     <div class="step">
@@ -1807,7 +1834,7 @@ rm ~/_gen_aes_key.py</pre>
   </div>
 </div>
 
-<h3><span class="badge bc">KLİENT</span> Addım 6 — Qoşulun</h3>
+<h3><span class="badge bc">KLİENT</span> Addım 7 — Qoşulun</h3>
 <div class="card">
   <div class="steps">
     <div class="step">
@@ -2664,7 +2691,7 @@ EOF
   </div>
 </div>
 
-<h3><span class="badge bv2">VPS2</span><span class="badge bv1" style="margin-left:6px;">VPS1</span> Step 2 — Create the encryption key (VPS2 and VPS1)</h3>
+<h3><span class="badge bv2">VPS2</span> Step 2 — Create the encryption key (VPS2)</h3>
 <div class="card card-green">
   <div class="steps">
     <div class="step">
@@ -2684,24 +2711,17 @@ EOF
         Restart the service:
         <pre><span class="g">systemctl restart</span> rdp-relay
 <span class="g">systemctl status</span> rdp-relay</pre>
-        Status: <code>active (running)</code>.<br>
-        Delete the script: <pre>rm ~/_gen_aes_key.py</pre>
+        Status: <code>active (running)</code>.
       </div>
     </div>
     <div class="step">
-      <div class="num purple">3</div>
+      <div class="num green">3</div>
       <div class="step-body">
-        <strong>Copy the script to VPS1 and repeat</strong>
-        <pre><span class="g">scp</span> _gen_aes_key.py root@<span class="y">VPS1_IP</span>:~/
-<span class="g">ssh</span> root@<span class="y">VPS1_IP</span>
-<span class="g">sudo python3</span> _gen_aes_key.py
-<span class="g">systemctl restart</span> rdp-relay
-<span class="g">systemctl status</span> rdp-relay
-rm ~/_gen_aes_key.py</pre>
+        <strong>Delete the script from the server</strong>
+        <pre>rm ~/_gen_aes_key.py</pre>
       </div>
     </div>
   </div>
-  <div class="tip">⚠ The key must exist on <strong>both</strong> servers. Without it the relay exits with <code>[FATAL] AES keys not configured</code>.</div>
 </div>
 
 <h3><span class="badge bv1">VPS1</span> Step 3 — Install the chain server</h3>
@@ -2730,7 +2750,41 @@ rm ~/_gen_aes_key.py</pre>
   <div class="tip">VPS1 installs relay only (chain mode) + nginx + coturn. No web panel — this is correct. Direct browser access to VPS1 returns 404.</div>
 </div>
 
-<h3><span class="badge bh">HOST</span> Step 4 — Configure</h3>
+<h3><span class="badge bv1">VPS1</span> Step 4 — Create the encryption key (VPS1)</h3>
+<div class="card card-green">
+  <div class="steps">
+    <div class="step">
+      <div class="num purple">1</div>
+      <div class="step-body">
+        <strong>Copy the script to VPS1</strong>
+        <pre><span class="g">scp</span> _gen_aes_key.py root@<span class="y">VPS1_IP</span>:~/</pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num purple">2</div>
+      <div class="step-body">
+        <strong>Create the key on VPS1</strong>
+        <pre><span class="g">ssh</span> root@<span class="y">VPS1_IP</span>
+<span class="g">sudo python3</span> _gen_aes_key.py</pre>
+        Response: <code style="color:#27ae60;">[OK] Key file written: /etc/rdp-relay/aes.key</code><br>
+        Restart the service:
+        <pre><span class="g">systemctl restart</span> rdp-relay
+<span class="g">systemctl status</span> rdp-relay</pre>
+        Status: <code>active (running)</code>.
+      </div>
+    </div>
+    <div class="step">
+      <div class="num purple">3</div>
+      <div class="step-body">
+        <strong>Delete the script from the server</strong>
+        <pre>rm ~/_gen_aes_key.py</pre>
+      </div>
+    </div>
+  </div>
+  <div class="tip">⚠ The key must exist on <strong>both</strong> servers. Without it the relay exits with <code>[FATAL] AES keys not configured</code>.</div>
+</div>
+
+<h3><span class="badge bh">HOST</span> Step 5 — Configure</h3>
 <div class="card">
   <div class="steps">
     <div class="step">
@@ -2769,7 +2823,7 @@ rm ~/_gen_aes_key.py</pre>
   </div>
 </div>
 
-<h3><span class="badge bh">HOST</span> Step 5 — Install the agent on Windows</h3>
+<h3><span class="badge bh">HOST</span> Step 6 — Install the agent on Windows</h3>
 <div class="card">
   <div class="steps">
     <div class="step">
@@ -2795,7 +2849,7 @@ rm ~/_gen_aes_key.py</pre>
   </div>
 </div>
 
-<h3><span class="badge bc">CLIENT</span> Step 6 — Connect</h3>
+<h3><span class="badge bc">CLIENT</span> Step 7 — Connect</h3>
 <div class="card">
   <div class="steps">
     <div class="step">
