@@ -431,7 +431,47 @@ hr { border:none; border-top:1px solid #dde; margin:32px 0; }
   </ul>
 </div>
 
-<h3><span class="badge bh">ХОСТ</span> Шаг 2 — Настроить конфиг</h3>
+<h3><span class="badge bv">ВПС</span> Шаг 2 — Создать ключ шифрования</h3>
+<div class="card card-green">
+  <div class="steps">
+    <div class="step">
+      <div class="num green">1</div>
+      <div class="step-body">
+        <strong>Скопировать скрипт на ВПС</strong><br>
+        Выполнить с локальной машины (рядом с проектом):
+        <pre><span class="g">scp</span> _gen_aes_key.py root@<span class="y">IP_ВПС</span>:~/</pre>
+      </div>
+    </div>
+    <div class="step">
+      <div class="num green">2</div>
+      <div class="step-body">
+        <strong>Создать файл ключа на ВПС</strong>
+        <pre><span class="g">ssh</span> root@<span class="y">IP_ВПС</span>
+<span class="g">sudo python3</span> _gen_aes_key.py</pre>
+        Ответ: <code style="color:#27ae60;">[OK] Key file written: /etc/rdp-relay/aes.key</code><br>
+        Затем перезапустить службу:
+        <pre><span class="g">systemctl restart</span> rdp-relay
+<span class="g">systemctl status</span> rdp-relay</pre>
+        Статус должен быть <code>active (running)</code>.
+      </div>
+    </div>
+    <div class="step">
+      <div class="num green">3</div>
+      <div class="step-body">
+        <strong>Удалить скрипт с сервера</strong>
+        <pre>rm ~/_gen_aes_key.py</pre>
+        Локальная копия остаётся в проекте — пригодится при переустановке.
+      </div>
+    </div>
+  </div>
+  <div class="tip">
+    ⚠ Без этого шага relay запустится, но <strong>сразу упадёт</strong> с ошибкой
+    <code>[FATAL] AES keys not configured</code>. Хост не сможет подключиться.
+    Подробнее — в разделе «Ключ шифрования» ниже.
+  </div>
+</div>
+
+<h3><span class="badge bh">ХОСТ</span> Шаг 3 — Настроить конфиг</h3>
 <div class="card">
   <div class="steps">
     <div class="step">
@@ -471,7 +511,7 @@ hr { border:none; border-top:1px solid #dde; margin:32px 0; }
   </div>
 </div>
 
-<h3><span class="badge bh">ХОСТ</span> Шаг 3 — Установить агент на Windows</h3>
+<h3><span class="badge bh">ХОСТ</span> Шаг 4 — Установить агент на Windows</h3>
 <div class="card">
   <div class="steps">
     <div class="step">
@@ -501,7 +541,7 @@ hr { border:none; border-top:1px solid #dde; margin:32px 0; }
   </div>
 </div>
 
-<h3><span class="badge bc">КЛИЕНТ</span> Шаг 4 — Подключиться</h3>
+<h3><span class="badge bc">КЛИЕНТ</span> Шаг 5 — Подключиться</h3>
 <div class="card">
   <div class="steps">
     <div class="step">
@@ -704,6 +744,10 @@ hr { border:none; border-top:1px solid #dde; margin:32px 0; }
 </div>
 
 <h3><span class="badge bv">ВПС</span> Первый деплой — создать файл ключа</h3>
+<div class="danger">
+  ⚠ <strong>Если используешь два ВПС (ВПС1 + ВПС2) — шаги 1–4 нужно выполнить на <u>каждом</u> из них отдельно.</strong><br>
+  Хост подключается через ВПС1. Если на ВПС1 нет <code>aes.key</code> — хост не запустится, даже если ВПС2 настроен правильно.
+</div>
 <div class="card card-green">
   <div class="steps">
     <div class="step">
@@ -772,7 +816,8 @@ cp _gen_aes_key.py.example _gen_aes_key.py
 <h3>Частые ошибки</h3>
 <div class="card card-red">
   <strong style="color:#e74c3c;">⛔ [FATAL] AES keys not configured</strong><br>
-  Файл ключа не найден. Выполни шаги 1–3 из «Первый деплой» выше.<br><br>
+  Файл ключа не найден. Выполни шаги 1–3 из «Первый деплой» выше.<br>
+  <em>Помни: если у тебя два ВПС — файл ключа нужен на <strong>обоих</strong>. Хост подключается через ВПС1 и если там нет ключа — он не войдёт, даже если ВПС2 работает.</em><br><br>
   <strong style="color:#e74c3c;">⛔ Cannot read key file</strong><br>
   Неправильные права. Исправь:
   <pre><span class="g">chmod</span> 600 /etc/rdp-relay/aes.key
