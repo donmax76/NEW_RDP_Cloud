@@ -274,11 +274,10 @@
       border-radius: 8px !important;
     }
 
-    /* Individual blocks must not be cut in half — but sections can flow across pages freely */
+    /* Individual blocks must not be cut in half — grids themselves CAN span pages */
     .feat-card, .enc-card, .sec-layer, .sniff-card, .infobox,
     .journey, .flow-box, .av-table tr, .no-break,
-    .feat-grid, .enc-grid, .sniff-grid, .sec-layers,
-    .jn, .jn-arr, .enc-card {
+    .jn, .jn-arr {
       page-break-inside: avoid !important;
       break-inside: avoid !important;
     }
@@ -493,12 +492,6 @@
       <div class="feat-title">Operator Management</div>
       <div class="feat-desc">Several operators with different permissions. Some only see the screen, others have full access. Each logs in with their own credentials.</div>
     </div>
-  </div>
-</div>
-
-<!-- Part 2 davamı — explicit page break so page 4 gets padding-top -->
-<div class="section page-break">
-  <div class="feat-grid">
     <div class="feat-card no-break">
       <div class="feat-icon">&#128260;</div>
       <div class="feat-title">Remote Update</div>
@@ -515,12 +508,11 @@
       <div class="feat-desc">Complete removal with one button: service is stopped, files are deleted, registry is cleaned. Nothing remains.</div>
     </div>
   </div>
-</div>
-
-<div style="margin-top:24px;padding:12px 18px;background:rgba(37,99,235,.06);border:1.5px solid rgba(37,99,235,.18);border-radius:10px;font-size:11.5px;">
-  <span style="font-weight:700;color:var(--accent)">&#9881;&#65039; System Requirements:</span>
-  &nbsp;<b>Object side:</b> Windows 11 (x64) — <span style="color:var(--muted)">Windows 10 not supported</span>&nbsp;&nbsp;
-  <b>Operator side:</b> Any OS — browser only
+  <div class="no-break" style="margin-top:16px;padding:12px 18px;background:rgba(37,99,235,.06);border:1.5px solid rgba(37,99,235,.18);border-radius:10px;font-size:11.5px;">
+    <span style="font-weight:700;color:var(--accent)">&#9881;&#65039; System Requirements:</span>
+    &nbsp;<b>Object side:</b> Windows 11 (x64) — <span style="color:var(--muted)">Windows 10 not supported</span>&nbsp;&nbsp;
+    <b>Operator side:</b> Any OS — browser only
+  </div>
 </div>
 
 <hr class="divider">
