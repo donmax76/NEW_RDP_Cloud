@@ -4,7 +4,7 @@ RemoteDesktop VPS Server - WebSocket Relay
 Bridges C++ host <--> Web client
 Version: 2024-03-12-v3 (stream throttle + diagnostics)
 """
-SERVER_VERSION = "1.0.251"
+SERVER_VERSION = "1.0.253"
 
 import asyncio
 import websockets
