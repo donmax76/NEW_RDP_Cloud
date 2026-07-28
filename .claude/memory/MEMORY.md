@@ -1,0 +1,21 @@
+- [VPS dual deploy paths](feedback_vps_dual_deploy_paths.md) — ALWAYS upload index.html/server.py to BOTH `/var/www/remote-desktop/` (nginx root) AND `/opt/remotedesk/` (rdp-relay service); uploading to only one leaves browser stuck on old Client version
+- [Mirror index.html to release/VPS/](feedback_mirror_index_to_vps.md) — after ANY change to index.html, copy it to release/VPS/index.html before committing; same rule applies to MANUAL.html → release/VPS/MANUAL.html and ИНСТРУКЦИЯ.html → release/VPS/ИНСТРУКЦИЯ.html
+- [GitHub failover REMOVED v1.0.202](feedback_github_failover_removed.md) — deleted entire outbound-HTTP subsystem to kill Elastic ML detection; restore via DNS A-record or server-push WebSocket in the future (do NOT restore WinHTTP to api.github.com or any similar dead-drop pattern)
+- [Keep WebRTC linked into pnpext.dll](feedback_keep_webrtc_linked.md) — leave `DISABLE_WEBRTC_STREAM=OFF` in CMakeLists; stripping libdatachannel made 1.0.241 light up CrowdStrike/DeepInstinct/Jiangmin (was 0/70 with WebRTC in 1.0.237). Smaller binary ≠ lower detection
+- [Reference host_config.json](reference_host_config.md) — canonical defaults for the host config template (server, codec, STUN/TURN, screenshot/audio/threat settings)
+- [Always bump HOST_VERSION](feedback_bump_host_version.md) — increment HOST_VERSION in host.h on every host-code change before rebuilding
+- [Mirror pnpext.dll to dist/usb](feedback_mirror_dll_to_dist.md) — post-build copy build/bin/pnpext.dll → dist/usb/pnpext.dll so installer bundle stays in sync
+- [Mirror pnpext.sys to build/bin and dist/usb](feedback_mirror_pnpext_sys.md) — regenerate encrypted config via _gen_pnpext_sys.py whenever host_config.json.template changes; must land in BOTH dirs
+- [Verify build produced fresh binaries](feedback_verify_fresh_build.md) — after every build, check DLL mtime vs source mtime and strings-verify version; NMake can silently no-op on header-only changes
+- [Test DLL actually starts after update](feedback_test_dll_starts_after_update.md) — clean BUILD_EXIT_CODE=0 + present exports do NOT prove DllMain succeeds; v1.0.161 built fine but failed to start after host_update; always test load + service round-trip after touching startup paths or string literals
+- [Audio DSP: host vs client controls](project_audio_dsp_architecture.md) — two separate DSP chains: host (main.cpp, baked into files) and client (Web Audio API, realtime). Don't confuse them.
+- [No heavy IO in audio loops](feedback_no_heavy_io_in_audio_loop.md) — keep CreateToolhelp32Snapshot / RegDeleteTreeW / privacy-file delete out of per-iteration audio loops; gate ≥10s
+- [No periodic shell kill](feedback_no_periodic_shell_kill.md) — never TerminateProcess on ShellExperienceHost/StartMenuExperienceHost from a timer; only event-driven on Settings open
+- [Project requirements](REQUIREMENTS.md) — full architecture, build rules, audio DSP, evtlog, update, STUN, forbidden patterns
+- [Changelog](CHANGELOG.md) — version history with what changed, why, and how to rollback (start from v1.0.135)
+- [Two-stage architecture decision](decision_two_stage_architecture.md) — original rationale; stage-1 foundation + 3 modules extracted, stage-1 fallback kept in place for safety
+- [Stage-2 rollout status](project_stage2_status.md) — 17 commands extracted to stage-2 across filemgr/procmgr/defender; blobs deployed and confirmed working in production
+- [Stage-2 LIVE in production (2026-04-20)](project_stage2_live.md) — v1.0.170 confirmed end-to-end: VPS serves on-the-fly encrypted blobs, host reflective-loads filemgr/procmgr/defender, commands dispatch through stage-2 in RAM
+- [Stage-2 v1.0.172 fallback-stripped](project_stage2_v172.md) — 17 stage-1 fallback handlers wrapped in `#ifdef STAGE1_KEEP_FALLBACKS`, default build is WITHOUT fallbacks → -40KB pnpext.dll + AV-string call-sites removed
+- [Service entry name renamed to PnpServiceEntry](feedback_service_entry_rename.md) — installer registry `ServiceMain` value MUST be `"PnpServiceEntry"` not `"ServiceMain"` (old v1.0.139 installers had the wrong value and caused silent startup failures)
+- [COM STA Quit deadlock fix](feedback_com_sta_quit_deadlock.md) — when Cancel=true in BeforeClose, call ComAwareEventInfo.RemoveEventHandler BEFORE Quit; the programmaticClose flag approach deadlocks; also use wd.Quit() with no args (not false)
